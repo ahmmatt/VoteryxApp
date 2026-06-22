@@ -8,6 +8,11 @@ import '../../features/election/presentation/screens/candidate_detail_screen.dar
 import '../../features/election/presentation/screens/vote_confirmation_screen.dart';
 import '../../features/election/presentation/screens/vote_processing_screen.dart';
 import '../../features/election/presentation/screens/vote_receipt_screen.dart';
+import '../../features/delegation/presentation/screens/delegation_screen.dart';
+import '../../features/delegation/presentation/screens/delegate_detail_screen.dart';
+import '../../features/profile/presentation/screens/profile_screen.dart';
+import '../../features/election/presentation/screens/election_detail_screen.dart';
+import '../../features/election/presentation/screens/proposal_create_screen.dart';
 
 // ── Route path constants ──────────────────────────────────────────────────────
 // Gunakan konstanta ini saat navigate agar tidak ada magic string.
@@ -97,8 +102,7 @@ final GoRouter appRouter = GoRouter(
       path: '/election/:id',
       name: 'election',
       builder: (ctx, state) {
-        final id = state.pathParameters['id'] ?? '';
-        return _PlaceholderScreen(title: 'Election: $id');
+        return const ElectionDetailScreen();
       },
       routes: [
         GoRoute(
@@ -128,7 +132,7 @@ final GoRouter appRouter = GoRouter(
     GoRoute(
       path: AppRoutes.delegation,
       name: 'delegation',
-      builder: (_, __) => const _PlaceholderScreen(title: 'Delegasi Suara'),
+      builder: (_, __) => const DelegationScreen(),
     ),
     GoRoute(
       path: '/delegation/:delegatorId',
@@ -143,15 +147,14 @@ final GoRouter appRouter = GoRouter(
     GoRoute(
       path: AppRoutes.profile,
       name: 'profile',
-      builder: (_, __) => const _PlaceholderScreen(title: 'Profil'),
+      builder: (_, __) => const ProfileScreen(),
     ),
 
     // ── Election Proposal ─────────────────────────────────────────────
     GoRoute(
       path: AppRoutes.proposalCreate,
       name: 'proposal-create',
-      builder: (_, __) =>
-          const _PlaceholderScreen(title: 'Ajukan Pemilihan Baru'),
+      builder: (_, __) => const ProposalCreateScreen(),
     ),
     GoRoute(
       path: AppRoutes.proposalStatus,

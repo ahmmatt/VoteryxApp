@@ -1,34 +1,13 @@
-// lib/features/election/presentation/widgets/elections_tab.dart
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_spacing.dart';
 import '../../../../core/constants/app_typography.dart';
-import '../../../../core/widgets/app_text_field.dart';
+import '../../../../core/constants/app_radius.dart';
+import '../screens/election_detail_screen.dart';
 
-class ElectionsTab extends StatefulWidget {
+class ElectionsTab extends StatelessWidget {
   const ElectionsTab({super.key});
-
-  @override
-  State<ElectionsTab> createState() => _ElectionsTabState();
-}
-
-class _ElectionsTabState extends State<ElectionsTab>
-    with SingleTickerProviderStateMixin {
-  late final TabController _tabController;
-
-  @override
-  void initState() {
-    super.initState();
-    _tabController = TabController(length: 2, vsync: this);
-  }
-
-  @override
-  void dispose() {
-    _tabController.dispose();
-    super.dispose();
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -36,51 +15,33 @@ class _ElectionsTabState extends State<ElectionsTab>
       children: [
         // Top Section (Navy Background AppBar)
         _buildAppBar(context),
-
-        // Body with Gradient
+        
+        // Body
         Expanded(
           child: Container(
-            decoration: const BoxDecoration(
-              gradient: AppColors.pageGradient,
-            ),
-            child: Column(
+            color: AppColors.background,
+            child: ListView(
+              padding: const EdgeInsets.all(AppSpacing.md),
+              physics: const BouncingScrollPhysics(),
               children: [
+                Text(
+                  'Daftar Pemilihan',
+                  style: AppTypography.displayHeading.copyWith(fontSize: 24),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Tentukan masa depan institusi Anda hari ini.',
+                  style: AppTypography.bodyText.copyWith(color: AppColors.textSecondary),
+                ),
                 const SizedBox(height: AppSpacing.xl),
-                // Progress Card
-                _buildProgressCard(context),
+                
+                // Live Election Card
+                _buildLiveElectionCard(context),
                 const SizedBox(height: AppSpacing.lg),
-
-                // Tab Bar
-                Container(
-                  color: Colors.transparent,
-                  child: TabBar(
-                    controller: _tabController,
-                    indicatorColor: AppColors.goldDark,
-                    indicatorWeight: 3,
-                    labelColor: AppColors.primary800,
-                    labelStyle: AppTypography.itemTitle,
-                    unselectedLabelColor: AppColors.textSecondary,
-                    unselectedLabelStyle: AppTypography.bodyMedium,
-                    tabs: const [
-                      Tab(text: 'Daftar\nKandidat'),
-                      Tab(text: 'Delegasikan\nSuara'),
-                    ],
-                  ),
-                ),
-
-                // Divider
-                const Divider(height: 1, thickness: 1, color: AppColors.outlineVariant),
-
-                // Tab Views
-                Expanded(
-                  child: TabBarView(
-                    controller: _tabController,
-                    children: const [
-                      _CandidateListTab(),
-                      _DelegatorListTab(),
-                    ],
-                  ),
-                ),
+                
+                // Completed Election Card
+                _buildCompletedElectionCard(),
+                const SizedBox(height: AppSpacing.xxl),
               ],
             ),
           ),
@@ -103,7 +64,7 @@ class _ElectionsTabState extends State<ElectionsTab>
         children: [
           GestureDetector(
             onTap: () {
-              // TODO: Navigasi back
+              // Can go back to home tab if needed, or pop if it was pushed
             },
             child: const Icon(
               Icons.arrow_back,
@@ -123,612 +84,269 @@ class _ElectionsTabState extends State<ElectionsTab>
     );
   }
 
-  Widget _buildProgressCard(BuildContext context) {
+  Widget _buildLiveElectionCard(BuildContext context) {
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: AppSpacing.pagePad),
-      padding: const EdgeInsets.all(AppSpacing.md),
+      padding: const EdgeInsets.all(AppSpacing.lg),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: const [
+        borderRadius: BorderRadius.circular(AppRadius.card),
+        boxShadow: [
           BoxShadow(
-            color: Color(0x080F1F3D),
-            blurRadius: 16,
-            offset: Offset(0, 4),
+            color: Colors.black.withOpacity(0.02),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
           ),
         ],
       ),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // Top Badges Row
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(
-                'Partisipasi Pemilih',
-                style: AppTypography.bodyMedium.copyWith(
-                  fontWeight: FontWeight.w700,
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFFEBEB), // Light red
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 6,
+                      height: 6,
+                      decoration: const BoxDecoration(
+                        color: Color(0xFFE53935), // Red
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      'Live',
+                      style: AppTypography.captionBold.copyWith(color: const Color(0xFFE53935)),
+                    ),
+                  ],
                 ),
               ),
-              Text(
-                '62%',
-                style: AppTypography.cardTitle.copyWith(
-                  color: AppColors.goldDark,
-                  fontSize: 22,
-                ),
-              ),
+              const Icon(Icons.receipt_long_outlined, color: AppColors.navyMid, size: 24),
             ],
           ),
-          const SizedBox(height: AppSpacing.sm),
+          const SizedBox(height: AppSpacing.md),
+          
+          Text('Pemilihan Ketua BEM 2026', style: AppTypography.screenTitle.copyWith(fontSize: 20)),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              const Icon(Icons.access_time, color: AppColors.navyMid, size: 16),
+              const SizedBox(width: 6),
+              Text('02 HARI : 14 JAM : 30 MENIT', style: AppTypography.captionBold.copyWith(color: AppColors.navyMid)),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.xl),
+          
+          // Progress Section
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text('Partisipasi Pemilih', style: AppTypography.bodyMedium.copyWith(fontWeight: FontWeight.w600)),
+              Text('62%', style: AppTypography.bodyMedium.copyWith(fontWeight: FontWeight.bold, color: AppColors.goldDark)),
+            ],
+          ),
+          const SizedBox(height: 8),
           ClipRRect(
             borderRadius: BorderRadius.circular(4),
             child: const LinearProgressIndicator(
               value: 0.62,
-              backgroundColor: AppColors.outlineVariant,
+              backgroundColor: Color(0xFFE4E9F7),
               valueColor: AlwaysStoppedAnimation<Color>(AppColors.goldDark),
               minHeight: 6,
             ),
           ),
-          const SizedBox(height: AppSpacing.md),
+          const SizedBox(height: 6),
+          Text(
+            '12,402 dari 20,000 mahasiswa sudah memilih',
+            style: AppTypography.caption.copyWith(color: AppColors.textSecondary, fontStyle: FontStyle.italic),
+          ),
+          const SizedBox(height: AppSpacing.lg),
+          
+          // Info Boxes Row
+          Row(
+            children: [
+              Expanded(
+                child: _buildInfoBox(
+                  icon: Icons.person_outline,
+                  title: 'Kandidat',
+                  value: '2 Kandidat',
+                  bgColor: const Color(0xFFF8F9FA),
+                  iconColor: AppColors.navyMid,
+                ),
+              ),
+              const SizedBox(width: AppSpacing.md),
+              Expanded(
+                child: _buildInfoBox(
+                  icon: Icons.people_outline,
+                  title: 'Delegasi',
+                  value: '3 Aktif',
+                  bgColor: const Color(0xFFE8F5E9), // Light green
+                  iconColor: const Color(0xFF2E7D32), // Dark green
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.xl),
+          
+          // Bottom Actions
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Expanded(
-                child: Text(
-                  '12,402 dari 20,000\nmahasiswa',
-                  style: AppTypography.captionBold.copyWith(
-                    color: AppColors.textSecondary,
-                    height: 1.3,
-                  ),
-                ),
+              Padding(
+                padding: const EdgeInsets.only(left: 8.0),
+                child: Text('Lihat Detail', style: AppTypography.bodyMedium.copyWith(fontWeight: FontWeight.w600)),
               ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                decoration: BoxDecoration(
-                  color: AppColors.primary800,
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Row(
-                  children: [
-                    const Icon(Icons.access_time, color: Colors.white, size: 14),
-                    const SizedBox(width: 6),
-                    Text(
-                      '02 : 14 : 45 : 12',
-                      style: AppTypography.captionBold.copyWith(
-                        color: Colors.white,
-                        letterSpacing: 1,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-// ── Tab 1: Daftar Kandidat ───────────────────────────────────────────────────
-
-class _CandidateListTab extends StatelessWidget {
-  const _CandidateListTab();
-
-  @override
-  Widget build(BuildContext context) {
-    return ListView(
-      padding: const EdgeInsets.all(AppSpacing.pagePad),
-      physics: const BouncingScrollPhysics(),
-      children: [
-        _CandidateCard(
-          number: '01',
-          name: 'Aris Setiawan',
-          tagline: '"Digitalisasi Kampus untuk Masa Depan Inklusif"',
-          isSelected: true,
-          avatarUrl: 'https://i.pravatar.cc/150?u=aris',
-        ),
-        const SizedBox(height: AppSpacing.md),
-        _CandidateCard(
-          number: '02',
-          name: 'Farah Quinn',
-          tagline: '"Kesejahteraan Mahasiswa Adalah Prioritas Utama"',
-          isSelected: false,
-          avatarUrl: 'https://i.pravatar.cc/150?u=farah',
-        ),
-        const SizedBox(height: AppSpacing.md),
-        _CandidateCard(
-          number: '03',
-          name: 'Budi Tabuti',
-          tagline: '"Kolaborasi Riset Antar Fakultas Tanpa Batas"',
-          isSelected: false,
-          avatarUrl: 'https://i.pravatar.cc/150?u=budi',
-        ),
-        const SizedBox(height: AppSpacing.md),
-        _CandidateCard(
-          number: '04',
-          name: 'Siti Aminah',
-          tagline: '"Satu Visi, Satu Aksi, Untuk BEM yang Berdikari"',
-          isSelected: false,
-          avatarUrl: 'https://i.pravatar.cc/150?u=siti',
-        ),
-        const SizedBox(height: AppSpacing.xl),
-
-        // Bottom Assistance
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  Text(
-                    'Butuh bantuan tentang pemilihan?',
-                    style: AppTypography.caption.copyWith(
-                      color: AppColors.textSecondary,
-                    ),
-                    textAlign: TextAlign.right,
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    'Baca Panduan Pemilihan',
-                    style: AppTypography.bodyMedium.copyWith(
-                      color: AppColors.primary800,
-                      fontWeight: FontWeight.w700,
-                    ),
-                    textAlign: TextAlign.right,
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(width: AppSpacing.md),
-            Container(
-              width: 56,
-              height: 56,
-              decoration: BoxDecoration(
-                gradient: AppColors.goldGradient,
-                shape: BoxShape.circle,
-                boxShadow: [
-                  BoxShadow(
-                    color: AppColors.goldMid.withValues(alpha: 0.3),
-                    blurRadius: 12,
-                    offset: const Offset(0, 4),
-                  ),
-                ],
-              ),
-              child: const Icon(
-                Icons.outbox_rounded,
-                color: Colors.white,
-                size: 28,
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: AppSpacing.xxl),
-      ],
-    );
-  }
-}
-
-class _CandidateCard extends StatelessWidget {
-  const _CandidateCard({
-    required this.number,
-    required this.name,
-    required this.tagline,
-    required this.isSelected,
-    required this.avatarUrl,
-  });
-
-  final String number;
-  final String name;
-  final String tagline;
-  final bool isSelected;
-  final String avatarUrl;
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: () {
-        context.pushNamed('election-candidate',
-            pathParameters: {'id': '1', 'candidateId': number});
-      },
-      child: Container(
-        padding: const EdgeInsets.all(AppSpacing.md),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-            color: isSelected ? AppColors.goldMid : Colors.transparent,
-            width: isSelected ? 2 : 0,
-          ),
-          boxShadow: const [
-            BoxShadow(
-              color: Color(0x080F1F3D),
-              blurRadius: 12,
-              offset: Offset(0, 4),
-            ),
-          ],
-        ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
-          // Avatar with Badges
-          SizedBox(
-            width: 72,
-            height: 72,
-            child: Stack(
-              clipBehavior: Clip.none,
-              children: [
-                Container(
-                  width: 64,
-                  height: 64,
+              InkWell(
+                onTap: () {
+                  context.pushNamed('election', pathParameters: {'id': '1'});
+                },
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
                   decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    border: Border.all(
-                      color: isSelected ? AppColors.goldMid : AppColors.outlineVariant,
-                      width: 2,
+                    color: AppColors.goldDark,
+                    borderRadius: BorderRadius.circular(24),
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFFD4A030), Color(0xFFB38622)],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
                     ),
-                  ),
-                  child: ClipOval(
-                    // Gunakan icon placeholder untuk web (hindari CORS)
-                    child: Container(
-                      color: const Color(0xFFE5E7EB),
-                      child: Icon(
-                        Icons.person,
-                        size: 40,
-                        color: isSelected ? AppColors.primary800 : AppColors.outline,
+                    boxShadow: [
+                      BoxShadow(
+                        color: AppColors.goldMid.withOpacity(0.3),
+                        blurRadius: 8,
+                        offset: const Offset(0, 4),
                       ),
-                    ),
+                    ],
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.arrow_forward, color: Colors.white, size: 18),
+                      const SizedBox(width: 8),
+                      Text('Pilih Sekarang', style: AppTypography.bodyMedium.copyWith(color: Colors.white, fontWeight: FontWeight.w600)),
+                    ],
                   ),
                 ),
-                // Number Badge
-                Positioned(
-                  top: 0,
-                  left: 0,
-                  child: Container(
-                    width: 24,
-                    height: 24,
-                    decoration: BoxDecoration(
-                      color: isSelected ? AppColors.goldDark : AppColors.outline,
-                      shape: BoxShape.circle,
-                      border: Border.all(color: Colors.white, width: 2),
-                    ),
-                    child: Center(
-                      child: Text(
-                        number,
-                        style: AppTypography.captionBold.copyWith(
-                          color: Colors.white,
-                          fontSize: 9,
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-                // Checkmark Badge (if selected)
-                if (isSelected)
-                  Positioned(
-                    bottom: 4,
-                    right: 4,
-                    child: Container(
-                      width: 20,
-                      height: 20,
-                      decoration: BoxDecoration(
-                        color: AppColors.goldDark,
-                        shape: BoxShape.circle,
-                        border: Border.all(color: Colors.white, width: 2),
-                      ),
-                      child: const Icon(Icons.check, color: Colors.white, size: 12),
-                    ),
-                  ),
-              ],
-            ),
-          ),
-          const SizedBox(width: AppSpacing.sm),
-
-          // Details
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  name,
-                  style: AppTypography.cardTitle.copyWith(
-                    color: AppColors.primary800,
-                    fontSize: 18,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  tagline,
-                  style: AppTypography.caption.copyWith(
-                    fontStyle: FontStyle.italic,
-                    color: AppColors.textSecondary,
-                  ),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                const SizedBox(height: 8),
-                Row(
-                  children: [
-                    Text(
-                      'Lihat Profil',
-                      style: AppTypography.bodyMedium.copyWith(
-                        color: isSelected ? AppColors.goldDark : AppColors.outline,
-                      ),
-                    ),
-                    const SizedBox(width: 4),
-                    Icon(
-                      Icons.arrow_forward,
-                      size: 16,
-                      color: isSelected ? AppColors.goldDark : AppColors.outline,
-                    ),
-                  ],
-                ),
-              ],
-            ),
+              ),
+            ],
           ),
         ],
       ),
-    ));
-  }
-}
-
-// ── Tab 2: Delegasikan Suara ─────────────────────────────────────────────────
-
-class _DelegatorListTab extends StatelessWidget {
-  const _DelegatorListTab();
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      children: [
-        // Search Bar
-        Padding(
-          padding: const EdgeInsets.all(AppSpacing.pagePad),
-          child: AppTextField(
-            label: '',
-            hint: 'Cari nama delegator',
-            prefixIcon: Icons.search,
-          ),
-        ),
-
-        // List
-        Expanded(
-          child: ListView(
-            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.pagePad),
-            physics: const BouncingScrollPhysics(),
-            children: [
-              _DelegatorCard(
-                name: 'Arkananta Putra',
-                badges: const [
-                  _DelegatorBadge(label: 'MANTAN KETUA BEM', type: _BadgeType.gray),
-                  _DelegatorBadge(label: 'FAKULTAS TEKNIK', type: _BadgeType.green),
-                ],
-                voteCount: 428,
-              ),
-              const SizedBox(height: AppSpacing.md),
-              _DelegatorCard(
-                name: 'Sarah Wijaya',
-                badges: const [
-                  _DelegatorBadge(label: 'AKTIVIS MAHASISWA', type: _BadgeType.gray),
-                  _DelegatorBadge(label: 'FAKULTAS HUKUM', type: _BadgeType.gold),
-                ],
-                voteCount: 152,
-              ),
-              const SizedBox(height: AppSpacing.md),
-              _DelegatorCard(
-                name: 'Dimas Ramadhan',
-                badges: const [
-                  _DelegatorBadge(label: 'KETUA HIMPUNAN', type: _BadgeType.gray),
-                  _DelegatorBadge(label: 'EKONOMI & BISNIS', type: _BadgeType.green),
-                ],
-                voteCount: 89,
-              ),
-              const SizedBox(height: AppSpacing.xl),
-
-              // Info Box
-              Container(
-                padding: const EdgeInsets.all(AppSpacing.md),
-                decoration: BoxDecoration(
-                  color: AppColors.primary800.withValues(alpha: 0.05),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: AppColors.outlineVariant.withValues(alpha: 0.5)),
-                ),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Icon(Icons.info_outline, color: AppColors.primary800, size: 20),
-                    const SizedBox(width: AppSpacing.sm),
-                    Expanded(
-                      child: Text(
-                        'Delegasi bersifat cair. Anda dapat menarik suara kapan saja.',
-                        style: AppTypography.caption.copyWith(
-                          color: AppColors.textSecondary,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: AppSpacing.xxl),
-            ],
-          ),
-        ),
-      ],
     );
   }
-}
 
-class _DelegatorCard extends StatelessWidget {
-  const _DelegatorCard({
-    required this.name,
-    required this.badges,
-    required this.voteCount,
-  });
-
-  final String name;
-  final List<Widget> badges;
-  final int voteCount;
-
-  @override
-  Widget build(BuildContext context) {
+  Widget _buildCompletedElectionCard() {
     return Container(
-      padding: const EdgeInsets.all(AppSpacing.md),
+      padding: const EdgeInsets.all(AppSpacing.lg),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: const [
+        borderRadius: BorderRadius.circular(AppRadius.card),
+        boxShadow: [
           BoxShadow(
-            color: Color(0x080F1F3D),
-            blurRadius: 12,
-            offset: Offset(0, 4),
+            color: Colors.black.withOpacity(0.02),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
           ),
         ],
       ),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Top Row: Avatar & Info
+          // Top Badges Row
           Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Container(
-                width: 48,
-                height: 48,
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFE5E7EB),
-                  shape: BoxShape.circle,
-                  border: Border.all(color: AppColors.outlineVariant),
+                  color: const Color(0xFFF3F4F6), // Light grey
+                  borderRadius: BorderRadius.circular(16),
                 ),
-                child: const Icon(Icons.person, color: AppColors.outline, size: 28),
-              ),
-              const SizedBox(width: AppSpacing.md),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      name,
-                      style: AppTypography.cardTitle.copyWith(
-                        color: AppColors.primary800,
-                        fontSize: 16,
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                    Wrap(
-                      spacing: 6,
-                      runSpacing: 6,
-                      children: badges,
-                    ),
-                  ],
+                child: Text(
+                  'Selesai',
+                  style: AppTypography.captionBold.copyWith(color: AppColors.textSecondary),
                 ),
               ),
+              const Icon(Icons.check_circle_outline, color: AppColors.textSecondary, size: 24),
             ],
           ),
           const SizedBox(height: AppSpacing.md),
-
-          // Bottom Row: Stats & Action
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'BEBAN SUARA SAAT INI',
-                    style: AppTypography.captionBold.copyWith(
-                      color: AppColors.outline,
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  Row(
-                    children: [
-                      Text(
-                        voteCount.toString(),
-                        style: AppTypography.itemTitle.copyWith(
-                          fontSize: 16,
-                          color: AppColors.primary800,
-                        ),
-                      ),
-                      Text(
-                        ' Suara',
-                        style: AppTypography.bodyMedium.copyWith(
-                          color: AppColors.primary800,
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-              // Button Delegasikan
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                decoration: BoxDecoration(
-                  gradient: AppColors.goldGradient,
-                  borderRadius: BorderRadius.circular(999),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      'Delegasikan',
-                      style: AppTypography.bodyMedium.copyWith(
-                        color: Colors.white,
-                      ),
-                    ),
-                    const SizedBox(width: 4),
-                    const Icon(Icons.arrow_forward, color: Colors.white, size: 14),
-                  ],
-                ),
-              ),
-            ],
+          
+          Text('Pemilihan Senat Mahasiswa', style: AppTypography.screenTitle.copyWith(fontSize: 20)),
+          const SizedBox(height: 6),
+          Text('Berakhir pada 12 Okt 2025', style: AppTypography.bodyText.copyWith(color: AppColors.textSecondary)),
+          const SizedBox(height: AppSpacing.xl),
+          
+          // Bottom Action
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(vertical: 14),
+            decoration: BoxDecoration(
+              color: const Color(0xFF384666), // Dark Navy button
+              borderRadius: BorderRadius.circular(24),
+            ),
+            alignment: Alignment.center,
+            child: Text(
+              'Lihat Hasil Akhir',
+              style: AppTypography.bodyMedium.copyWith(color: Colors.white, fontWeight: FontWeight.w600),
+            ),
           ),
         ],
       ),
     );
   }
-}
 
-enum _BadgeType { gray, green, gold }
-
-class _DelegatorBadge extends StatelessWidget {
-  const _DelegatorBadge({required this.label, required this.type});
-
-  final String label;
-  final _BadgeType type;
-
-  @override
-  Widget build(BuildContext context) {
-    Color bgColor;
-    Color textColor;
-
-    switch (type) {
-      case _BadgeType.green:
-        bgColor = const Color(0x3334C759); // Light green
-        textColor = const Color(0xFF0F6E56); // Dark green
-        break;
-      case _BadgeType.gold:
-        bgColor = const Color(0x33D4A030);
-        textColor = AppColors.goldDark;
-        break;
-      case _BadgeType.gray:
-        bgColor = AppColors.outlineVariant.withValues(alpha: 0.3);
-        textColor = AppColors.primary800;
-        break;
-    }
-
+  Widget _buildInfoBox({
+    required IconData icon,
+    required String title,
+    required String value,
+    required Color bgColor,
+    required Color iconColor,
+  }) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      padding: const EdgeInsets.all(AppSpacing.sm),
       decoration: BoxDecoration(
         color: bgColor,
-        borderRadius: BorderRadius.circular(6),
+        borderRadius: BorderRadius.circular(12),
       ),
-      child: Text(
-        label,
-        style: AppTypography.captionBold.copyWith(
-          color: textColor,
-          fontSize: 9,
-          letterSpacing: 0.5,
-        ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(6),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(8),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.02),
+                  blurRadius: 4,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: Icon(icon, color: iconColor, size: 18),
+          ),
+          const SizedBox(width: AppSpacing.sm),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(title, style: AppTypography.captionBold.copyWith(fontSize: 10)),
+                const SizedBox(height: 2),
+                Text(value, style: AppTypography.bodyMedium.copyWith(fontWeight: FontWeight.w600, fontSize: 13)),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }

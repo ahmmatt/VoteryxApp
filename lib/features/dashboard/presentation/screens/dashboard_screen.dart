@@ -5,6 +5,8 @@ import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_typography.dart';
 import '../../../election/presentation/widgets/elections_tab.dart';
 import '../widgets/home_tab.dart';
+import '../../../delegation/presentation/screens/delegation_screen.dart';
+import '../../../profile/presentation/screens/profile_screen.dart';
 
 /// Halaman utama setelah login.
 /// Mengelola BottomNavigationBar dan menampilkan tab yang sesuai.
@@ -22,8 +24,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
   final List<Widget> _tabs = [
     const HomeTab(),
     const ElectionsTab(),
-    const Center(child: Text('Delegations Tab')), // TODO: implement tab Delegations
-    const Center(child: Text('Profile Tab')), // TODO: implement tab Profile
+    const DelegationScreen(),
+    const ProfileScreen(),
   ];
 
   @override
