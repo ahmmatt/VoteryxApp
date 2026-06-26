@@ -194,13 +194,15 @@ class ProfileScreen extends StatelessWidget {
           _buildMenuItem(
             icon: Icons.assignment_ind_outlined,
             title: 'Masuk sebagai Delegates',
-            onTap: () {},
+            onTap: () {
+              context.pushNamed('delegate-login');
+            },
           ),
           _buildMenuItem(
             icon: Icons.group_add_outlined,
-            title: 'Ajukan Pemilihan',
+            title: 'Usulan Pemilihan',
             onTap: () {
-              context.pushNamed('proposal-create');
+              context.pushNamed('proposal-status');
             },
           ),
           _buildMenuItem(

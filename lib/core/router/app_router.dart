@@ -9,10 +9,21 @@ import '../../features/election/presentation/screens/vote_confirmation_screen.da
 import '../../features/election/presentation/screens/vote_processing_screen.dart';
 import '../../features/election/presentation/screens/vote_receipt_screen.dart';
 import '../../features/delegation/presentation/screens/delegation_screen.dart';
-import '../../features/delegation/presentation/screens/delegate_detail_screen.dart';
+import '../../features/delegation/presentation/screens/delegate_login_screen.dart';
+import '../../features/delegation/presentation/screens/delegate_registration_form_screen.dart';
+import '../../features/delegation/presentation/screens/delegate_review_screen.dart';
+import '../../features/delegation/presentation/screens/delegate_approved_screen.dart';
+import '../../features/delegation/presentation/screens/delegate_dashboard_screen.dart';
+import '../../features/delegation/presentation/screens/delegate_home_screen.dart';
+import '../../features/delegation/presentation/screens/delegate_vote_execution_screen.dart';
+import '../../features/delegation/presentation/screens/delegate_vote_processing_screen.dart';
+import '../../features/delegation/presentation/screens/delegate_vote_success_screen.dart';
+import '../../features/delegation/presentation/screens/delegate_execution_history_screen.dart';
 import '../../features/profile/presentation/screens/profile_screen.dart';
 import '../../features/election/presentation/screens/election_detail_screen.dart';
 import '../../features/election/presentation/screens/proposal_create_screen.dart';
+import '../../features/election_proposal/presentation/screens/my_election_proposals_screen.dart';
+
 
 // ── Route path constants ──────────────────────────────────────────────────────
 // Gunakan konstanta ini saat navigate agar tidak ada magic string.
@@ -135,6 +146,56 @@ final GoRouter appRouter = GoRouter(
       builder: (_, __) => const DelegationScreen(),
     ),
     GoRoute(
+      path: '/delegation/login',
+      name: 'delegate-login',
+      builder: (_, __) => const DelegateLoginScreen(),
+    ),
+    GoRoute(
+      path: '/delegation/registration',
+      name: 'delegate-registration',
+      builder: (_, __) => const DelegateRegistrationFormScreen(),
+    ),
+    GoRoute(
+      path: '/delegation/review',
+      name: 'delegate-review',
+      builder: (_, __) => const DelegateReviewScreen(),
+    ),
+    GoRoute(
+      path: '/delegation/approved',
+      name: 'delegate-approved',
+      builder: (_, __) => const DelegateApprovedScreen(),
+    ),
+    GoRoute(
+      path: '/delegation/home',
+      name: 'delegate-home',
+      builder: (_, __) => const DelegateHomeScreen(),
+    ),
+    GoRoute(
+      path: '/delegation/dashboard',
+      name: 'delegate-dashboard',
+      builder: (_, __) => const DelegateDashboardScreen(),
+    ),
+    GoRoute(
+      path: '/delegation/vote-execution',
+      name: 'delegate-vote-execution',
+      builder: (_, __) => const DelegateVoteExecutionScreen(),
+    ),
+    GoRoute(
+      path: '/delegation/vote-processing',
+      name: 'delegate-vote-processing',
+      builder: (_, __) => const DelegateVoteProcessingScreen(),
+    ),
+    GoRoute(
+      path: '/delegation/vote-success',
+      name: 'delegate-vote-success',
+      builder: (_, __) => const DelegateVoteSuccessScreen(),
+    ),
+    GoRoute(
+      path: '/delegation/history',
+      name: 'delegate-history',
+      builder: (_, __) => const DelegateExecutionHistoryScreen(),
+    ),
+    GoRoute(
       path: '/delegation/:delegatorId',
       name: 'delegation-detail',
       builder: (ctx, state) {
@@ -159,8 +220,7 @@ final GoRouter appRouter = GoRouter(
     GoRoute(
       path: AppRoutes.proposalStatus,
       name: 'proposal-status',
-      builder: (_, __) =>
-          const _PlaceholderScreen(title: 'Status Usulan Saya'),
+      builder: (_, __) => const MyElectionProposalsScreen(),
     ),
   ],
 

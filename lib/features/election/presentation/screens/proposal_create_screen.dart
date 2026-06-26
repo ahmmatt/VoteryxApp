@@ -3,6 +3,7 @@ import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_spacing.dart';
 import '../../../../core/constants/app_typography.dart';
 import '../../../../core/constants/app_radius.dart';
+import '../../../../features/election_proposal/presentation/screens/my_election_proposals_screen.dart';
 
 class ProposalCreateScreen extends StatefulWidget {
   const ProposalCreateScreen({super.key});
@@ -514,7 +515,11 @@ class _ProposalCreateScreenState extends State<ProposalCreateScreen> {
                   text: 'Kirim Usulan',
                   icon: Icons.send,
                   onTap: () {
-                    // TODO: Submit logic
+                    Navigator.of(context).pushReplacement(
+                      MaterialPageRoute(
+                        builder: (context) => const MyElectionProposalsScreen(),
+                      ),
+                    );
                   },
                 ),
                 const SizedBox(height: AppSpacing.md),
