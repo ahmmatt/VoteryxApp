@@ -36,7 +36,7 @@ class GoldButton extends StatelessWidget {
     this.icon,
     this.isLoading = false,
     this.isFullWidth = true,
-    this.height = 48,
+    this.height = 44,
   });
 
   /// Teks label tombol.
@@ -90,8 +90,8 @@ class GoldButton extends StatelessWidget {
             child: Center(
               child: isLoading
                   ? const SizedBox(
-                      width: 22,
-                      height: 22,
+                      width: 20,
+                      height: 20,
                       child: CircularProgressIndicator(
                         color: Colors.white,
                         strokeWidth: 2.5,
@@ -101,8 +101,8 @@ class GoldButton extends StatelessWidget {
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         if (icon != null) ...[
-                          Icon(icon, color: Colors.white, size: 18),
-                          const SizedBox(width: 8),
+                          Icon(icon, color: Colors.white, size: 16),
+                          const SizedBox(width: 6),
                         ],
                         Text(
                           label,

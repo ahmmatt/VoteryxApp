@@ -21,8 +21,8 @@ class _SlideToConfirmState extends State<SlideToConfirm> {
   double _dragPosition = 0.0;
   bool _isConfirmed = false;
 
-  static const double _height = 56.0;
-  static const double _thumbSize = 50.0;
+  static const double _height = 48.0;
+  static const double _thumbSize = 42.0;
   static const double _padding = 3.0;
 
   void _onHorizontalDragUpdate(DragUpdateDetails details, double maxWidth) {
@@ -109,7 +109,7 @@ class _SlideToConfirmState extends State<SlideToConfirm> {
                     child: const Icon(
                       Icons.lock_outline,
                       color: Colors.white,
-                      size: 24,
+                      size: 20,
                     ),
                   ),
                 ),

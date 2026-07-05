@@ -15,12 +15,28 @@ abstract final class AppColors {
   static const Color goldDark   = Color(0xFF9C7523);
   static const Color goldMid    = Color(0xFFD4A030);
 
-  /// Gold gradient: digunakan untuk tombol CTA, icon aktif,
-  /// progress bar, dll.
   static const LinearGradient goldGradient = LinearGradient(
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
     colors: [goldMid, goldDark],
+  );
+
+  // ── Delegate (Teal/Emerald) Palette ───────────────────────
+  static const Color delegateTealDark = Color(0xFF0F5A4D);
+  static const Color delegateTealMid  = Color(0xFF139971);
+  static const LinearGradient delegateGradient = LinearGradient(
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+    colors: [delegateTealMid, delegateTealDark],
+  );
+
+  // ── Admin (Slate/Red) Palette ─────────────────────────────
+  static const Color adminRedDark  = Color(0xFF7A1515);
+  static const Color adminRedMid   = Color(0xFFBA1A1A);
+  static const LinearGradient adminGradient = LinearGradient(
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+    colors: [adminRedMid, adminRedDark],
   );
 
   // ── Semantic Colors ───────────────────────────────────────

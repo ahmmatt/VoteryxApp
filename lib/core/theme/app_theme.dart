@@ -54,9 +54,10 @@ abstract final class AppTheme {
         foregroundColor: Colors.white,
         elevation: 0,
         centerTitle: true,
+        toolbarHeight: 52,
         systemOverlayStyle: SystemUiOverlayStyle.light,
         titleTextStyle: GoogleFonts.plusJakartaSans(
-          fontSize: 17,
+          fontSize: 16,
           fontWeight: FontWeight.w700,
           color: Colors.white,
         ),
@@ -65,35 +66,43 @@ abstract final class AppTheme {
       // Text theme menggunakan DM Sans sebagai default body
       textTheme: GoogleFonts.dmSansTextTheme().copyWith(
         displayLarge: GoogleFonts.plusJakartaSans(
-          fontSize: 28, fontWeight: FontWeight.w700,
+          fontSize: 24,
+          fontWeight: FontWeight.w700,
           color: AppColors.textPrimary,
         ),
         displayMedium: GoogleFonts.plusJakartaSans(
-          fontSize: 24, fontWeight: FontWeight.w700,
+          fontSize: 20,
+          fontWeight: FontWeight.w700,
           color: AppColors.textPrimary,
         ),
         titleLarge: GoogleFonts.plusJakartaSans(
-          fontSize: 18, fontWeight: FontWeight.w700,
+          fontSize: 16,
+          fontWeight: FontWeight.w700,
           color: AppColors.textPrimary,
         ),
         titleMedium: GoogleFonts.plusJakartaSans(
-          fontSize: 16, fontWeight: FontWeight.w700,
+          fontSize: 15,
+          fontWeight: FontWeight.w700,
           color: AppColors.textPrimary,
         ),
         bodyLarge: GoogleFonts.dmSans(
-          fontSize: 14, fontWeight: FontWeight.w400,
+          fontSize: 13,
+          fontWeight: FontWeight.w400,
           color: AppColors.textSecondary,
         ),
         bodyMedium: GoogleFonts.dmSans(
-          fontSize: 13, fontWeight: FontWeight.w400,
+          fontSize: 12,
+          fontWeight: FontWeight.w400,
           color: AppColors.textSecondary,
         ),
         labelLarge: GoogleFonts.dmSans(
-          fontSize: 14, fontWeight: FontWeight.w600,
+          fontSize: 13,
+          fontWeight: FontWeight.w600,
           color: AppColors.textPrimary,
         ),
         labelSmall: GoogleFonts.dmSans(
-          fontSize: 11, fontWeight: FontWeight.w400,
+          fontSize: 10,
+          fontWeight: FontWeight.w400,
           color: AppColors.outline,
         ),
       ),
@@ -128,14 +137,17 @@ abstract final class AppTheme {
           borderRadius: BorderRadius.circular(AppRadius.input),
           borderSide: const BorderSide(color: AppColors.errorRed, width: 2),
         ),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
         labelStyle: GoogleFonts.dmSans(
-          fontSize: 12, fontWeight: FontWeight.w700,
+          fontSize: 10,
+          fontWeight: FontWeight.w700,
           color: AppColors.textSecondary,
-          letterSpacing: 0.06 * 12,
+          letterSpacing: 0.06 * 10,
         ),
         hintStyle: GoogleFonts.dmSans(
-          fontSize: 13, color: const Color(0xFFA0A2A8),
+          fontSize: 12,
+          color: const Color(0xFFA0A2A8),
         ),
       ),
 
@@ -145,12 +157,14 @@ abstract final class AppTheme {
           backgroundColor: AppColors.navyMid,
           foregroundColor: Colors.white,
           elevation: 0,
-          minimumSize: const Size(double.infinity, 48),
+          minimumSize: const Size(double.infinity, 44),
+          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(AppRadius.button),
           ),
           textStyle: GoogleFonts.dmSans(
-            fontSize: 14, fontWeight: FontWeight.w700,
+            fontSize: 13,
+            fontWeight: FontWeight.w700,
           ),
         ),
       ),
@@ -159,13 +173,15 @@ abstract final class AppTheme {
       outlinedButtonTheme: OutlinedButtonThemeData(
         style: OutlinedButton.styleFrom(
           foregroundColor: AppColors.textPrimary,
-          minimumSize: const Size(double.infinity, 48),
+          minimumSize: const Size(double.infinity, 44),
+          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
           side: const BorderSide(color: Color(0x33000000)), // 20% hitam
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(AppRadius.button),
           ),
           textStyle: GoogleFonts.dmSans(
-            fontSize: 14, fontWeight: FontWeight.w600,
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
           ),
         ),
       ),
@@ -189,7 +205,8 @@ abstract final class AppTheme {
       snackBarTheme: SnackBarThemeData(
         backgroundColor: AppColors.primary800,
         contentTextStyle: GoogleFonts.dmSans(
-          fontSize: 13, color: Colors.white,
+          fontSize: 13,
+          color: Colors.white,
         ),
         behavior: SnackBarBehavior.floating,
         shape: RoundedRectangleBorder(

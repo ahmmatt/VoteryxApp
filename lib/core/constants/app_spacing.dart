@@ -12,20 +12,20 @@ abstract final class AppSpacing {
   static const double sm = 8;
 
   /// 12px — jarak sedang-kecil, e.g. padding internal card
-  static const double mdSm = 12;
+  static const double mdSm = 10;
 
   /// 16px — jarak standar / default page padding
-  static const double md = 16;
+  static const double md = 14;
 
   /// 20px — padding halaman utama (left/right)
-  static const double pagePad = 20;
+  static const double pagePad = 16;
 
   /// 24px — jarak besar, e.g. antar section
-  static const double lg = 24;
+  static const double lg = 18;
 
   /// 32px — jarak sangat besar
-  static const double xl = 32;
+  static const double xl = 24;
 
   /// 48px — untuk bottom nav clearance, spacer besar
-  static const double xxl = 48;
+  static const double xxl = 36;
 }

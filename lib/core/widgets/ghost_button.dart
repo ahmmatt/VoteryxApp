@@ -23,7 +23,7 @@ class GhostButton extends StatelessWidget {
     required this.onPressed,
     this.icon,
     this.isFullWidth = true,
-    this.height = 48,
+    this.height = 44,
     this.borderColor,
     this.textColor,
   });
@@ -57,14 +57,14 @@ class GhostButton extends StatelessWidget {
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(AppRadius.button),
           ),
-          padding: const EdgeInsets.symmetric(horizontal: 20),
+          padding: const EdgeInsets.symmetric(horizontal: 14),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
             if (icon != null) ...[
-              Icon(icon, size: 18),
-              const SizedBox(width: 8),
+              Icon(icon, size: 16),
+              const SizedBox(width: 6),
             ],
             Text(
               label,

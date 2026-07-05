@@ -49,7 +49,7 @@ class StatusBadge extends StatelessWidget {
     final config = _StatusConfig.of(status);
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(
         color: config.bgColor,
         borderRadius: BorderRadius.circular(9999),
@@ -64,17 +64,16 @@ class StatusBadge extends StatelessWidget {
           else if (config.icon != null)
             Padding(
               padding: const EdgeInsets.only(right: 4),
-              child: Icon(config.icon, size: 12, color: config.textColor),
+              child: Icon(config.icon, size: 11, color: config.textColor),
             ),
-          if (status == ElectionStatus.live ||
-              status == ElectionStatus.pending)
-            const SizedBox(width: 5),
+          if (status == ElectionStatus.live || status == ElectionStatus.pending)
+            const SizedBox(width: 4),
           Text(
             config.label,
             style: AppTypography.caption.copyWith(
               color: config.textColor,
               fontWeight: FontWeight.w700,
-              fontSize: 10.5,
+              fontSize: 9.5,
               height: 1,
             ),
           ),
@@ -123,8 +122,8 @@ class _PulsingDotState extends State<_PulsingDot>
       builder: (_, __) => Transform.scale(
         scale: _scale.value,
         child: Container(
-          width: 6,
-          height: 6,
+          width: 5,
+          height: 5,
           decoration: BoxDecoration(
             shape: BoxShape.circle,
             color: widget.color,

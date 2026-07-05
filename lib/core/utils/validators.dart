@@ -47,15 +47,24 @@ abstract final class Validators {
     return null;
   }
 
-  /// Validasi NIM untuk login — harus tepat 10 digit angka.
-  static String? nimLogin(String? value) {
+  /// Validasi identifier login inklusif:
+  /// - NIK 16 digit untuk pengguna umum
+  /// - email untuk pengguna umum yang mendaftar via email
+  /// - NIM 8–12 digit untuk pengguna mahasiswa
+  static String? loginIdentifier(String? value) {
     if (value == null || value.trim().isEmpty) {
-      return 'NIM wajib diisi.';
+      return 'NIK, email, atau NIM wajib diisi.';
     }
+
     final cleaned = value.trim();
-    if (!RegExp(r'^\d{10}$').hasMatch(cleaned)) {
-      return 'NIM harus tepat 10 digit angka.';
+    final isNik = RegExp(r'^\d{16}$').hasMatch(cleaned);
+    final isStudentNim = RegExp(r'^\d{8,12}$').hasMatch(cleaned);
+    final isEmail = RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(cleaned);
+
+    if (!isNik && !isStudentNim && !isEmail) {
+      return 'Masukkan NIK 16 digit, email valid, atau NIM mahasiswa.';
     }
+
     return null;
   }
 

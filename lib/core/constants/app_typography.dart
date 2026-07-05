@@ -13,7 +13,7 @@ abstract final class AppTypography {
 
   /// 28px Bold — digunakan di halaman utama / splash heading.
   static TextStyle get displayHeading => GoogleFonts.plusJakartaSans(
-        fontSize: 28,
+        fontSize: 24,
         fontWeight: FontWeight.w700,
         color: AppColors.textPrimary,
         height: 1.25,
@@ -21,7 +21,7 @@ abstract final class AppTypography {
 
   /// 24px Bold — judul halaman utama.
   static TextStyle get screenTitle => GoogleFonts.plusJakartaSans(
-        fontSize: 24,
+        fontSize: 20,
         fontWeight: FontWeight.w700,
         color: AppColors.textPrimary,
         height: 1.3,
@@ -29,7 +29,7 @@ abstract final class AppTypography {
 
   /// 18px Bold — judul di header bar.
   static TextStyle get headerTitle => GoogleFonts.plusJakartaSans(
-        fontSize: 18,
+        fontSize: 16,
         fontWeight: FontWeight.w700,
         color: Colors.white,
         height: 1.2,
@@ -37,7 +37,7 @@ abstract final class AppTypography {
 
   /// 16px Bold — judul card / section.
   static TextStyle get cardTitle => GoogleFonts.plusJakartaSans(
-        fontSize: 16,
+        fontSize: 15,
         fontWeight: FontWeight.w700,
         color: AppColors.textPrimary,
         height: 1.35,
@@ -45,7 +45,7 @@ abstract final class AppTypography {
 
   /// 14px Bold — nama kandidat / judul pemilihan dalam list.
   static TextStyle get itemTitle => GoogleFonts.plusJakartaSans(
-        fontSize: 14,
+        fontSize: 13,
         fontWeight: FontWeight.w700,
         color: AppColors.textPrimary,
         height: 1.4,
@@ -55,7 +55,7 @@ abstract final class AppTypography {
 
   /// 14px Regular — teks isi / deskripsi umum.
   static TextStyle get bodyText => GoogleFonts.dmSans(
-        fontSize: 14,
+        fontSize: 13,
         fontWeight: FontWeight.w400,
         color: AppColors.textSecondary,
         height: 1.6,
@@ -63,7 +63,7 @@ abstract final class AppTypography {
 
   /// 14px Medium — label tombol, info penting.
   static TextStyle get labelLarge => GoogleFonts.dmSans(
-        fontSize: 14,
+        fontSize: 13,
         fontWeight: FontWeight.w500,
         color: AppColors.textPrimary,
         height: 1.4,
@@ -71,7 +71,7 @@ abstract final class AppTypography {
 
   /// 13px SemiBold — subinfo, nilai dalam card.
   static TextStyle get bodyMedium => GoogleFonts.dmSans(
-        fontSize: 13,
+        fontSize: 12,
         fontWeight: FontWeight.w600,
         color: AppColors.textPrimary,
         height: 1.4,
@@ -79,16 +79,16 @@ abstract final class AppTypography {
 
   /// 12px Bold Uppercase — section label (gold).
   static TextStyle get labelSmall => GoogleFonts.dmSans(
-        fontSize: 12,
+        fontSize: 11,
         fontWeight: FontWeight.w700,
         color: AppColors.goldDark,
-        letterSpacing: 0.08 * 12,
+        letterSpacing: 0.08 * 11,
         height: 1.3,
       );
 
   /// 11px Regular — helper text, timestamp, hint.
   static TextStyle get caption => GoogleFonts.dmSans(
-        fontSize: 11,
+        fontSize: 10,
         fontWeight: FontWeight.w400,
         color: AppColors.outline,
         height: 1.5,
@@ -96,10 +96,27 @@ abstract final class AppTypography {
 
   /// 10px Bold Uppercase — sub-label di section header.
   static TextStyle get captionBold => GoogleFonts.dmSans(
-        fontSize: 10,
+        fontSize: 9,
         fontWeight: FontWeight.w700,
         color: AppColors.outline,
-        letterSpacing: 0.06 * 10,
+        letterSpacing: 0.06 * 9,
         height: 1.3,
+      );
+
+  /// Alias untuk style tombol pada layar KYC lama.
+  static TextStyle get buttonText => labelLarge.copyWith(
+        fontWeight: FontWeight.w700,
+      );
+
+  /// Alias untuk body bold pada layar admin/delegate lama.
+  static TextStyle get bodyBold => bodyMedium.copyWith(
+        fontSize: 13,
+        fontWeight: FontWeight.w700,
+      );
+
+  /// 12px Regular — teks kecil pada card dan helper compact.
+  static TextStyle get bodySmall => bodyText.copyWith(
+        fontSize: 11,
+        height: 1.4,
       );
 }

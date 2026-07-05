@@ -102,8 +102,8 @@ class AppTextField extends StatelessWidget {
           label,
           style: AppTypography.captionBold.copyWith(
             color: AppColors.textSecondary,
-            fontSize: 11,
-            letterSpacing: 0.06 * 11,
+            fontSize: 10,
+            letterSpacing: 0.06 * 10,
           ),
         ),
         const SizedBox(height: AppSpacing.xs),
@@ -131,7 +131,7 @@ class AppTextField extends StatelessWidget {
           decoration: InputDecoration(
             hintText: hint,
             prefixIcon: prefixIcon != null
-                ? Icon(prefixIcon, size: 18, color: AppColors.outline)
+                ? Icon(prefixIcon, size: 17, color: AppColors.outline)
                 : null,
             suffixIcon: suffixIcon,
             suffix: suffixText != null
@@ -139,7 +139,7 @@ class AppTextField extends StatelessWidget {
                     suffixText!,
                     style: AppTypography.bodyText.copyWith(
                       color: AppColors.outline,
-                      fontSize: 13,
+                      fontSize: 12,
                     ),
                   )
                 : null,
@@ -182,7 +182,7 @@ class AppTextField extends StatelessWidget {
             ),
             contentPadding: EdgeInsets.symmetric(
               horizontal: AppSpacing.md,
-              vertical: maxLines > 1 ? AppSpacing.md : 14,
+              vertical: maxLines > 1 ? AppSpacing.md : 12,
             ),
             counterStyle: AppTypography.caption,
           ),
