@@ -17,7 +17,8 @@ class AdminDelegateReviewScreen extends ConsumerWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text('Review Pengajuan', style: AppTypography.headerTitle.copyWith(color: Colors.white)),
+        titleSpacing: 0,
+        title: Text('Review Pengajuan', style: AppTypography.headerTitle),
         backgroundColor: AppColors.primary800,
         iconTheme: const IconThemeData(color: Colors.white),
       ),

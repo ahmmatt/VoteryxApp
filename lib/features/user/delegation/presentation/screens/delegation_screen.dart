@@ -17,16 +17,12 @@ class DelegationScreen extends StatelessWidget {
       child: CustomScrollView(
         slivers: [
           SliverAppBar(
+            titleSpacing: 0,
             backgroundColor: AppColors.primary800,
             expandedHeight: kToolbarHeight,
             pinned: true,
             automaticallyImplyLeading: false,
-            title: Text('Delegasi', style: AppTypography.headerTitle),
-            flexibleSpace: Container(
-              decoration: const BoxDecoration(
-                gradient: AppColors.headerGradient,
-              ),
-            ),
+            title: Text('Delegasi', style: AppTypography.headerTitle.copyWith(color: Colors.white)),
           ),
           SliverToBoxAdapter(
             child: Padding(

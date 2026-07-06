@@ -107,6 +107,7 @@ class _DelegateVoteExecutionScreenState
   // ─────────────────────────── AppBar ────────────────────────────
   PreferredSizeWidget _buildAppBar() {
     return AppBar(
+      titleSpacing: 0,
       backgroundColor: AppColors.primary800,
       elevation: 0,
       leading: IconButton(
@@ -115,7 +116,7 @@ class _DelegateVoteExecutionScreenState
       ),
       title: Text(
         'Eksekusi Suara',
-        style: AppTypography.headerTitle.copyWith(color: Colors.white),
+        style: AppTypography.headerTitle,
       ),
       actions: [
         IconButton(

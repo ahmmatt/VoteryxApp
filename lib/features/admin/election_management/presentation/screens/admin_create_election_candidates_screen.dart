@@ -13,7 +13,8 @@ class AdminCreateElectionCandidatesScreen extends StatelessWidget {
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
-        backgroundColor: AppColors.primary900,
+        titleSpacing: 0,
+        backgroundColor: AppColors.primary800,
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Colors.white),
@@ -27,7 +28,7 @@ class AdminCreateElectionCandidatesScreen extends StatelessWidget {
             child: SingleChildScrollView(
               padding: const EdgeInsets.all(AppSpacing.lg),
               child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   _buildStepper(),
                   const SizedBox(height: AppSpacing.xxl),

@@ -16,6 +16,7 @@ class VoteConfirmationScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
+        titleSpacing: 0,
         backgroundColor: AppColors.primary800,
         elevation: 0,
         leading: IconButton(

@@ -65,13 +65,14 @@ class _DelegateRegistrationFormScreenState extends ConsumerState<DelegateRegistr
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
+        titleSpacing: 0,
         backgroundColor: AppColors.primary800,
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Colors.white),
           onPressed: () => Navigator.of(context).pop(),
         ),
-        title: Text('Pendaftaran Delegasi', style: AppTypography.headerTitle.copyWith(color: Colors.white)),
+        title: Text('Pendaftaran Delegasi', style: AppTypography.headerTitle),
       ),
       body: Container(
         width: double.infinity,

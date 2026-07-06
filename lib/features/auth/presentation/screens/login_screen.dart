@@ -34,8 +34,12 @@ class _LoginScreenState extends State<LoginScreen> {
       );
       return;
     }
-    // Demo login navigates to dashboard
-    context.go(AppRoutes.dashboard);
+    // Check if NIK is 'admin' for demo purposes
+    if (_nikController.text.toLowerCase() == 'admin') {
+      context.go(AppRoutes.adminDashboard);
+    } else {
+      context.go(AppRoutes.dashboard);
+    }
   }
 
   @override

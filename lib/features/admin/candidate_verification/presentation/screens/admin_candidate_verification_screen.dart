@@ -13,7 +13,8 @@ class AdminCandidateVerificationScreen extends StatelessWidget {
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
-        backgroundColor: AppColors.primary900,
+        titleSpacing: 0,
+        backgroundColor: AppColors.primary800,
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Colors.white),
@@ -75,30 +76,42 @@ class AdminCandidateVerificationScreen extends StatelessWidget {
           BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 10, offset: const Offset(0, 4)),
         ],
       ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          // Left border indicator if highlight
-          Container(
-            width: 4,
-            decoration: BoxDecoration(
-              color: isHighlight ? AppColors.goldMid : Colors.transparent,
-              borderRadius: const BorderRadius.horizontal(left: Radius.circular(AppRadius.card)),
+      child: IntrinsicHeight(
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // Left border indicator if highlight
+            Container(
+              width: 4,
+              decoration: BoxDecoration(
+                color: isHighlight ? AppColors.goldMid : Colors.transparent,
+                borderRadius: const BorderRadius.horizontal(left: Radius.circular(AppRadius.card)),
+              ),
             ),
-          ),
-          Expanded(
-            child: Padding(
-              padding: const EdgeInsets.all(AppSpacing.lg),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(8),
-                        child: Image.network(imageUrl, width: 48, height: 48, fit: BoxFit.cover),
-                      ),
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.all(AppSpacing.lg),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(8),
+                          child: Image.network(
+                            imageUrl, 
+                            width: 48, 
+                            height: 48, 
+                            fit: BoxFit.cover,
+                            errorBuilder: (context, error, stackTrace) => Container(
+                              width: 48,
+                              height: 48,
+                              color: AppColors.navy600.withOpacity(0.1),
+                              child: const Icon(Icons.person, color: AppColors.textSecondary),
+                            ),
+                          ),
+                        ),
                       const SizedBox(width: 12),
                       Expanded(
                         child: Column(
@@ -177,6 +190,7 @@ class AdminCandidateVerificationScreen extends StatelessWidget {
             ),
           ),
         ],
+        ),
       ),
     );
   }

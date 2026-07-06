@@ -13,7 +13,8 @@ class AdminSettingsScreen extends StatelessWidget {
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
-        backgroundColor: AppColors.primary900,
+        titleSpacing: 0,
+        backgroundColor: AppColors.primary800,
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Colors.white),
@@ -44,15 +45,41 @@ class AdminSettingsScreen extends StatelessWidget {
                   subtitle: 'admin@voteryx.gov.id',
                   leading: ClipRRect(
                     borderRadius: BorderRadius.circular(20),
-                    child: Image.network('https://i.pravatar.cc/150?img=11', width: 40, height: 40, fit: BoxFit.cover),
+                    child: Image.network(
+                      'https://i.pravatar.cc/150?img=11',
+                      width: 40,
+                      height: 40,
+                      fit: BoxFit.cover,
+                      errorBuilder: (context, error, stackTrace) =>
+                          const Icon(Icons.account_circle, size: 40, color: AppColors.outlineVariant),
+                    ),
                   ),
                   trailing: const Icon(Icons.chevron_right, color: AppColors.outlineVariant),
+                  onTap: () {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Profil Admin Utama sedang dalam pengembangan')),
+                    );
+                  },
                 ),
                 const SizedBox(height: 16),
                 _buildListTile(
                   title: 'Hak Akses',
                   subtitle: 'Super Administrator (Akses Penuh)',
                   trailing: const Icon(Icons.chevron_right, color: AppColors.outlineVariant),
+                  onTap: () {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Pengaturan Hak Akses sedang dalam pengembangan')),
+                    );
+                  },
+                ),
+                const SizedBox(height: 16),
+                _buildListTile(
+                  title: 'Keluar',
+                  subtitle: 'Keluar dari sesi administrator',
+                  trailing: const Icon(Icons.logout, color: AppColors.errorRed),
+                  onTap: () {
+                    context.go('/login');
+                  },
                 ),
               ],
             ),
@@ -205,7 +232,6 @@ class AdminSettingsScreen extends StatelessWidget {
           ],
         ),
       ),
-      bottomNavigationBar: _buildBottomNavBar(context),
     );
   }
 
@@ -243,29 +269,36 @@ class AdminSettingsScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildListTile({required String title, required String subtitle, Widget? leading, Widget? trailing}) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.center,
-      children: [
-        if (leading != null) ...[
-          leading,
-          const SizedBox(width: 16),
-        ],
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(title, style: AppTypography.bodyMedium.copyWith(color: AppColors.primary900, fontWeight: FontWeight.bold)),
-              const SizedBox(height: 4),
-              Text(subtitle, style: AppTypography.caption.copyWith(color: AppColors.textSecondary)),
+  Widget _buildListTile({required String title, required String subtitle, Widget? leading, Widget? trailing, VoidCallback? onTap}) {
+    return InkWell(
+      onTap: onTap ?? () {},
+      borderRadius: BorderRadius.circular(8),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 8.0),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            if (leading != null) ...[
+              leading,
+              const SizedBox(width: 16),
             ],
-          ),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(title, style: AppTypography.bodyMedium.copyWith(color: AppColors.primary900, fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 4),
+                  Text(subtitle, style: AppTypography.caption.copyWith(color: AppColors.textSecondary)),
+                ],
+              ),
+            ),
+            if (trailing != null) ...[
+              const SizedBox(width: 16),
+              trailing,
+            ],
+          ],
         ),
-        if (trailing != null) ...[
-          const SizedBox(width: 16),
-          trailing,
-        ],
-      ],
+      ),
     );
   }
 
@@ -296,61 +329,4 @@ class AdminSettingsScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildBottomNavBar(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        border: Border(top: BorderSide(color: AppColors.outlineVariant.withOpacity(0.5))),
-      ),
-      child: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 8.0),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
-            children: [
-              _buildNavItem(Icons.grid_view, 'Overview', false, () {
-                context.pushNamed('admin-dashboard');
-              }),
-              _buildNavItem(Icons.how_to_vote_outlined, 'Elections', false, () {
-                context.pushNamed('admin-proposals');
-              }),
-              _buildNavItem(Icons.people_outline, 'Voters', false, () {
-                context.pushNamed('admin-voters');
-              }),
-              _buildNavItem(Icons.settings_outlined, 'Settings', true, () {}),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildNavItem(IconData icon, String label, bool isSelected, VoidCallback onTap) {
-    return InkWell(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        decoration: isSelected
-            ? BoxDecoration(
-                color: AppColors.goldMid,
-                borderRadius: BorderRadius.circular(20),
-              )
-            : null,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, color: isSelected ? Colors.white : AppColors.textSecondary),
-            const SizedBox(height: 4),
-            Text(
-              label,
-              style: AppTypography.captionBold.copyWith(
-                color: isSelected ? Colors.white : AppColors.textSecondary,
-                fontSize: 10,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
 }

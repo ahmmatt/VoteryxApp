@@ -54,9 +54,10 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
                       }
                     },
                   ),
+                  titleSpacing: 0,
                   title: Text(
                     'Profil Kandidat',
-                    style: AppTypography.headerTitle,
+                    style: AppTypography.headerTitle.copyWith(color: Colors.white),
                   ),
                   actions: [
                     IconButton(

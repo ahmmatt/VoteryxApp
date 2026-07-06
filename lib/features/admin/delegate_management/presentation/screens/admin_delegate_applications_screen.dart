@@ -16,7 +16,8 @@ class AdminDelegateApplicationsScreen extends ConsumerWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text('Pengajuan Delegate ($pendingCount)', style: AppTypography.headerTitle.copyWith(color: Colors.white)),
+        titleSpacing: 0,
+        title: Text('Pengajuan Delegate ($pendingCount)', style: AppTypography.headerTitle),
         backgroundColor: AppColors.primary800,
         iconTheme: const IconThemeData(color: Colors.white),
       ),

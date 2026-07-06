@@ -314,22 +314,23 @@ class AdminDashboardScreen extends StatelessWidget {
                   Row(
                     children: [
                       Expanded(
-                        child: InkWell(
-                          onTap: () {
-                            context.pushNamed('admin-create-candidates');
-                          },
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
-                            decoration: BoxDecoration(
-                              color: AppColors.goldMid,
-                              borderRadius: BorderRadius.circular(AppRadius.card),
-                            ),
-                            child: Column(
-                              children: [
-                                const Icon(Icons.add_box_outlined, color: Colors.white, size: 28),
-                                const SizedBox(height: 8),
-                                Text('Buat Pemilihan Baru', style: AppTypography.captionBold.copyWith(color: Colors.white), textAlign: TextAlign.center),
-                              ],
+                        child: Material(
+                          color: AppColors.goldMid,
+                          borderRadius: BorderRadius.circular(AppRadius.card),
+                          child: InkWell(
+                            onTap: () {
+                              context.pushNamed('proposal-create');
+                            },
+                            borderRadius: BorderRadius.circular(AppRadius.card),
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
+                              child: Column(
+                                children: [
+                                  const Icon(Icons.add_box_outlined, color: Colors.white, size: 28),
+                                  const SizedBox(height: 8),
+                                  Text('Buat Pemilihan Baru', style: AppTypography.captionBold.copyWith(color: Colors.white), textAlign: TextAlign.center),
+                                ],
+                              ),
                             ),
                           ),
                         ),
@@ -339,19 +340,25 @@ class AdminDashboardScreen extends StatelessWidget {
                         child: Stack(
                           clipBehavior: Clip.none,
                           children: [
-                            Container(
-                              width: double.infinity,
-                              padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
-                              decoration: BoxDecoration(
-                                color: AppColors.primary900,
+                            Material(
+                              color: AppColors.primary900,
+                              borderRadius: BorderRadius.circular(AppRadius.card),
+                              child: InkWell(
+                                onTap: () {
+                                  context.pushNamed('admin-candidate-verification');
+                                },
                                 borderRadius: BorderRadius.circular(AppRadius.card),
-                              ),
-                              child: Column(
-                                children: [
-                                  const Icon(Icons.verified_user_outlined, color: Colors.white, size: 28),
-                                  const SizedBox(height: 8),
-                                  Text('Verifikasi Kandidat', style: AppTypography.captionBold.copyWith(color: Colors.white), textAlign: TextAlign.center),
-                                ],
+                                child: Padding(
+                                  padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                                    children: [
+                                      const Icon(Icons.verified_user_outlined, color: Colors.white, size: 28),
+                                      const SizedBox(height: 8),
+                                      Text('Verifikasi Kandidat', style: AppTypography.captionBold.copyWith(color: Colors.white), textAlign: TextAlign.center),
+                                    ],
+                                  ),
+                                ),
                               ),
                             ),
                             Positioned(

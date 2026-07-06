@@ -13,15 +13,14 @@ class MyElectionProposalsScreen extends StatelessWidget {
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
+        titleSpacing: 0,
         backgroundColor: AppColors.primary800,
         elevation: 0,
-        automaticallyImplyLeading: false,
-        title: Text('Usulan Pemilihan Saya', style: AppTypography.headerTitle.copyWith(color: Colors.white)),
-        flexibleSpace: Container(
-          decoration: const BoxDecoration(
-            gradient: AppColors.headerGradient,
-          ),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: Colors.white),
+          onPressed: () => context.pop(),
         ),
+        title: Text('Usulan Pemilihan Saya', style: AppTypography.headerTitle.copyWith(color: Colors.white)),
       ),
       body: Container(
         decoration: const BoxDecoration(
@@ -41,10 +40,10 @@ class MyElectionProposalsScreen extends StatelessWidget {
             ),
             const SizedBox(height: AppSpacing.xl),
             
-            _buildReviewCard(),
+            _buildReviewCard(context),
             const SizedBox(height: AppSpacing.lg),
             
-            _buildApprovedCard(),
+            _buildApprovedCard(context),
             const SizedBox(height: AppSpacing.lg),
             
             _buildRejectedCard(),
@@ -97,7 +96,7 @@ class MyElectionProposalsScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildReviewCard() {
+  Widget _buildReviewCard(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
         color: const Color(0xFFF7F6EE), // Light cream/yellowish background
@@ -173,7 +172,9 @@ class MyElectionProposalsScreen extends StatelessWidget {
             child: Material(
               color: Colors.transparent,
               child: InkWell(
-                onTap: () {},
+                onTap: () {
+                  context.pushNamed('proposal-track', pathParameters: {'id': 'VTX-7777'});
+                },
                 borderRadius: BorderRadius.circular(AppRadius.input),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.center,
@@ -257,7 +258,7 @@ class MyElectionProposalsScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildApprovedCard() {
+  Widget _buildApprovedCard(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
@@ -379,7 +380,9 @@ class MyElectionProposalsScreen extends StatelessWidget {
             child: Material(
               color: Colors.transparent,
               child: InkWell(
-                onTap: () {},
+                onTap: () {
+                  context.pushNamed('proposal-candidates', pathParameters: {'id': 'VTX-8821'});
+                },
                 borderRadius: BorderRadius.circular(AppRadius.input),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.center,
@@ -400,7 +403,9 @@ class MyElectionProposalsScreen extends StatelessWidget {
           // Link
           Center(
             child: InkWell(
-              onTap: () {},
+              onTap: () {
+                context.pushNamed('proposal-schedule', pathParameters: {'id': 'VTX-8821'});
+              },
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                 child: Text(

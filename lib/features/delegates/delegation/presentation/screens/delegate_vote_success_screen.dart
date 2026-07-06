@@ -91,6 +91,7 @@ class DelegateVoteSuccessScreen extends StatelessWidget {
   // ─────────────────────────── AppBar ────────────────────────────
   PreferredSizeWidget _buildAppBar(BuildContext context) {
     return AppBar(
+      titleSpacing: 0,
       backgroundColor: AppColors.primary800,
       elevation: 0,
       leading: IconButton(
@@ -99,7 +100,7 @@ class DelegateVoteSuccessScreen extends StatelessWidget {
       ),
       title: Text(
         'Delegate Portal',
-        style: AppTypography.headerTitle.copyWith(color: Colors.white),
+        style: AppTypography.headerTitle,
       ),
     );
   }

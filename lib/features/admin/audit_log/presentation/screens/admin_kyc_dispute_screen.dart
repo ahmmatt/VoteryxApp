@@ -89,7 +89,8 @@ class _AdminKycDisputeScreenState extends State<AdminKycDisputeScreen> {
   // ── AppBar ────────────────────────────────────────────────────────────────
   PreferredSizeWidget _buildAppBar(BuildContext context) {
     return AppBar(
-      backgroundColor: AppColors.primary900,
+      titleSpacing: 0,
+      backgroundColor: AppColors.primary800,
       elevation: 0,
       leading: IconButton(
         icon: const Icon(Icons.arrow_back, color: Colors.white),

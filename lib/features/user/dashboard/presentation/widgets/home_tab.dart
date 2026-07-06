@@ -109,92 +109,39 @@ class _HeaderSection extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Top bar: Logo, Bell, Avatar
+          // Header Content: Greeting and Bell Icon
           Row(
-            children: [
-              Text(
-                'Voteryx',
-                style: AppTypography.displayHeading.copyWith(
-                  color: Colors.white,
-                  fontSize: 20,
-                ),
-              ),
-              const Spacer(),
-              // Bell Icon
-              Container(
-                width: 34,
-                height: 34,
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.2),
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(
-                  Icons.notifications_none_rounded,
-                  color: Colors.white,
-                  size: 19,
-                ),
-              ),
-              const SizedBox(width: AppSpacing.sm),
-              // Avatar (Diubah ke Icon statis agar aman dari CORS Web)
-              Container(
-                width: 34,
-                height: 34,
-                decoration: BoxDecoration(
-                  color: const Color(0xFFC5C6CE),
-                  shape: BoxShape.circle,
-                  border: Border.all(color: AppColors.goldMid, width: 1.5),
-                ),
-                child: const Icon(
-                  Icons.person,
-                  color: AppColors.textSecondary,
-                  size: 20,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: AppSpacing.lg),
-
-          // Greeting
-          Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               Expanded(
-                child: Text(
-                  'Halo, Budi Santoso',
-                  style: AppTypography.displayHeading.copyWith(
-                    color: Colors.white,
-                    fontSize: 18,
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-              const SizedBox(width: AppSpacing.sm),
-              // KYC Badge
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  color: const Color(0x330F6E56),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: const Color(0xFF0F6E56)),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Icon(
-                      Icons.verified,
-                      color: Color(0xFF34C759),
-                      size: 11,
-                    ),
-                    const SizedBox(width: 4),
                     Text(
-                      'KYC',
-                      style: AppTypography.captionBold.copyWith(
-                        color: const Color(0xFF34C759),
-                        fontSize: 9,
+                      'Selamat Pagi,',
+                      style: AppTypography.caption.copyWith(
+                        color: Colors.white70,
                       ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      'Admin Pemilu FST',
+                      style: AppTypography.displayHeading.copyWith(
+                        color: Colors.white,
+                        fontSize: 20,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ],
                 ),
+              ),
+              const SizedBox(width: AppSpacing.sm),
+              // Bell Icon
+              const Icon(
+                Icons.notifications_none_rounded,
+                color: Colors.white,
+                size: 24,
               ),
             ],
           ),
@@ -538,7 +485,7 @@ class _ActiveElectionCard extends StatelessWidget {
                 flex: 2,
                 child: TextButton(
                   onPressed: () {
-                    context.pushNamed('election', pathParameters: {'id': '1'});
+                    context.pushNamed('election-info', pathParameters: {'id': '1'});
                   },
                   child: Text(
                     'Lihat Detail',

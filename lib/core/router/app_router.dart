@@ -26,11 +26,17 @@ import '../../features/delegates/delegation/presentation/screens/delegate_vote_e
 import '../../features/delegates/delegation/presentation/screens/delegate_vote_processing_screen.dart';
 import '../../features/delegates/delegation/presentation/screens/delegate_vote_success_screen.dart';
 import '../../features/delegates/delegation/presentation/screens/delegate_execution_history_screen.dart';
+import '../../features/delegates/delegation/presentation/screens/delegate_detail_screen.dart';
+import '../../features/delegates/delegation/presentation/screens/mandator_profile_screen.dart';
 import '../../features/user/profile/presentation/screens/profile_screen.dart';
 import '../../features/user/election/presentation/screens/election_detail_screen.dart';
+import '../../features/user/election/presentation/screens/election_info_screen.dart';
 import '../../features/user/election/presentation/screens/election_list_screen.dart';
 import '../../features/user/election/presentation/screens/proposal_create_screen.dart';
 import '../../features/user/election_proposal/presentation/screens/my_election_proposals_screen.dart';
+import '../../features/user/election_proposal/presentation/screens/proposal_candidate_list_screen.dart';
+import '../../features/user/election_proposal/presentation/screens/proposal_manage_schedule_screen.dart';
+import '../../features/user/election_proposal/presentation/screens/proposal_track_detail_screen.dart';
 import '../../features/delegates/profile/presentation/screens/delegate_profile_screen.dart';
 
 // Admin Imports
@@ -67,9 +73,20 @@ abstract final class AppRoutes {
   static const kycNfcScan = '/kyc/nfc-scan';
 
   static const dashboard = '/dashboard';
+  static const profile = '/profile';
+  static const settings = '/settings';
+  static const security = '/security';
+  static const history = '/history';
+  static const notification = '/notification';
+  static const proposalStatus = '/proposal-status';
+  static const proposalCreate = '/proposal-create';
+  static const proposalCandidates = '/election-proposal/:id/candidates';
+  static const proposalSchedule = '/election-proposal/:id/schedule';
+  static const proposalTrack = '/election-proposal/:id/track';
 
   // Election — :id adalah UUID pemilihan
   static const electionList = '/elections';
+  static const electionInfo = '/election-info/:id';
   static const electionDetail = '/election/:id';
   static const electionCandidate = '/election/:id/candidate/:candidateId';
   static const electionVote = '/election/:id/vote-execution';
@@ -79,13 +96,6 @@ abstract final class AppRoutes {
   // Delegation
   static const delegation = '/delegation';
   static const delegationDetail = '/delegation/:delegatorId';
-
-  // Profile
-  static const profile = '/profile';
-
-  // Election Proposal (user/organisasi)
-  static const proposalCreate = '/election-proposal/create';
-  static const proposalStatus = '/election-proposal/status';
 
   // Admin
   static const adminDashboard = '/admin/dashboard';
@@ -259,13 +269,6 @@ final GoRouter appRouter = GoRouter(
         ]),
         StatefulShellBranch(routes: [
           GoRoute(
-            path: '/delegation/dashboard',
-            name: 'delegate-dashboard',
-            builder: (_, __) => const DelegateDashboardScreen(),
-          ),
-        ]),
-        StatefulShellBranch(routes: [
-          GoRoute(
             path: '/delegation/history',
             name: 'delegate-history',
             builder: (_, __) => const DelegateExecutionHistoryScreen(),
@@ -289,6 +292,12 @@ final GoRouter appRouter = GoRouter(
       name: 'elections',
       parentNavigatorKey: _rootNavigatorKey,
       builder: (_, __) => const ElectionListScreen(),
+    ),
+    GoRoute(
+      path: AppRoutes.electionInfo,
+      name: 'election-info',
+      parentNavigatorKey: _rootNavigatorKey,
+      builder: (ctx, state) => const ElectionInfoScreen(),
     ),
     GoRoute(
       path: '/election/:id',
@@ -327,10 +336,58 @@ final GoRouter appRouter = GoRouter(
       path: AppRoutes.proposalCreate,
       name: 'proposal-create',
       parentNavigatorKey: _rootNavigatorKey,
-      builder: (_, __) => const ProposalCreateScreen(),
+      builder: (ctx, state) => const ProposalCreateScreen(),
+    ),
+    GoRoute(
+      path: AppRoutes.proposalCandidates,
+      name: 'proposal-candidates',
+      parentNavigatorKey: _rootNavigatorKey,
+      builder: (ctx, state) => const ProposalCandidateListScreen(),
+    ),
+    GoRoute(
+      path: AppRoutes.proposalSchedule,
+      name: 'proposal-schedule',
+      parentNavigatorKey: _rootNavigatorKey,
+      builder: (ctx, state) => const ProposalManageScheduleScreen(),
+    ),
+    GoRoute(
+      path: AppRoutes.proposalTrack,
+      name: 'proposal-track',
+      parentNavigatorKey: _rootNavigatorKey,
+      builder: (ctx, state) => const ProposalTrackDetailScreen(),
     ),
 
     // Delegate non-nav routes
+    GoRoute(
+      path: '/delegation/dashboard',
+      name: 'delegate-dashboard',
+      parentNavigatorKey: _rootNavigatorKey,
+      builder: (_, __) => const DelegateDashboardScreen(),
+    ),
+    GoRoute(
+      path: '/delegation/mandator-detail',
+      name: 'delegate-detail',
+      parentNavigatorKey: _rootNavigatorKey,
+      builder: (_, __) => const DelegateDetailScreen(),
+    ),
+    GoRoute(
+      path: '/delegation/mandator/:name',
+      name: 'mandator-profile',
+      parentNavigatorKey: _rootNavigatorKey,
+      builder: (ctx, state) {
+        final extra = state.extra as Map<String, dynamic>? ?? {};
+        return MandatorProfileScreen(
+          name: extra['name'] as String? ?? 'Mandator',
+          nim: extra['nim'] as String? ?? '-',
+          faculty: extra['faculty'] as String? ?? '-',
+          status: extra['status'] as String? ?? 'Aktif',
+          statusColor: extra['statusColor'] as Color? ?? const Color(0xFF10B981),
+          votes: extra['votes'] as int? ?? 1,
+          isRevoked: extra['isRevoked'] as bool? ?? false,
+          imageUrl: extra['imageUrl'] as String? ?? 'https://i.pravatar.cc/150',
+        );
+      },
+    ),
     GoRoute(
       path: '/delegation/registration',
       name: 'delegate-registration',

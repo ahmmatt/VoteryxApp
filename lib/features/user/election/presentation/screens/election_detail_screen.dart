@@ -4,7 +4,9 @@ import 'package:go_router/go_router.dart';
 import '../../../../../core/constants/app_colors.dart';
 import '../../../../../core/constants/app_spacing.dart';
 import '../../../../../core/constants/app_typography.dart';
+import '../../../../../core/constants/app_typography.dart';
 import '../../../../../core/widgets/app_text_field.dart';
+import '../widgets/election_summary_white_card.dart';
 
 class ElectionDetailScreen extends StatefulWidget {
   const ElectionDetailScreen({super.key});
@@ -34,13 +36,14 @@ class _ElectionDetailScreenState extends State<ElectionDetailScreen>
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
+        titleSpacing: 0,
         backgroundColor: AppColors.primary800,
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Colors.white),
           onPressed: () => context.go('/dashboard'),
         ),
-        title: Text('Elections', style: AppTypography.headerTitle),
+        title: Text('Elections', style: AppTypography.headerTitle.copyWith(color: Colors.white)),
       ),
       body: Container(
         decoration: const BoxDecoration(
@@ -49,10 +52,15 @@ class _ElectionDetailScreenState extends State<ElectionDetailScreen>
         child: Column(
           children: [
             const SizedBox(height: AppSpacing.lg),
-            _buildElectionSummaryCard(context),
-            const SizedBox(height: AppSpacing.sm),
-            // Progress Card
-            _buildProgressCard(context),
+            const Padding(
+              padding: EdgeInsets.symmetric(horizontal: AppSpacing.pagePad),
+              child: ElectionSummaryWhiteCard(
+                title: 'Pemilihan Ketua BEM 2026',
+                participationPercentage: 0.62,
+                votersCountText: '12,402 dari 20,000\nmahasiswa',
+                countdownText: '02 : 14 : 45 : 12',
+              ),
+            ),
             const SizedBox(height: AppSpacing.lg),
 
             // Tab Bar
@@ -93,190 +101,7 @@ class _ElectionDetailScreenState extends State<ElectionDetailScreen>
     );
   }
 
-  Widget _buildElectionSummaryCard(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: AppSpacing.pagePad),
-      padding: const EdgeInsets.all(AppSpacing.md),
-      decoration: BoxDecoration(
-        color: AppColors.primary800,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: const [
-          BoxShadow(
-            color: Color(0x140F1F3D),
-            blurRadius: 16,
-            offset: Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                width: 34,
-                height: 34,
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.14),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: const Icon(
-                  Icons.how_to_vote_outlined,
-                  color: AppColors.goldMid,
-                  size: 19,
-                ),
-              ),
-              const SizedBox(width: AppSpacing.sm),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'PEMILIHAN AKTIF',
-                      style: AppTypography.captionBold.copyWith(
-                        color: AppColors.goldMid,
-                        letterSpacing: 0.7,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      'Ketua BEM 2026',
-                      style: AppTypography.cardTitle.copyWith(
-                        color: Colors.white,
-                        fontSize: 17,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              Text(
-                '4 Kandidat',
-                style: AppTypography.caption.copyWith(
-                  color: Colors.white.withValues(alpha: 0.72),
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: AppSpacing.md),
-          const _CandidateEstimateRow(
-            name: 'Aris Setiawan',
-            votes: '5,120',
-            percent: 0.41,
-            color: AppColors.goldMid,
-          ),
-          const SizedBox(height: AppSpacing.sm),
-          const _CandidateEstimateRow(
-            name: 'Farah Quinn',
-            votes: '4,780',
-            percent: 0.38,
-            color: Color(0xFF34C759),
-          ),
-          const SizedBox(height: AppSpacing.sm),
-          const _CandidateEstimateRow(
-            name: 'Budi Tabuti',
-            votes: '1,640',
-            percent: 0.13,
-            color: Color(0xFF5B8DEF),
-          ),
-          const SizedBox(height: AppSpacing.sm),
-          const _CandidateEstimateRow(
-            name: 'Siti Aminah',
-            votes: '862',
-            percent: 0.08,
-            color: Color(0xFFE86E6E),
-          ),
-        ],
-      ),
-    );
-  }
 
-  Widget _buildProgressCard(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: AppSpacing.pagePad),
-      padding: const EdgeInsets.all(AppSpacing.md),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: const [
-          BoxShadow(
-            color: Color(0x080F1F3D),
-            blurRadius: 16,
-            offset: Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Column(
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                'Partisipasi Pemilih',
-                style: AppTypography.bodyMedium.copyWith(
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-              Text(
-                '62%',
-                style: AppTypography.cardTitle.copyWith(
-                  color: AppColors.goldDark,
-                  fontSize: 22,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: AppSpacing.sm),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(4),
-            child: const LinearProgressIndicator(
-              value: 0.62,
-              backgroundColor: AppColors.outlineVariant,
-              valueColor: AlwaysStoppedAnimation<Color>(AppColors.goldDark),
-              minHeight: 6,
-            ),
-          ),
-          const SizedBox(height: AppSpacing.md),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Expanded(
-                child: Text(
-                  '12,402 dari 20,000\nmahasiswa',
-                  style: AppTypography.captionBold.copyWith(
-                    color: AppColors.textSecondary,
-                    height: 1.3,
-                  ),
-                ),
-              ),
-              Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                decoration: BoxDecoration(
-                  color: AppColors.primary800,
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Row(
-                  children: [
-                    const Icon(Icons.access_time,
-                        color: Colors.white, size: 14),
-                    const SizedBox(width: 6),
-                    Text(
-                      '02 : 14 : 45 : 12',
-                      style: AppTypography.captionBold.copyWith(
-                        color: Colors.white,
-                        letterSpacing: 1,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
 }
 
 class _CandidateEstimateRow extends StatelessWidget {

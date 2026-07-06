@@ -133,7 +133,7 @@ class _Header extends StatelessWidget {
               const SizedBox(width: AppSpacing.xs),
               Text(
                 'Daftar Pemilihan',
-                style: AppTypography.headerTitle.copyWith(fontSize: 18),
+                style: AppTypography.headerTitle.copyWith(fontSize: 18, color: Colors.white),
               ),
             ],
           ),

@@ -76,6 +76,7 @@ class ElectionsTab extends StatelessWidget {
             'Elections',
             style: AppTypography.headerTitle.copyWith(
               fontSize: 20,
+              color: Colors.white,
             ),
           ),
         ],

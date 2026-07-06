@@ -13,17 +13,14 @@ class ProfileSettingsScreen extends StatelessWidget {
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
+        titleSpacing: 0,
         backgroundColor: AppColors.primary800,
         elevation: 0,
-        automaticallyImplyLeading: false,
-        leadingWidth: 80,
-        leading: TextButton(
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: Colors.white),
           onPressed: () => Navigator.of(context).pop(),
-          child: Text(
-            'Batal',
-            style: AppTypography.bodyMedium.copyWith(color: Colors.white, fontWeight: FontWeight.w600),
-          ),
         ),
+        title: Text('Pengaturan Profil', style: AppTypography.headerTitle.copyWith(color: Colors.white)),
         actions: [
           TextButton(
             onPressed: () {
@@ -39,11 +36,6 @@ class ProfileSettingsScreen extends StatelessWidget {
           ),
           const SizedBox(width: AppSpacing.sm),
         ],
-        flexibleSpace: Container(
-          decoration: const BoxDecoration(
-            gradient: AppColors.headerGradient,
-          ),
-        ),
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg, vertical: AppSpacing.xl),

@@ -38,7 +38,7 @@ class DelegateExecutionHistoryScreen extends StatefulWidget {
 class _DelegateExecutionHistoryScreenState
     extends State<DelegateExecutionHistoryScreen> {
   int _selectedFilter = 0;
-  final List<String> _filters = ['Semua', '2026', '2025', 'BEM'];
+  final List<String> _filters = ['Semua', 'Menunggu', 'Selesai'];
 
   static const List<_ExecutionItem> _items = [
     _ExecutionItem(
@@ -47,7 +47,7 @@ class _DelegateExecutionHistoryScreenState
       votes: 47,
       mandators: 12,
       accuracy: '96% tepat waktu',
-      status: 'Selesai',
+      status: 'Menunggu',
     ),
     _ExecutionItem(
       title: 'HIMA Teknik 2025',
@@ -63,6 +63,14 @@ class _DelegateExecutionHistoryScreenState
       status: 'Selesai',
     ),
   ];
+
+  List<_ExecutionItem> get _filteredItems {
+    if (_selectedFilter == 0) return _items; // Semua
+    final keyword = _filters[_selectedFilter].toLowerCase();
+    return _items.where((item) => 
+      item.status.toLowerCase() == keyword
+    ).toList();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -84,7 +92,15 @@ class _DelegateExecutionHistoryScreenState
               const SizedBox(height: AppSpacing.xl),
               _buildFilterChips(),
               const SizedBox(height: AppSpacing.xl),
-              ..._items.map(_buildExecutionCard),
+              if (_filteredItems.isEmpty)
+                const Center(
+                  child: Padding(
+                    padding: EdgeInsets.all(20.0),
+                    child: Text('Tidak ada riwayat untuk filter ini'),
+                  ),
+                )
+              else
+                ..._filteredItems.map(_buildExecutionCard),
               const SizedBox(height: AppSpacing.xl),
             ],
           ),
@@ -96,19 +112,14 @@ class _DelegateExecutionHistoryScreenState
   // ─────────────────────────── AppBar ────────────────────────────
   PreferredSizeWidget _buildAppBar() {
     return AppBar(
+      titleSpacing: 0,
       backgroundColor: AppColors.primary800,
       elevation: 0,
       automaticallyImplyLeading: false,
       title: Text(
         'Riwayat Eksekusi',
-        style: AppTypography.headerTitle.copyWith(color: Colors.white),
+        style: AppTypography.headerTitle,
       ),
-      actions: [
-        IconButton(
-          icon: const Icon(Icons.filter_list, color: Colors.white),
-          onPressed: () {},
-        ),
-      ],
     );
   }
 
@@ -219,10 +230,13 @@ class _DelegateExecutionHistoryScreenState
 
   // ──────────────────── Execution Card ──────────────────────────
   Widget _buildExecutionCard(_ExecutionItem item) {
-    const Color teal = Color(0xFF10B981);
-    const Color tealBg = Color(0xFFD1FAE5);
+    final bool isSelesai = item.status.toLowerCase() == 'selesai';
+    final Color badgeColor = isSelesai ? const Color(0xFF10B981) : AppColors.goldDark;
+    final Color badgeBgColor = badgeColor.withOpacity(0.15);
 
-    return Container(
+    return GestureDetector(
+      onTap: () => context.pushNamed('delegate-dashboard'),
+      child: Container(
       margin: const EdgeInsets.only(bottom: AppSpacing.md),
       clipBehavior: Clip.antiAlias,
       decoration: BoxDecoration(
@@ -241,7 +255,7 @@ class _DelegateExecutionHistoryScreenState
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             // Left accent bar
-            Container(width: 4, color: teal),
+            Container(width: 4, color: badgeColor),
             // Card content
             Expanded(
               child: Padding(
@@ -257,12 +271,12 @@ class _DelegateExecutionHistoryScreenState
                         Container(
                           padding: const EdgeInsets.all(10),
                           decoration: BoxDecoration(
-                            color: tealBg,
+                            color: badgeBgColor,
                             borderRadius: BorderRadius.circular(12),
                           ),
-                          child: const Icon(
+                          child: Icon(
                             Icons.list_alt_rounded,
-                            color: teal,
+                            color: badgeColor,
                             size: 24,
                           ),
                         ),
@@ -299,13 +313,13 @@ class _DelegateExecutionHistoryScreenState
                             vertical: 4,
                           ),
                           decoration: BoxDecoration(
-                            color: tealBg,
+                            color: badgeBgColor,
                             borderRadius: BorderRadius.circular(12),
                           ),
                           child: Text(
                             item.status,
                             style: AppTypography.captionBold.copyWith(
-                              color: teal,
+                              color: badgeColor,
                               fontSize: 11,
                             ),
                           ),
@@ -335,8 +349,8 @@ class _DelegateExecutionHistoryScreenState
                           _buildBadge(
                             Icons.timer_outlined,
                             item.accuracy!,
-                            bgColor: tealBg,
-                            textColor: teal,
+                            bgColor: badgeBgColor,
+                            textColor: badgeColor,
                           ),
                       ],
                     ),
@@ -346,6 +360,7 @@ class _DelegateExecutionHistoryScreenState
             ),
           ],
         ),
+      ),
       ),
     );
   }

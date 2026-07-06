@@ -24,7 +24,8 @@ class _DelegateDashboardScreenState extends State<DelegateDashboardScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.background,
-      appBar: _buildAppBar(),
+      appBar: _buildAppBar(context),
+      bottomNavigationBar: _buildBottomNav(context),
       body: Stack(
         children: [
           // Gradient background
@@ -58,21 +59,19 @@ class _DelegateDashboardScreenState extends State<DelegateDashboardScreen> {
   }
 
   // ─────────────────────────── AppBar ────────────────────────────
-  PreferredSizeWidget _buildAppBar() {
+  PreferredSizeWidget _buildAppBar(BuildContext context) {
     return AppBar(
+      titleSpacing: 0,
       backgroundColor: AppColors.primary800,
       elevation: 0,
-      automaticallyImplyLeading: false,
+      leading: IconButton(
+        icon: const Icon(Icons.arrow_back, color: Colors.white),
+        onPressed: () => context.pop(),
+      ),
       title: Text(
         'Manajemen Mandat',
-        style: AppTypography.headerTitle.copyWith(color: Colors.white),
+        style: AppTypography.headerTitle,
       ),
-      actions: [
-        IconButton(
-          icon: const Icon(Icons.filter_list, color: Colors.white),
-          onPressed: () {},
-        ),
-      ],
     );
   }
 
@@ -258,47 +257,78 @@ class _DelegateDashboardScreenState extends State<DelegateDashboardScreen> {
   }
 
   // ──────────────────── Mandator List ────────────────────────────
+  final List<Map<String, dynamic>> _mandatorData = const [
+    {
+      'name': 'Siti Rahma',
+      'nim': '220104052',
+      'faculty': 'Ilmu Komputer',
+      'votes': 1,
+      'status': 'Menunggu',
+      'statusColor': AppColors.goldDark,
+      'imageUrl': 'https://i.pravatar.cc/150?img=5',
+      'isRevoked': false,
+    },
+    {
+      'name': 'Ahmad Fauzi',
+      'nim': '220104099',
+      'faculty': 'Teknik Mesin',
+      'votes': 1,
+      'status': 'Aktif',
+      'statusColor': Color(0xFF10B981),
+      'imageUrl': 'https://i.pravatar.cc/150?img=11',
+      'isRevoked': false,
+    },
+    {
+      'name': 'Dian Kartika',
+      'nim': '220104011',
+      'faculty': 'Psikologi',
+      'votes': 0,
+      'status': 'Mandat telah ditarik oleh pemberi',
+      'statusColor': Colors.red,
+      'imageUrl': 'https://i.pravatar.cc/150?img=9',
+      'isRevoked': true,
+    },
+    {
+      'name': 'Kevin Pratama',
+      'nim': '220104105',
+      'faculty': 'Ekonomi',
+      'votes': 1,
+      'status': 'Aktif',
+      'statusColor': Color(0xFF10B981),
+      'imageUrl': 'https://i.pravatar.cc/150?img=12',
+      'isRevoked': false,
+    },
+  ];
+
   Widget _buildMandatorList() {
+    // 0: Semua, 1: Aktif, 2: Menunggu
+    final filteredData = _mandatorData.where((m) {
+      if (_selectedTab == 0) return true;
+      if (_selectedTab == 1) return m['status'] == 'Aktif';
+      if (_selectedTab == 2) return m['status'] == 'Menunggu';
+      return true;
+    }).toList();
+
+    if (filteredData.isEmpty) {
+      return const Center(
+        child: Padding(
+          padding: EdgeInsets.all(20.0),
+          child: Text('Tidak ada data untuk tab ini'),
+        ),
+      );
+    }
+
     return Column(
-      children: [
-        _buildMandatorCard(
-          name: 'Siti Rahma',
-          nim: '220104052',
-          faculty: 'Ilmu Komputer',
-          votes: 1,
-          status: 'Menunggu',
-          statusColor: AppColors.goldDark,
-          imageUrl: 'https://i.pravatar.cc/150?img=5',
-        ),
-        _buildMandatorCard(
-          name: 'Ahmad Fauzi',
-          nim: '220104099',
-          faculty: 'Teknik Mesin',
-          votes: 1,
-          status: 'Aktif',
-          statusColor: const Color(0xFF10B981),
-          imageUrl: 'https://i.pravatar.cc/150?img=11',
-        ),
-        _buildMandatorCard(
-          name: 'Dian Kartika',
-          nim: '220104011',
-          faculty: 'Psikologi',
-          votes: 0,
-          status: 'Mandat telah ditarik oleh pemberi',
-          statusColor: Colors.red,
-          imageUrl: 'https://i.pravatar.cc/150?img=9',
-          isRevoked: true,
-        ),
-        _buildMandatorCard(
-          name: 'Kevin Pratama',
-          nim: '220104105',
-          faculty: 'Ekonomi',
-          votes: 1,
-          status: 'Aktif',
-          statusColor: const Color(0xFF10B981),
-          imageUrl: 'https://i.pravatar.cc/150?img=12',
-        ),
-      ],
+      children: filteredData.map((data) => _buildMandatorCard(
+        name: data['name'] as String,
+        nim: data['nim'] as String,
+        faculty: data['faculty'] as String,
+        votes: data['votes'] as int,
+        status: data['status'] as String,
+        statusColor: data['statusColor'] as Color,
+        imageUrl: data['imageUrl'] as String,
+        isRevoked: data['isRevoked'] as bool,
+      )).toList(),
     );
   }
 
@@ -312,30 +342,45 @@ class _DelegateDashboardScreenState extends State<DelegateDashboardScreen> {
     required String imageUrl,
     bool isRevoked = false,
   }) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: AppSpacing.md),
-      padding: const EdgeInsets.symmetric(
-        horizontal: AppSpacing.md,
-        vertical: AppSpacing.md,
+    return GestureDetector(
+      onTap: isRevoked ? null : () => context.pushNamed(
+        'mandator-profile',
+        pathParameters: {'name': name.replaceAll(' ', '-').toLowerCase()},
+        extra: {
+          'name': name,
+          'nim': nim,
+          'faculty': faculty,
+          'status': status,
+          'statusColor': statusColor,
+          'votes': votes,
+          'isRevoked': isRevoked,
+          'imageUrl': imageUrl,
+        },
       ),
-      decoration: BoxDecoration(
-        color: isRevoked ? const Color(0xFFF5F5F5) : Colors.white,
-        borderRadius: BorderRadius.circular(AppRadius.card),
-        border: isRevoked
-            ? Border.all(color: Colors.red.withOpacity(0.15))
-            : null,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(isRevoked ? 0.01 : 0.03),
-            blurRadius: 12,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
-          // Avatar
+      child: Container(
+        margin: const EdgeInsets.only(bottom: AppSpacing.md),
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.md,
+          vertical: AppSpacing.md,
+        ),
+        decoration: BoxDecoration(
+          color: isRevoked ? const Color(0xFFF5F5F5) : Colors.white,
+          borderRadius: BorderRadius.circular(AppRadius.card),
+          border: isRevoked
+              ? Border.all(color: Colors.red.withOpacity(0.15))
+              : null,
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(isRevoked ? 0.01 : 0.03),
+              blurRadius: 12,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            // Avatar
           _buildAvatar(imageUrl, isRevoked),
           const SizedBox(width: 12),
           // Info
@@ -443,7 +488,8 @@ class _DelegateDashboardScreenState extends State<DelegateDashboardScreen> {
             const Icon(Icons.chevron_right, color: AppColors.outline, size: 22),
         ],
       ),
-    );
+      ), // Close GestureDetector child
+    ); // Close GestureDetector
   }
 
   Widget _buildAvatar(String imageUrl, bool isRevoked) {
@@ -509,6 +555,93 @@ class _DelegateDashboardScreenState extends State<DelegateDashboardScreen> {
               ],
             ),
           ),
+        ),
+      ),
+    );
+  }
+
+  // ──────────────── Bottom Navigation Bar ──────────────────────────
+  Widget _buildBottomNav(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        border: Border(
+          top: BorderSide(color: AppColors.outlineVariant.withOpacity(0.5)),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.04),
+            blurRadius: 8,
+            offset: const Offset(0, -2),
+          ),
+        ],
+      ),
+      child: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceAround,
+            children: [
+              _buildNavItem(
+                context,
+                icon: Icons.home_outlined,
+                label: 'Beranda',
+                onTap: () => context.goNamed('delegate-home'),
+              ),
+              _buildNavItem(
+                context,
+                icon: Icons.gavel_outlined,
+                label: 'Mandat',
+                isSelected: true,
+                onTap: () => context.pop(),
+              ),
+              _buildNavItem(
+                context,
+                icon: Icons.person_outline_rounded,
+                label: 'Profil',
+                onTap: () => context.goNamed('delegate-profile'),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildNavItem(
+    BuildContext context, {
+    required IconData icon,
+    required String label,
+    bool isSelected = false,
+    required VoidCallback onTap,
+  }) {
+    final color = isSelected ? AppColors.goldDark : AppColors.textSecondary;
+    return GestureDetector(
+      onTap: onTap,
+      behavior: HitTestBehavior.opaque,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+        decoration: isSelected
+            ? BoxDecoration(
+                color: AppColors.goldMid.withOpacity(0.15),
+                borderRadius: BorderRadius.circular(16),
+              )
+            : null,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 21, color: color),
+            const SizedBox(height: 2),
+            Text(
+              label,
+              style: AppTypography.captionBold.copyWith(
+                color: color,
+                fontSize: 9,
+                fontWeight: isSelected ? FontWeight.w700 : FontWeight.w400,
+              ),
+            ),
+          ],
         ),
       ),
     );

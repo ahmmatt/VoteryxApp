@@ -5,6 +5,7 @@ import 'package:voteryxapp/core/constants/app_typography.dart';
 import 'package:voteryxapp/core/constants/app_spacing.dart';
 import 'package:voteryxapp/core/constants/app_radius.dart';
 import 'package:voteryxapp/core/widgets/user_bottom_nav_bar.dart';
+import 'package:voteryxapp/core/router/app_router.dart';
 
 import 'history_screen.dart';
 import 'help_screen.dart';
@@ -18,10 +19,11 @@ class ProfileScreen extends StatelessWidget {
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
+        titleSpacing: 0,
         backgroundColor: AppColors.primary800,
         elevation: 0,
         automaticallyImplyLeading: false,
-        title: Text('Profile', style: AppTypography.headerTitle),
+        title: Text('Profile', style: AppTypography.headerTitle.copyWith(color: Colors.white)),
         actions: [
           IconButton(
             icon: const Icon(Icons.settings, color: Colors.white),
@@ -34,11 +36,6 @@ class ProfileScreen extends StatelessWidget {
             },
           ),
         ],
-        flexibleSpace: Container(
-          decoration: const BoxDecoration(
-            gradient: AppColors.headerGradient,
-          ),
-        ),
       ),
       body: SingleChildScrollView(
         child: Column(
@@ -213,6 +210,15 @@ class ProfileScreen extends StatelessWidget {
               Navigator.of(context, rootNavigator: true).push(
                 MaterialPageRoute(builder: (context) => const HelpScreen()),
               );
+            },
+          ),
+          _buildMenuItem(
+            icon: Icons.logout,
+            title: 'Keluar (Logout)',
+            iconColor: AppColors.errorRed,
+            trailingColor: AppColors.errorRed,
+            onTap: () {
+              context.go(AppRoutes.login);
             },
           ),
         ],
