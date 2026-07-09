@@ -182,8 +182,41 @@ class DelegateReviewScreen extends StatelessWidget {
                         ],
                       ),
                     ),
-                    const SizedBox(height: 48),
-                    
+                    const SizedBox(height: 36),
+
+                    // Progress Bar (Tahap 3/3)
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Container(
+                            height: 4,
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFD1D5DB),
+                              borderRadius: BorderRadius.circular(2),
+                            ),
+                            child: FractionallySizedBox(
+                              alignment: Alignment.centerLeft,
+                              widthFactor: 1.0,
+                              child: Container(
+                                decoration: BoxDecoration(
+                                  gradient: const LinearGradient(
+                                    colors: [Color(0xFFFFD54F), Color(0xFFF57F17)],
+                                  ),
+                                  borderRadius: BorderRadius.circular(2),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+                        Text(
+                          'TAHAP 3/3',
+                          style: AppTypography.captionBold.copyWith(color: AppColors.goldDark),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 24),
+
                     // Button
                     Container(
                       width: double.infinity,
@@ -193,7 +226,7 @@ class DelegateReviewScreen extends StatelessWidget {
                         borderRadius: BorderRadius.circular(AppRadius.button),
                         boxShadow: [
                           BoxShadow(
-                            color: AppColors.goldDark.withOpacity(0.3),
+                            color: AppColors.goldDark.withValues(alpha: 0.3),
                             blurRadius: 12,
                             offset: const Offset(0, 4),
                           ),
@@ -203,8 +236,7 @@ class DelegateReviewScreen extends StatelessWidget {
                         color: Colors.transparent,
                         child: InkWell(
                           onTap: () {
-                            // Link to approved for demo purposes
-                            context.pushNamed('delegate-approved');
+                            context.pushReplacementNamed('dashboard');
                           },
                           borderRadius: BorderRadius.circular(AppRadius.button),
                           child: Row(

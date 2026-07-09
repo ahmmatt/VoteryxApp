@@ -222,7 +222,7 @@ class _ProposalCreateScreenState extends State<ProposalCreateScreen> {
                       ),
                       Padding(
                         padding: const EdgeInsets.only(right: 16),
-                        child: Text('mahasiswa', style: AppTypography.bodyMedium.copyWith(fontWeight: FontWeight.w600)),
+                        child: Text('orang', style: AppTypography.bodyMedium.copyWith(fontWeight: FontWeight.w600)),
                       ),
                     ],
                   ),

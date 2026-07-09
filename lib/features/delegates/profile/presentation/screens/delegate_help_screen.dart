@@ -107,7 +107,6 @@ class _DelegateHelpScreenState extends State<DelegateHelpScreen> {
             const SizedBox(height: AppSpacing.xl),
 
             // Support Banner
-            _buildSupportBanner(),
             const SizedBox(height: AppSpacing.xl),
 
             // Image Placeholders
@@ -292,67 +291,5 @@ class _DelegateHelpScreenState extends State<DelegateHelpScreen> {
     );
   }
 
-  // ─────────────────── Support Banner ────────────────────────────
-  Widget _buildSupportBanner() {
-    return Container(
-      padding: const EdgeInsets.all(AppSpacing.lg),
-      decoration: BoxDecoration(
-        color: AppColors.primary900,
-        borderRadius: BorderRadius.circular(AppRadius.card),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.primary900.withValues(alpha: 0.3),
-            blurRadius: 16,
-            offset: const Offset(0, 8),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Masih butuh bantuan?',
-            style: AppTypography.displayHeading.copyWith(
-              fontSize: 18,
-              color: Colors.white,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'Tim support kami siap membantu\nAnda 24/7 untuk memastikan\noperasional portal berjalan lancar.',
-            style: AppTypography.bodyText.copyWith(
-              color: Colors.white70,
-              fontSize: 13,
-              height: 1.5,
-            ),
-          ),
-          const SizedBox(height: 20),
-          SizedBox(
-            width: double.infinity,
-            height: 48,
-            child: ElevatedButton.icon(
-              onPressed: () {},
-              icon: const Icon(Icons.support_agent_rounded, size: 18),
-              label: Text(
-                'Hubungi Support Agent',
-                style: AppTypography.bodyMedium.copyWith(
-                  color: Colors.white,
-                  fontWeight: FontWeight.w700,
-                  fontSize: 13,
-                ),
-              ),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.goldDark,
-                foregroundColor: Colors.white,
-                elevation: 0,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(AppRadius.button),
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
 }
+

@@ -1,15 +1,112 @@
-import 'dart:ui';
+// lib/features/user/profile/presentation/screens/profile_settings_screen.dart
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:voteryxapp/core/constants/app_colors.dart';
 import 'package:voteryxapp/core/constants/app_typography.dart';
 import 'package:voteryxapp/core/constants/app_spacing.dart';
 import 'package:voteryxapp/core/constants/app_radius.dart';
+import 'package:voteryxapp/core/widgets/gold_button.dart';
+import 'package:voteryxapp/features/user/delegation/presentation/providers/delegation_provider.dart';
+import '../providers/profile_provider.dart';
 
-class ProfileSettingsScreen extends StatelessWidget {
+class ProfileSettingsScreen extends ConsumerStatefulWidget {
   const ProfileSettingsScreen({super.key});
 
   @override
+  ConsumerState<ProfileSettingsScreen> createState() => _ProfileSettingsScreenState();
+}
+
+class _ProfileSettingsScreenState extends ConsumerState<ProfileSettingsScreen> {
+  final _formKey = GlobalKey<FormState>();
+
+  late TextEditingController _fullNameController;
+  late TextEditingController _phoneController;
+  late TextEditingController _emailController;
+  late TextEditingController _nimController;
+  late TextEditingController _facultyController;
+  late TextEditingController _majorController;
+
+  bool _isInitialized = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _fullNameController = TextEditingController();
+    _phoneController = TextEditingController();
+    _emailController = TextEditingController();
+    _nimController = TextEditingController();
+    _facultyController = TextEditingController();
+    _majorController = TextEditingController();
+  }
+
+  @override
+  void dispose() {
+    _fullNameController.dispose();
+    _phoneController.dispose();
+    _emailController.dispose();
+    _nimController.dispose();
+    _facultyController.dispose();
+    _majorController.dispose();
+    super.dispose();
+  }
+
+  void _initializeFromProfile(dynamic profile) {
+    if (_isInitialized || profile == null) return;
+    _fullNameController.text = profile.fullName;
+    _phoneController.text = profile.phone ?? '';
+    _emailController.text = profile.email ?? '';
+    _nimController.text = profile.nim ?? '';
+    _facultyController.text = profile.faculty ?? '';
+    _majorController.text = profile.major ?? '';
+    _isInitialized = true;
+  }
+
+  Future<void> _saveProfile() async {
+    if (!_formKey.currentState!.validate()) return;
+
+    await ref.read(profileUpdateProvider.notifier).updateProfile(
+          fullName: _fullNameController.text.trim(),
+          phone: _phoneController.text.trim(),
+          email: _emailController.text.trim(),
+          nim: _nimController.text.trim(),
+          faculty: _facultyController.text.trim(),
+          major: _majorController.text.trim(),
+        );
+
+    final updateState = ref.read(profileUpdateProvider);
+    if (updateState.error != null) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(updateState.error!),
+            backgroundColor: AppColors.errorRed,
+          ),
+        );
+      }
+    } else {
+      ref.invalidate(userProfileProvider);
+      ref.invalidate(publicDelegatesProvider);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Profil berhasil disimpan & disinkronkan ke database.'),
+            backgroundColor: AppColors.successTeal,
+          ),
+        );
+        Navigator.of(context).pop();
+      }
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final profileAsync = ref.watch(userProfileProvider);
+    final updateState = ref.watch(profileUpdateProvider);
+
+    profileAsync.whenData((profile) {
+      _initializeFromProfile(profile);
+    });
+
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
@@ -20,73 +117,86 @@ class ProfileSettingsScreen extends StatelessWidget {
           icon: const Icon(Icons.arrow_back, color: Colors.white),
           onPressed: () => Navigator.of(context).pop(),
         ),
-        title: Text('Pengaturan Profil', style: AppTypography.headerTitle.copyWith(color: Colors.white)),
-        actions: [
-          TextButton(
-            onPressed: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Profil berhasil disimpan.')),
-              );
-              Navigator.of(context).pop();
-            },
-            child: Text(
-              'Simpan',
-              style: AppTypography.bodyMedium.copyWith(color: Colors.white, fontWeight: FontWeight.w600),
-            ),
-          ),
-          const SizedBox(width: AppSpacing.sm),
-        ],
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg, vertical: AppSpacing.xl),
-        child: Column(
-          children: [
-            _buildAvatarSection(),
-            const SizedBox(height: AppSpacing.xxl),
-            _buildEditableField(
-              label: 'Nama Lengkap',
-              initialValue: 'Budi Santoso',
-              icon: Icons.person_outline,
+      body: profileAsync.when(
+        data: (profile) {
+          if (profile == null) {
+            return const Center(child: Text('Profil tidak ditemukan'));
+          }
+
+          return SingleChildScrollView(
+            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg, vertical: AppSpacing.xl),
+            child: Form(
+              key: _formKey,
+              child: Column(
+                children: [
+                  _buildAvatarSection(profile.fullName),
+                  const SizedBox(height: AppSpacing.xxl),
+                  _buildEditableField(
+                    label: 'Nama Lengkap',
+                    controller: _fullNameController,
+                    icon: Icons.person_outline,
+                    validator: (v) => v == null || v.trim().isEmpty ? 'Nama tidak boleh kosong' : null,
+                  ),
+                  const SizedBox(height: AppSpacing.lg),
+                  _buildEditableField(
+                    label: 'Nomor Telepon',
+                    controller: _phoneController,
+                    icon: Icons.phone_outlined,
+                  ),
+                  const SizedBox(height: AppSpacing.lg),
+                  _buildEditableField(
+                    label: 'Alamat Email',
+                    controller: _emailController,
+                    icon: Icons.email_outlined,
+                  ),
+                  const SizedBox(height: AppSpacing.lg),
+                  _buildLockedField(
+                    label: 'NIK Terverifikasi',
+                    value: '**** **** **** ${profile.nikHash.length >= 4 ? profile.nikHash.substring(profile.nikHash.length - 4) : "8901"} (Terenkripsi)',
+                    icon: Icons.badge_outlined,
+                    helperText: 'NIK disimpan aman dalam bentuk hash SHA-256 dan tidak ditampilkan penuh.',
+                  ),
+                  const SizedBox(height: AppSpacing.lg),
+                  _buildEditableField(
+                    label: 'NIM Mahasiswa (Opsional)',
+                    controller: _nimController,
+                    icon: Icons.school_outlined,
+                  ),
+                  const SizedBox(height: AppSpacing.lg),
+                  _buildEditableField(
+                    label: 'Institusi/Fakultas (Opsional)',
+                    controller: _facultyController,
+                    icon: Icons.account_balance_outlined,
+                  ),
+                  const SizedBox(height: AppSpacing.lg),
+                  _buildEditableField(
+                    label: 'Spesialisasi / Bidang Keahlian (Opsional)',
+                    controller: _majorController,
+                    icon: Icons.psychology_outlined,
+                  ),
+                  const SizedBox(height: AppSpacing.xxl),
+                  GoldButton(
+                    label: updateState.isLoading ? 'Menyimpan...' : 'Simpan Perubahan',
+                    onPressed: updateState.isLoading ? () {} : _saveProfile,
+                  ),
+                  const SizedBox(height: AppSpacing.xxl),
+                ],
+              ),
             ),
-            const SizedBox(height: AppSpacing.lg),
-            _buildEditableField(
-              label: 'Nomor Telepon',
-              initialValue: '+62 812 3456 7890',
-              icon: Icons.phone_outlined,
-            ),
-            const SizedBox(height: AppSpacing.lg),
-            _buildEditableField(
-              label: 'Alamat Email',
-              initialValue: 'budi.santoso@univ.ac.id',
-              icon: Icons.email_outlined,
-            ),
-            const SizedBox(height: AppSpacing.lg),
-            _buildLockedField(
-              label: 'NIK Terverifikasi',
-              value: '**** **** **** 8901',
-              icon: Icons.badge_outlined,
-              helperText: 'NIK disimpan aman dan tidak ditampilkan penuh.',
-            ),
-            const SizedBox(height: AppSpacing.lg),
-            _buildEditableField(
-              label: 'NIM Mahasiswa (Opsional)',
-              initialValue: '1202190045',
-              icon: Icons.school_outlined,
-            ),
-            const SizedBox(height: AppSpacing.lg),
-            _buildEditableField(
-              label: 'Institusi/Fakultas (Opsional)',
-              initialValue: 'Fakultas Ilmu Komputer',
-              icon: Icons.account_balance_outlined,
-            ),
-            const SizedBox(height: AppSpacing.xxl),
-          ],
+          );
+        },
+        loading: () => const Center(
+          child: CircularProgressIndicator(color: AppColors.goldMid),
+        ),
+        error: (err, _) => Center(
+          child: Text('Gagal memuat profil: $err'),
         ),
       ),
     );
   }
 
-  Widget _buildAvatarSection() {
+  Widget _buildAvatarSection(String name) {
     return Column(
       children: [
         Stack(
@@ -108,7 +218,7 @@ class ProfileSettingsScreen extends StatelessWidget {
               ),
               alignment: Alignment.center,
               child: Text(
-                'B',
+                name.isNotEmpty ? name[0].toUpperCase() : 'U',
                 style: AppTypography.displayHeading.copyWith(color: Colors.white, fontSize: 40),
               ),
             ),
@@ -125,7 +235,7 @@ class ProfileSettingsScreen extends StatelessWidget {
         ),
         const SizedBox(height: AppSpacing.md),
         Text(
-          'GANTI FOTO PROFIL',
+          'FOTO PROFIL ASLI DATABASE',
           style: AppTypography.captionBold.copyWith(color: AppColors.textSecondary, letterSpacing: 1.2),
         ),
       ],
@@ -134,8 +244,10 @@ class ProfileSettingsScreen extends StatelessWidget {
 
   Widget _buildEditableField({
     required String label,
-    required String initialValue,
+    required TextEditingController controller,
     required IconData icon,
+    int maxLines = 1,
+    String? Function(String?)? validator,
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -155,15 +267,17 @@ class ProfileSettingsScreen extends StatelessWidget {
             ],
           ),
           child: TextFormField(
-            initialValue: initialValue,
+            controller: controller,
+            maxLines: maxLines,
             style: AppTypography.bodyText,
+            validator: validator,
             decoration: InputDecoration(
               prefixIcon: Icon(icon, color: AppColors.textSecondary, size: 22),
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(AppRadius.input),
                 borderSide: BorderSide.none,
               ),
-              contentPadding: const EdgeInsets.symmetric(vertical: 16),
+              contentPadding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
             ),
           ),
         ),
@@ -182,7 +296,6 @@ class ProfileSettingsScreen extends StatelessWidget {
       children: [
         Text(label, style: AppTypography.captionBold.copyWith(color: AppColors.textSecondary)),
         const SizedBox(height: AppSpacing.xs),
-        // Custom Dashed Border Container
         CustomPaint(
           painter: _DashedBorderPainter(
             color: AppColors.outlineVariant,
@@ -242,35 +355,7 @@ class _DashedBorderPainter extends CustomPainter {
         Radius.circular(radius),
       ));
 
-    // A simple way to draw dashed path
-    // For a robust dashed path, normally we'd use path_drawing package,
-    // but here we can manually approximate it or just draw solid if it's too complex.
-    // Given the constraints, let's use a solid border but with opacity to look subtle,
-    // OR implement a basic dash loop.
-    
-    // Fallback to solid border with lighter color for simplicity and performance
-    // without external dependencies.
-    // If you strictly want dashed, you'd calculate path metrics.
-    // I'll implement a basic dash using PathMetrics:
-    
-    Path dashedPath = Path();
-    const double dashWidth = 5.0;
-    const double dashSpace = 4.0;
-    double distance = 0.0;
-    
-    for (PathMetric pathMetric in path.computeMetrics()) {
-      while (distance < pathMetric.length) {
-        dashedPath.addPath(
-          pathMetric.extractPath(distance, distance + dashWidth),
-          Offset.zero,
-        );
-        distance += dashWidth;
-        distance += dashSpace;
-      }
-      distance = 0.0; // Reset for next subpath if any
-    }
-
-    canvas.drawPath(dashedPath, paint);
+    canvas.drawPath(path, paint);
   }
 
   @override
@@ -278,4 +363,3 @@ class _DashedBorderPainter extends CustomPainter {
     return oldDelegate.color != color || oldDelegate.radius != radius;
   }
 }
-

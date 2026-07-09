@@ -1,19 +1,30 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../../core/constants/app_colors.dart';
 import '../../../../../core/constants/app_spacing.dart';
 import '../../../../../core/constants/app_typography.dart';
 import '../../../../../core/widgets/gold_button.dart';
+import '../../domain/entities/election.dart';
+import 'package:voteryxapp/features/user/vote_execution/presentation/providers/vote_execution_provider.dart';
+import '../providers/election_provider.dart';
 
-class CandidateDetailScreen extends StatefulWidget {
-  const CandidateDetailScreen({super.key});
+class CandidateDetailScreen extends ConsumerStatefulWidget {
+  const CandidateDetailScreen({
+    super.key,
+    required this.electionId,
+    required this.candidateId,
+  });
+
+  final String electionId;
+  final String candidateId;
 
   @override
-  State<CandidateDetailScreen> createState() => _CandidateDetailScreenState();
+  ConsumerState<CandidateDetailScreen> createState() => _CandidateDetailScreenState();
 }
 
-class _CandidateDetailScreenState extends State<CandidateDetailScreen>
+class _CandidateDetailScreenState extends ConsumerState<CandidateDetailScreen>
     with SingleTickerProviderStateMixin {
   late final TabController _tabController;
 
@@ -31,104 +42,147 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      body: Stack(
-        children: [
-          NestedScrollView(
-            physics: const ClampingScrollPhysics(),
-            headerSliverBuilder: (context, innerBoxIsScrolled) {
-              return [
-                SliverAppBar(
-                  expandedHeight: 350,
-                  pinned: true,
-                  backgroundColor: AppColors.primary800,
-                  elevation: 0,
-                  leading: IconButton(
-                    icon: const Icon(Icons.arrow_back, color: Colors.white),
-                    onPressed: () {
-                      if (context.canPop()) {
-                        context.pop();
-                      } else {
-                        context.go('/dashboard');
-                      }
-                    },
-                  ),
-                  titleSpacing: 0,
-                  title: Text(
-                    'Profil Kandidat',
-                    style: AppTypography.headerTitle.copyWith(color: Colors.white),
-                  ),
-                  actions: [
-                    IconButton(
-                      icon: const Icon(Icons.share, color: Colors.white, size: 20),
-                      onPressed: () {},
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.more_vert, color: Colors.white, size: 20),
-                      onPressed: () {},
-                    ),
-                  ],
-                  flexibleSpace: FlexibleSpaceBar(
-                    background: _buildProfileHeader(context),
-                  ),
-                  bottom: PreferredSize(
-                    preferredSize: const Size.fromHeight(48),
-                    child: Container(
-                      width: double.infinity,
-                      decoration: const BoxDecoration(
-                        color: AppColors.background,
-                        border: Border(
-                          bottom: BorderSide(color: AppColors.outlineVariant, width: 1),
-                        ),
-                      ),
-                      child: TabBar(
-                        controller: _tabController,
-                        isScrollable: true,
-                        tabAlignment: TabAlignment.start,
-                        indicatorColor: AppColors.goldDark,
-                        indicatorWeight: 3,
-                        labelColor: AppColors.goldDark,
-                        unselectedLabelColor: AppColors.textSecondary,
-                        labelStyle: AppTypography.labelLarge,
-                        unselectedLabelStyle: AppTypography.bodyMedium,
-                        dividerColor: Colors.transparent,
-                        tabs: const [
-                          Tab(text: 'Visi & Misi'),
-                          Tab(text: 'Track Record'),
-                          Tab(text: 'Program Kerja'),
-                          Tab(text: 'Statistik'),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-              ];
-            },
-            body: TabBarView(
-              controller: _tabController,
+    final candidateAsync = ref.watch(candidateDetailProvider(widget.candidateId));
+
+    return candidateAsync.when(
+      loading: () => Scaffold(
+        backgroundColor: AppColors.background,
+        appBar: AppBar(backgroundColor: AppColors.primary800, elevation: 0),
+        body: const Center(child: CircularProgressIndicator(color: AppColors.primary800)),
+      ),
+      error: (err, _) => Scaffold(
+        backgroundColor: AppColors.background,
+        appBar: AppBar(backgroundColor: AppColors.primary800, elevation: 0),
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                _buildVisiMisiTab(),
-                _buildTrackRecordTab(),
-                _buildProgramKerjaTab(),
-                _buildStatistikTab(),
+                const Icon(Icons.error_outline, size: 48, color: AppColors.errorRed),
+                const SizedBox(height: 16),
+                Text('Gagal memuat profil kandidat.', style: AppTypography.cardTitle),
+                const SizedBox(height: 16),
+                GoldButton(
+                  label: 'Coba Lagi',
+                  onPressed: () => ref.invalidate(candidateDetailProvider(widget.candidateId)),
+                ),
               ],
             ),
           ),
-
-          // Bottom Sticky Button
-          Positioned(
-            left: 0,
-            right: 0,
-            bottom: 0,
-            child: _buildBottomButton(context),
-          ),
-        ],
+        ),
       ),
+      data: (candidate) {
+        if (candidate == null) {
+          return Scaffold(
+            backgroundColor: AppColors.background,
+            appBar: AppBar(backgroundColor: AppColors.primary800, elevation: 0),
+            body: Center(
+              child: Text('Kandidat tidak ditemukan.', style: AppTypography.cardTitle),
+            ),
+          );
+        }
+
+        return Scaffold(
+          backgroundColor: AppColors.background,
+          body: Stack(
+            children: [
+              NestedScrollView(
+                physics: const ClampingScrollPhysics(),
+                headerSliverBuilder: (context, innerBoxIsScrolled) {
+                  return [
+                    SliverAppBar(
+                      expandedHeight: 350,
+                      pinned: true,
+                      backgroundColor: AppColors.primary800,
+                      elevation: 0,
+                      leading: IconButton(
+                        icon: const Icon(Icons.arrow_back, color: Colors.white),
+                        onPressed: () {
+                          if (context.canPop()) {
+                            context.pop();
+                          } else {
+                            context.go('/dashboard');
+                          }
+                        },
+                      ),
+                      titleSpacing: 0,
+                      title: Text(
+                        'Profil Kandidat',
+                        style: AppTypography.headerTitle.copyWith(color: Colors.white),
+                      ),
+                      actions: [
+                        IconButton(
+                          icon: const Icon(Icons.share, color: Colors.white, size: 20),
+                          onPressed: () {},
+                        ),
+                      ],
+                      flexibleSpace: FlexibleSpaceBar(
+                        background: _buildProfileHeader(context, candidate),
+                      ),
+                      bottom: PreferredSize(
+                        preferredSize: const Size.fromHeight(48),
+                        child: Container(
+                          width: double.infinity,
+                          decoration: const BoxDecoration(
+                            color: AppColors.background,
+                            border: Border(
+                              bottom: BorderSide(color: AppColors.outlineVariant, width: 1),
+                            ),
+                          ),
+                          child: TabBar(
+                            controller: _tabController,
+                            isScrollable: true,
+                            tabAlignment: TabAlignment.start,
+                            indicatorColor: AppColors.goldDark,
+                            indicatorWeight: 3,
+                            labelColor: AppColors.goldDark,
+                            unselectedLabelColor: AppColors.textSecondary,
+                            labelStyle: AppTypography.labelLarge,
+                            unselectedLabelStyle: AppTypography.bodyMedium,
+                            dividerColor: Colors.transparent,
+                            tabs: const [
+                              Tab(text: 'Visi & Misi'),
+                              Tab(text: 'Track Record'),
+                              Tab(text: 'Program Kerja'),
+                              Tab(text: 'Statistik'),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ];
+                },
+                body: TabBarView(
+                  controller: _tabController,
+                  children: [
+                    _buildVisiMisiTab(candidate),
+                    _buildTrackRecordTab(candidate),
+                    _buildProgramKerjaTab(candidate),
+                    _buildStatistikTab(candidate),
+                  ],
+                ),
+              ),
+
+              // Bottom Sticky Button
+              Positioned(
+                left: 0,
+                right: 0,
+                bottom: 0,
+                child: _buildBottomButton(context, candidate),
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 
-  Widget _buildProfileHeader(BuildContext context) {
+  Widget _buildProfileHeader(BuildContext context, Candidate candidate) {
+    final numberStr = candidate.candidateNumber != null
+        ? 'No. ${candidate.candidateNumber!.toString().padLeft(2, '0')}'
+        : 'Kandidat';
+
     return Container(
       color: AppColors.primary800,
       padding: EdgeInsets.only(
@@ -138,7 +192,7 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          // Avatar with No.02 badge
+          // Avatar with Number badge
           Stack(
             clipBehavior: Clip.none,
             children: [
@@ -151,24 +205,25 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
                   border: Border.all(
                       color: Colors.white.withValues(alpha: 0.2), width: 4),
                 ),
-                child: const Icon(Icons.person,
-                    size: 64, color: AppColors.textSecondary),
+                child: ClipOval(
+                  child: candidate.photoUrl != null && candidate.photoUrl!.isNotEmpty
+                      ? Image.network(candidate.photoUrl!, fit: BoxFit.cover)
+                      : const Icon(Icons.person, size: 64, color: AppColors.textSecondary),
+                ),
               ),
               Positioned(
                 bottom: 0,
                 right: -10,
                 child: Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
                   decoration: BoxDecoration(
                     color: AppColors.warningAmber,
                     borderRadius: BorderRadius.circular(16),
                     border: Border.all(color: Colors.white, width: 2),
                   ),
                   child: Text(
-                    'No. 02',
-                    style:
-                        AppTypography.labelLarge.copyWith(color: Colors.white),
+                    numberStr,
+                    style: AppTypography.labelLarge.copyWith(color: Colors.white),
                   ),
                 ),
               ),
@@ -179,38 +234,43 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Text(
-                'Faisal Ahmadi',
-                style: AppTypography.displayHeading
-                    .copyWith(color: Colors.white, fontSize: 24),
-              ),
-              const SizedBox(width: 8),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                decoration: BoxDecoration(
-                  color: const Color(0x33139971),
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: AppColors.successTeal),
-                ),
-                child: Row(
-                  children: [
-                    const Icon(Icons.verified,
-                        color: AppColors.successTeal, size: 10),
-                    const SizedBox(width: 4),
-                    Text(
-                      'Terverifikasi',
-                      style: AppTypography.captionBold.copyWith(
-                          color: AppColors.successTeal, fontSize: 8),
-                    ),
-                  ],
+              Flexible(
+                child: Text(
+                  candidate.fullName,
+                  style: AppTypography.displayHeading
+                      .copyWith(color: Colors.white, fontSize: 24),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
+              if (candidate.isVerified) ...[
+                const SizedBox(width: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: const Color(0x33139971),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: AppColors.successTeal),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.verified, color: AppColors.successTeal, size: 10),
+                      const SizedBox(width: 4),
+                      Text(
+                        'Terverifikasi',
+                        style: AppTypography.captionBold.copyWith(
+                            color: AppColors.successTeal, fontSize: 8),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
             ],
           ),
           const SizedBox(height: 4),
           // Subtitle
           Text(
-            'Fakultas Hukum • Semester 6',
+            '${candidate.faculty ?? "Fakultas Mahasiswa"}${candidate.nim != null ? " • NIM ${candidate.nim}" : ""}',
             style: AppTypography.bodyText
                 .copyWith(color: Colors.white.withValues(alpha: 0.7)),
           ),
@@ -219,7 +279,7 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
     );
   }
 
-  Widget _buildVisiMisiTab() {
+  Widget _buildVisiMisiTab(Candidate candidate) {
     return ListView(
       padding: const EdgeInsets.fromLTRB(24, 24, 24, 120),
       physics: const ClampingScrollPhysics(),
@@ -227,7 +287,7 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
         Text('Visi', style: AppTypography.screenTitle.copyWith(fontSize: 20)),
         const SizedBox(height: 12),
         Text(
-          '"Mewujudkan universitas yang inklusif, transparan, dan berorientasi pada kesejahteraan mahasiswa melalui inovasi digital."',
+          '"${candidate.visi ?? "Mewujudkan organisasi yang inklusif, transparan, dan berorientasi pada kemajuan bersama melalui inovasi berkelanjutan."}"',
           style: AppTypography.bodyText.copyWith(
               fontStyle: FontStyle.italic,
               color: AppColors.textSecondary,
@@ -236,12 +296,16 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
         const SizedBox(height: 24),
         Text('Misi', style: AppTypography.screenTitle.copyWith(fontSize: 20)),
         const SizedBox(height: 12),
-        _buildBulletPoint(
-            'Digitalisasi seluruh layanan administrasi kemahasiswaan untuk efisiensi waktu.'),
-        _buildBulletPoint(
-            'Membangun transparansi anggaran organisasi kemahasiswaan yang dapat diakses publik.'),
-        _buildBulletPoint(
-            'Meningkatkan kuota beasiswa internal bagi mahasiswa berprestasi dan kurang mampu.'),
+        if (candidate.misi != null && candidate.misi!.isNotEmpty)
+          ...candidate.misi!
+              .split('\n')
+              .where((s) => s.trim().isNotEmpty)
+              .map((item) => _buildBulletPoint(item.trim()))
+        else ...[
+          _buildBulletPoint('Digitalisasi seluruh layanan administrasi kemahasiswaan untuk efisiensi waktu.'),
+          _buildBulletPoint('Membangun transparansi anggaran organisasi kemahasiswaan yang dapat diakses publik.'),
+          _buildBulletPoint('Meningkatkan partisipasi aktif mahasiswa dalam perumusan kebijakan kampus.'),
+        ],
       ],
     );
   }
@@ -273,36 +337,33 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
     );
   }
 
-  Widget _buildTrackRecordTab() {
-    return ListView(
+  Widget _buildTrackRecordTab(Candidate candidate) {
+    if (candidate.trackRecords.isEmpty) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Text(
+            'Belum ada data riwayat organisasi.',
+            style: AppTypography.bodyMedium.copyWith(color: AppColors.textSecondary),
+          ),
+        ),
+      );
+    }
+
+    return ListView.builder(
       padding: const EdgeInsets.fromLTRB(24, 24, 24, 120),
       physics: const ClampingScrollPhysics(),
-      children: [
-        _buildTimelineItem(
-          year: '2023 - SEKARANG',
-          title: 'Ketua Himpunan Mahasiswa Hukum',
-          description:
-              'Memimpin 150+ anggota dan berhasil menyelenggarakan National Law Debate 2023 dengan peserta dari 30 universitas.',
-          isFirst: true,
-          isLast: false,
-        ),
-        _buildTimelineItem(
-          year: '2022',
-          title: 'Koordinator Advokasi Kampus',
-          description:
-              'Berhasil menegosiasikan penurunan biaya SPP bagi 200 mahasiswa terdampak ekonomi melalui program subsidi silang.',
-          isFirst: false,
-          isLast: false,
-        ),
-        _buildTimelineItem(
-          year: '2021',
-          title: 'Pertukaran Pelajar – NUS Singapore',
-          description:
-              'Terpilih sebagai salah satu dari 5 delegasi universitas untuk program studi banding kebijakan publik di Singapura.',
-          isFirst: false,
-          isLast: true,
-        ),
-      ],
+      itemCount: candidate.trackRecords.length,
+      itemBuilder: (context, index) {
+        final record = candidate.trackRecords[index];
+        return _buildTimelineItem(
+          year: (record['year'] ?? '2024').toString(),
+          title: (record['title'] ?? 'Pengalaman Organisasi').toString(),
+          description: (record['description'] ?? '').toString(),
+          isFirst: index == 0,
+          isLast: index == candidate.trackRecords.length - 1,
+        );
+      },
     );
   }
 
@@ -367,11 +428,13 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
                     title,
                     style: AppTypography.cardTitle.copyWith(fontSize: 16),
                   ),
-                  const SizedBox(height: 8),
-                  Text(
-                    description,
-                    style: AppTypography.bodyText,
-                  ),
+                  if (description.isNotEmpty) ...[
+                    const SizedBox(height: 8),
+                    Text(
+                      description,
+                      style: AppTypography.bodyText,
+                    ),
+                  ],
                 ],
               ),
             ),
@@ -381,23 +444,31 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
     );
   }
 
-  Widget _buildProgramKerjaTab() {
-    return ListView(
+  Widget _buildProgramKerjaTab(Candidate candidate) {
+    if (candidate.programs.isEmpty) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Text(
+            'Belum ada data program kerja.',
+            style: AppTypography.bodyMedium.copyWith(color: AppColors.textSecondary),
+          ),
+        ),
+      );
+    }
+
+    return ListView.separated(
       padding: const EdgeInsets.fromLTRB(24, 24, 24, 120),
       physics: const ClampingScrollPhysics(),
-      children: [
-        _buildProgramCard(
-          title: 'Kampus Digital Terintegrasi',
-          description:
-              'Pengembangan aplikasi satu pintu untuk administrasi mahasiswa.',
-        ),
-        const SizedBox(height: 16),
-        _buildProgramCard(
-          title: 'Dana Hibah Riset Mandiri',
-          description:
-              'Alokasi dana 500jt per tahun untuk riset inovatif mahasiswa.',
-        ),
-      ],
+      itemCount: candidate.programs.length,
+      separatorBuilder: (_, __) => const SizedBox(height: 16),
+      itemBuilder: (context, index) {
+        final prog = candidate.programs[index];
+        return _buildProgramCard(
+          title: (prog['title'] ?? 'Program Kerja ${index + 1}').toString(),
+          description: (prog['description'] ?? '').toString(),
+        );
+      },
     );
   }
 
@@ -431,8 +502,10 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
             children: [
               Text(title,
                   style: AppTypography.itemTitle.copyWith(fontSize: 16)),
-              const SizedBox(height: 8),
-              Text(description, style: AppTypography.bodyText),
+              if (description.isNotEmpty) ...[
+                const SizedBox(height: 8),
+                Text(description, style: AppTypography.bodyText),
+              ],
             ],
           ),
         ),
@@ -440,7 +513,7 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
     );
   }
 
-  Widget _buildStatistikTab() {
+  Widget _buildStatistikTab(Candidate candidate) {
     return ListView(
       padding: const EdgeInsets.fromLTRB(24, 24, 24, 120),
       physics: const ClampingScrollPhysics(),
@@ -450,13 +523,6 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
           decoration: BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.circular(16),
-            boxShadow: const [
-              BoxShadow(
-                color: Color(0x050F1F3D),
-                blurRadius: 16,
-                offset: Offset(0, 4),
-              ),
-            ],
           ),
           child: Column(
             children: [
@@ -527,7 +593,7 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
     );
   }
 
-  Widget _buildBottomButton(BuildContext context) {
+  Widget _buildBottomButton(BuildContext context, Candidate candidate) {
     return Container(
       padding: EdgeInsets.only(
         left: AppSpacing.pagePad,
@@ -548,10 +614,15 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
         ),
       ),
       child: GoldButton(
-        label: 'Pilih Kandidat No. 02',
-        icon: Icons.arrow_forward,
+        label: 'Pilih ${candidate.fullName}',
+        icon: Icons.how_to_vote,
         onPressed: () {
-          context.pushNamed('election-vote', pathParameters: {'id': '1'});
+          ref.read(voteExecutionProvider.notifier).setSelectedCandidate(
+                candidateId: candidate.id,
+                candidateName: candidate.fullName,
+                electionId: widget.electionId,
+              );
+          context.pushNamed('election-vote', pathParameters: {'id': widget.electionId});
         },
       ),
     );

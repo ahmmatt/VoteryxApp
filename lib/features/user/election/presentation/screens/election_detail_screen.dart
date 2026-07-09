@@ -1,23 +1,33 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../../core/constants/app_colors.dart';
 import '../../../../../core/constants/app_spacing.dart';
 import '../../../../../core/constants/app_typography.dart';
-import '../../../../../core/constants/app_typography.dart';
 import '../../../../../core/widgets/app_text_field.dart';
+import '../../../../../core/widgets/gold_button.dart';
+import 'package:voteryxapp/core/utils/app_snackbar.dart';
+import '../../domain/entities/election.dart';
+import 'package:voteryxapp/features/user/vote_execution/presentation/providers/vote_execution_provider.dart';
+import 'package:voteryxapp/features/user/delegation/presentation/providers/delegation_provider.dart';
+import 'package:voteryxapp/features/user/delegation/domain/entities/delegate.dart';
+import '../providers/election_provider.dart';
 import '../widgets/election_summary_white_card.dart';
 
-class ElectionDetailScreen extends StatefulWidget {
-  const ElectionDetailScreen({super.key});
+class ElectionDetailScreen extends ConsumerStatefulWidget {
+  const ElectionDetailScreen({super.key, required this.electionId});
+
+  final String electionId;
 
   @override
-  State<ElectionDetailScreen> createState() => _ElectionDetailScreenState();
+  ConsumerState<ElectionDetailScreen> createState() => _ElectionDetailScreenState();
 }
 
-class _ElectionDetailScreenState extends State<ElectionDetailScreen>
+class _ElectionDetailScreenState extends ConsumerState<ElectionDetailScreen>
     with SingleTickerProviderStateMixin {
   late final TabController _tabController;
+  String? _selectedCandidateId;
 
   @override
   void initState() {
@@ -33,6 +43,8 @@ class _ElectionDetailScreenState extends State<ElectionDetailScreen>
 
   @override
   Widget build(BuildContext context) {
+    final detailAsync = ref.watch(electionDetailProvider(widget.electionId));
+
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
@@ -41,121 +53,133 @@ class _ElectionDetailScreenState extends State<ElectionDetailScreen>
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Colors.white),
-          onPressed: () => context.go('/dashboard'),
+          onPressed: () {
+            if (context.canPop()) {
+              context.pop();
+            } else {
+              context.go('/dashboard');
+            }
+          },
         ),
-        title: Text('Elections', style: AppTypography.headerTitle.copyWith(color: Colors.white)),
+        title: Text('Pemilihan', style: AppTypography.headerTitle.copyWith(color: Colors.white)),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh, color: Colors.white),
+            onPressed: () => ref.invalidate(electionDetailProvider(widget.electionId)),
+          ),
+        ],
       ),
-      body: Container(
-        decoration: const BoxDecoration(
-          gradient: AppColors.pageGradient,
+      body: detailAsync.when(
+        loading: () => const Center(
+          child: CircularProgressIndicator(color: AppColors.primary800),
         ),
-        child: Column(
-          children: [
-            const SizedBox(height: AppSpacing.lg),
-            const Padding(
-              padding: EdgeInsets.symmetric(horizontal: AppSpacing.pagePad),
-              child: ElectionSummaryWhiteCard(
-                title: 'Pemilihan Ketua BEM 2026',
-                participationPercentage: 0.62,
-                votersCountText: '12,402 dari 20,000\nmahasiswa',
-                countdownText: '02 : 14 : 45 : 12',
-              ),
-            ),
-            const SizedBox(height: AppSpacing.lg),
-
-            // Tab Bar
-            Container(
-              color: Colors.transparent,
-              child: TabBar(
-                controller: _tabController,
-                indicatorColor: AppColors.goldDark,
-                indicatorWeight: 3,
-                labelColor: AppColors.primary800,
-                labelStyle: AppTypography.itemTitle,
-                unselectedLabelColor: AppColors.textSecondary,
-                unselectedLabelStyle: AppTypography.bodyMedium,
-                tabs: const [
-                  Tab(text: 'Daftar\nKandidat'),
-                  Tab(text: 'Delegasikan\nSuara'),
-                ],
-              ),
-            ),
-
-            // Divider
-            const Divider(
-                height: 1, thickness: 1, color: AppColors.outlineVariant),
-
-            // Tab Views
-            Expanded(
-              child: TabBarView(
-                controller: _tabController,
-                children: const [
-                  _CandidateListTab(),
-                  _DelegatorListTab(),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-
-}
-
-class _CandidateEstimateRow extends StatelessWidget {
-  const _CandidateEstimateRow({
-    required this.name,
-    required this.votes,
-    required this.percent,
-    required this.color,
-  });
-
-  final String name;
-  final String votes;
-  final double percent;
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            Expanded(
-              child: Text(
-                name,
-                style: AppTypography.caption.copyWith(
-                  color: Colors.white.withValues(alpha: 0.84),
-                  fontWeight: FontWeight.w700,
+        error: (error, stack) => Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(Icons.error_outline, size: 48, color: AppColors.errorRed),
+                const SizedBox(height: 16),
+                Text(
+                  'Gagal memuat kandidat pemilihan.',
+                  style: AppTypography.cardTitle.copyWith(color: AppColors.primary800),
+                  textAlign: TextAlign.center,
                 ),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
+                const SizedBox(height: 8),
+                Text(
+                  error.toString(),
+                  style: AppTypography.caption.copyWith(color: AppColors.textSecondary),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 16),
+                GoldButton(
+                  label: 'Coba Lagi',
+                  onPressed: () => ref.invalidate(electionDetailProvider(widget.electionId)),
+                ),
+              ],
             ),
-            const SizedBox(width: AppSpacing.sm),
-            Text(
-              '$votes suara',
-              style: AppTypography.captionBold.copyWith(
-                color: Colors.white,
-                letterSpacing: 0,
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 4),
-        ClipRRect(
-          borderRadius: BorderRadius.circular(999),
-          child: LinearProgressIndicator(
-            value: percent,
-            minHeight: 5,
-            backgroundColor: Colors.white.withValues(alpha: 0.14),
-            valueColor: AlwaysStoppedAnimation<Color>(color),
           ),
         ),
-      ],
+        data: (detailData) {
+          final election = detailData.election;
+          final candidates = detailData.candidates;
+
+          return Container(
+            decoration: const BoxDecoration(
+              gradient: AppColors.pageGradient,
+            ),
+            child: Column(
+              children: [
+                const SizedBox(height: AppSpacing.lg),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: AppSpacing.pagePad),
+                  child: ElectionSummaryWhiteCard(
+                    title: election.title,
+                    participationPercentage: election.participationRate,
+                    votersCountText: '${election.voteCount} dari ${election.estimatedVoters > 0 ? election.estimatedVoters : 100}\npemilih',
+                    countdownText: election.timeRemainingFormatted,
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.lg),
+
+                // Tab Bar
+                Container(
+                  color: Colors.transparent,
+                  child: TabBar(
+                    controller: _tabController,
+                    indicatorColor: AppColors.goldDark,
+                    indicatorWeight: 3,
+                    labelColor: AppColors.primary800,
+                    labelStyle: AppTypography.itemTitle,
+                    unselectedLabelColor: AppColors.textSecondary,
+                    unselectedLabelStyle: AppTypography.bodyMedium,
+                    tabs: const [
+                      Tab(text: 'Daftar\nKandidat'),
+                      Tab(text: 'Delegasikan\nSuara'),
+                    ],
+                  ),
+                ),
+
+                // Divider
+                const Divider(
+                    height: 1, thickness: 1, color: AppColors.outlineVariant),
+
+                // Tab Views
+                Expanded(
+                  child: TabBarView(
+                    controller: _tabController,
+                    children: [
+                      _CandidateListTab(
+                        candidates: candidates,
+                        selectedId: _selectedCandidateId,
+                        onSelect: (id) {
+                          setState(() {
+                            _selectedCandidateId = (_selectedCandidateId == id) ? null : id;
+                          });
+                        },
+                        electionId: widget.electionId,
+                        hasVoted: detailData.hasParticipated,
+                        onVoteConfirm: () {
+                          if (_selectedCandidateId == null) return;
+                          final c = candidates.firstWhere((x) => x.id == _selectedCandidateId);
+                          ref.read(voteExecutionProvider.notifier).setSelectedCandidate(
+                                candidateId: c.id,
+                                candidateName: c.fullName,
+                                electionId: widget.electionId,
+                              );
+                          context.pushNamed('election-vote', pathParameters: {'id': widget.electionId});
+                        },
+                      ),
+                      _DelegatorListTab(electionId: widget.electionId),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          );
+        },
+      ),
     );
   }
 }
@@ -163,94 +187,132 @@ class _CandidateEstimateRow extends StatelessWidget {
 // ── Tab 1: Daftar Kandidat ───────────────────────────────────────────────────
 
 class _CandidateListTab extends StatelessWidget {
-  const _CandidateListTab();
+  const _CandidateListTab({
+    required this.candidates,
+    required this.selectedId,
+    required this.onSelect,
+    required this.electionId,
+    required this.hasVoted,
+    required this.onVoteConfirm,
+  });
+
+  final List<Candidate> candidates;
+  final String? selectedId;
+  final ValueChanged<String> onSelect;
+  final String electionId;
+  final bool hasVoted;
+  final VoidCallback onVoteConfirm;
 
   @override
   Widget build(BuildContext context) {
-    return ListView(
-      padding: const EdgeInsets.all(AppSpacing.pagePad),
-      physics: const ClampingScrollPhysics(),
-      children: [
-        _CandidateCard(
-          number: '01',
-          name: 'Aris Setiawan',
-          tagline: '"Digitalisasi Kampus untuk Masa Depan Inklusif"',
-          isSelected: true,
-        ),
-        const SizedBox(height: AppSpacing.md),
-        _CandidateCard(
-          number: '02',
-          name: 'Farah Quinn',
-          tagline: '"Kesejahteraan Mahasiswa Adalah Prioritas Utama"',
-          isSelected: false,
-        ),
-        const SizedBox(height: AppSpacing.md),
-        _CandidateCard(
-          number: '03',
-          name: 'Budi Tabuti',
-          tagline: '"Kolaborasi Riset Antar Fakultas Tanpa Batas"',
-          isSelected: false,
-        ),
-        const SizedBox(height: AppSpacing.md),
-        _CandidateCard(
-          number: '04',
-          name: 'Siti Aminah',
-          tagline: '"Satu Visi, Satu Aksi, Untuk BEM yang Berdikari"',
-          isSelected: false,
-        ),
-        const SizedBox(height: AppSpacing.xl),
-
-        // Bottom Assistance
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  Text(
-                    'Butuh bantuan tentang pemilihan?',
-                    style: AppTypography.caption.copyWith(
-                      color: AppColors.textSecondary,
-                    ),
-                    textAlign: TextAlign.right,
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    'Baca Panduan Pemilihan',
-                    style: AppTypography.bodyMedium.copyWith(
-                      color: AppColors.primary800,
-                      fontWeight: FontWeight.w700,
-                    ),
-                    textAlign: TextAlign.right,
-                  ),
-                ],
+    if (candidates.isEmpty) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(32),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.people_outline, size: 64, color: AppColors.outline.withValues(alpha: 0.6)),
+              const SizedBox(height: 16),
+              Text(
+                'Belum Ada Kandidat',
+                style: AppTypography.cardTitle.copyWith(color: AppColors.primary800),
               ),
-            ),
-            const SizedBox(width: AppSpacing.md),
-            Container(
-              width: 56,
-              height: 56,
+              const SizedBox(height: 8),
+              Text(
+                'Kandidat untuk pemilihan ini akan segera diumumkan oleh panitia penyelenggara.',
+                style: AppTypography.bodyMedium.copyWith(color: AppColors.textSecondary),
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    return Stack(
+      children: [
+        ListView.separated(
+          padding: EdgeInsets.only(
+            left: AppSpacing.pagePad,
+            right: AppSpacing.pagePad,
+            top: AppSpacing.pagePad,
+            bottom: (selectedId != null || hasVoted) ? 100 : AppSpacing.xxl,
+          ),
+          physics: const ClampingScrollPhysics(),
+          itemCount: candidates.length,
+          separatorBuilder: (_, __) => const SizedBox(height: AppSpacing.md),
+          itemBuilder: (context, index) {
+            final candidate = candidates[index];
+            final isSelected = selectedId == candidate.id;
+            final numberStr = candidate.candidateNumber != null
+                ? candidate.candidateNumber!.toString().padLeft(2, '0')
+                : (index + 1).toString().padLeft(2, '0');
+
+            return _CandidateCard(
+              number: numberStr,
+              candidate: candidate,
+              isSelected: isSelected,
+              onTap: () => onSelect(candidate.id),
+              onDetailTap: () {
+                context.pushNamed(
+                  'election-candidate',
+                  pathParameters: {'id': electionId, 'candidateId': candidate.id},
+                );
+              },
+            );
+          },
+        ),
+
+        // Sticky action bar below if hasVoted or selectedId is not null
+        if (hasVoted)
+          Positioned(
+            left: 0,
+            right: 0,
+            bottom: 0,
+            child: Container(
+              padding: const EdgeInsets.all(AppSpacing.pagePad),
               decoration: BoxDecoration(
-                gradient: AppColors.goldGradient,
-                shape: BoxShape.circle,
+                color: Colors.white,
                 boxShadow: [
                   BoxShadow(
-                    color: AppColors.goldMid.withValues(alpha: 0.3),
-                    blurRadius: 12,
-                    offset: const Offset(0, 4),
+                    color: Colors.black.withValues(alpha: 0.08),
+                    blurRadius: 16,
+                    offset: const Offset(0, -4),
                   ),
                 ],
               ),
-              child: const Icon(
-                Icons.outbox_rounded,
-                color: Colors.white,
-                size: 28,
+              child: const GoldButton(
+                label: 'Anda Sudah Memilih',
+                icon: Icons.check_circle_outline,
+                onPressed: null,
               ),
             ),
-          ],
-        ),
-        const SizedBox(height: AppSpacing.xxl),
+          )
+        else if (selectedId != null)
+          Positioned(
+            left: 0,
+            right: 0,
+            bottom: 0,
+            child: Container(
+              padding: const EdgeInsets.all(AppSpacing.pagePad),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.08),
+                    blurRadius: 16,
+                    offset: const Offset(0, -4),
+                  ),
+                ],
+              ),
+              child: GoldButton(
+                label: 'Lanjutkan Pilih Kandidat Ini',
+                icon: Icons.how_to_vote,
+                onPressed: onVoteConfirm,
+              ),
+            ),
+          ),
       ],
     );
   }
@@ -259,182 +321,215 @@ class _CandidateListTab extends StatelessWidget {
 class _CandidateCard extends StatelessWidget {
   const _CandidateCard({
     required this.number,
-    required this.name,
-    required this.tagline,
+    required this.candidate,
     required this.isSelected,
+    required this.onTap,
+    required this.onDetailTap,
   });
 
   final String number;
-  final String name;
-  final String tagline;
+  final Candidate candidate;
   final bool isSelected;
+  final VoidCallback onTap;
+  final VoidCallback onDetailTap;
 
   @override
   Widget build(BuildContext context) {
+    final tagline = candidate.visi ?? (candidate.misi ?? '"Dedikasi dan Kolaborasi untuk Masa Depan Nyata"');
+
     return GestureDetector(
-        onTap: () {
-          context.pushNamed('election-candidate',
-              pathParameters: {'id': '1', 'candidateId': number});
-        },
-        child: Container(
-          padding: const EdgeInsets.all(AppSpacing.md),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(
-              color: isSelected ? AppColors.goldMid : Colors.transparent,
-              width: isSelected ? 2 : 0,
-            ),
-            boxShadow: const [
-              BoxShadow(
-                color: Color(0x080F1F3D),
-                blurRadius: 12,
-                offset: Offset(0, 4),
-              ),
-            ],
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.all(AppSpacing.md),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: isSelected ? AppColors.goldMid : Colors.transparent,
+            width: isSelected ? 2 : 0,
           ),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              // Avatar with Badges
-              SizedBox(
-                width: 72,
-                height: 72,
-                child: Stack(
-                  clipBehavior: Clip.none,
-                  children: [
-                    Container(
-                      width: 64,
-                      height: 64,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        border: Border.all(
-                          color: isSelected
-                              ? AppColors.goldMid
-                              : AppColors.outlineVariant,
-                          width: 2,
-                        ),
+          boxShadow: const [
+            BoxShadow(
+              color: Color(0x080F1F3D),
+              blurRadius: 12,
+              offset: Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            // Avatar with Badges
+            SizedBox(
+              width: 72,
+              height: 72,
+              child: Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  Container(
+                    width: 64,
+                    height: 64,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: isSelected ? AppColors.goldMid : AppColors.outlineVariant,
+                        width: 2,
                       ),
-                      child: ClipOval(
-                        // Gunakan icon placeholder untuk web (hindari CORS)
-                        child: Container(
-                          color: const Color(0xFFE5E7EB),
-                          child: Icon(
-                            Icons.person,
-                            size: 40,
-                            color: isSelected
-                                ? AppColors.primary800
-                                : AppColors.outline,
+                    ),
+                    child: ClipOval(
+                      child: candidate.photoUrl != null && candidate.photoUrl!.isNotEmpty
+                          ? Image.network(
+                              candidate.photoUrl!,
+                              fit: BoxFit.cover,
+                              errorBuilder: (_, __, ___) => Container(
+                                color: const Color(0xFFE5E7EB),
+                                child: Icon(Icons.person, size: 40, color: isSelected ? AppColors.primary800 : AppColors.outline),
+                              ),
+                            )
+                          : Container(
+                              color: const Color(0xFFE5E7EB),
+                              child: Icon(
+                                Icons.person,
+                                size: 40,
+                                color: isSelected ? AppColors.primary800 : AppColors.outline,
+                              ),
+                            ),
+                    ),
+                  ),
+                  // Number Badge
+                  Positioned(
+                    top: -2,
+                    right: 4,
+                    child: Container(
+                      width: 22,
+                      height: 22,
+                      decoration: BoxDecoration(
+                        color: isSelected ? AppColors.goldDark : AppColors.outline,
+                        shape: BoxShape.circle,
+                        border: Border.all(color: Colors.white, width: 2),
+                      ),
+                      child: Center(
+                        child: Text(
+                          number,
+                          style: AppTypography.captionBold.copyWith(
+                            color: Colors.white,
+                            fontSize: 9,
                           ),
                         ),
                       ),
                     ),
-                    // Number Badge
+                  ),
+                  // Checkmark Badge (if selected)
+                  if (isSelected)
                     Positioned(
-                      top: 0,
-                      left: 0,
+                      bottom: 4,
+                      right: 4,
                       child: Container(
-                        width: 24,
-                        height: 24,
+                        width: 20,
+                        height: 20,
                         decoration: BoxDecoration(
-                          color: isSelected
-                              ? AppColors.goldDark
-                              : AppColors.outline,
+                          color: AppColors.goldDark,
                           shape: BoxShape.circle,
                           border: Border.all(color: Colors.white, width: 2),
                         ),
-                        child: Center(
-                          child: Text(
-                            number,
-                            style: AppTypography.captionBold.copyWith(
-                              color: Colors.white,
-                              fontSize: 9,
+                        child: const Icon(Icons.check, color: Colors.white, size: 12),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+            const SizedBox(width: AppSpacing.sm),
+
+            // Details
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    candidate.fullName,
+                    style: AppTypography.cardTitle.copyWith(
+                      color: AppColors.primary800,
+                      fontSize: 18,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    tagline,
+                    style: AppTypography.caption.copyWith(
+                      fontStyle: FontStyle.italic,
+                      color: AppColors.textSecondary,
+                    ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 8),
+                  GestureDetector(
+                    onTap: onDetailTap,
+                    behavior: HitTestBehavior.opaque,
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 4),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            'Lihat Profil & Visi Misi',
+                            style: AppTypography.bodyMedium.copyWith(
+                              color: isSelected ? AppColors.goldDark : AppColors.primary800,
+                              fontWeight: FontWeight.w600,
                             ),
                           ),
-                        ),
-                      ),
-                    ),
-                    // Checkmark Badge (if selected)
-                    if (isSelected)
-                      Positioned(
-                        bottom: 4,
-                        right: 4,
-                        child: Container(
-                          width: 20,
-                          height: 20,
-                          decoration: BoxDecoration(
-                            color: AppColors.goldDark,
-                            shape: BoxShape.circle,
-                            border: Border.all(color: Colors.white, width: 2),
+                          const SizedBox(width: 4),
+                          Icon(
+                            Icons.arrow_forward,
+                            size: 16,
+                            color: isSelected ? AppColors.goldDark : AppColors.primary800,
                           ),
-                          child: const Icon(Icons.check,
-                              color: Colors.white, size: 12),
-                        ),
+                        ],
                       ),
-                  ],
-                ),
+                    ),
+                  ),
+                ],
               ),
-              const SizedBox(width: AppSpacing.sm),
-
-              // Details
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      name,
-                      style: AppTypography.cardTitle.copyWith(
-                        color: AppColors.primary800,
-                        fontSize: 18,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      tagline,
-                      style: AppTypography.caption.copyWith(
-                        fontStyle: FontStyle.italic,
-                        color: AppColors.textSecondary,
-                      ),
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    const SizedBox(height: 8),
-                    Row(
-                      children: [
-                        Text(
-                          'Lihat Profil',
-                          style: AppTypography.bodyMedium.copyWith(
-                            color: isSelected
-                                ? AppColors.goldDark
-                                : AppColors.outline,
-                          ),
-                        ),
-                        const SizedBox(width: 4),
-                        Icon(
-                          Icons.arrow_forward,
-                          size: 16,
-                          color: isSelected
-                              ? AppColors.goldDark
-                              : AppColors.outline,
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ));
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }
 
-// ── Tab 2: Delegasikan Suara ─────────────────────────────────────────────────
+// ── Tab 2: Delegasikan Suara (Murni Database) ─────────────────────────────────
 
-class _DelegatorListTab extends StatelessWidget {
-  const _DelegatorListTab();
+class _DelegatorListTab extends ConsumerStatefulWidget {
+  const _DelegatorListTab({required this.electionId});
+
+  final String electionId;
+
+  @override
+  ConsumerState<_DelegatorListTab> createState() => _DelegatorListTabState();
+}
+
+class _DelegatorListTabState extends ConsumerState<_DelegatorListTab> {
+  String _searchQuery = '';
 
   @override
   Widget build(BuildContext context) {
+    final delegatesAsync = ref.watch(publicDelegatesProvider);
+
+    ref.listen<DelegationActionState>(delegationActionProvider, (_, next) {
+      if (next.error != null) {
+        AppSnackBar.showError(context, next.error!);
+        ref.read(delegationActionProvider.notifier).clearError();
+      }
+      if (next.isSuccess) {
+        AppSnackBar.showSuccess(
+          context,
+          'Suaramu berhasil didelegasikan ke ${next.selectedDelegateName}!',
+        );
+        ref.read(delegationActionProvider.notifier).reset();
+      }
+    });
+
     return Column(
       children: [
         // Search Bar
@@ -442,100 +537,164 @@ class _DelegatorListTab extends StatelessWidget {
           padding: const EdgeInsets.all(AppSpacing.pagePad),
           child: AppTextField(
             label: '',
-            hint: 'Cari nama delegator',
+            hint: 'Cari nama atau fakultas delegator...',
             prefixIcon: Icons.search,
+            onChanged: (val) {
+              setState(() {
+                _searchQuery = val.toLowerCase();
+              });
+            },
           ),
         ),
 
-        // List
+        // List / Database State
         Expanded(
-          child: ListView(
-            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.pagePad),
-            physics: const ClampingScrollPhysics(),
-            children: [
-              _DelegatorCard(
-                name: 'Arkananta Putra',
-                badges: const [
-                  _DelegatorBadge(
-                      label: 'MANTAN KETUA BEM', type: _BadgeType.gray),
-                  _DelegatorBadge(
-                      label: 'FAKULTAS TEKNIK', type: _BadgeType.green),
-                ],
-                voteCount: 428,
-              ),
-              const SizedBox(height: AppSpacing.md),
-              _DelegatorCard(
-                name: 'Sarah Wijaya',
-                badges: const [
-                  _DelegatorBadge(
-                      label: 'AKTIVIS MAHASISWA', type: _BadgeType.gray),
-                  _DelegatorBadge(
-                      label: 'FAKULTAS HUKUM', type: _BadgeType.gold),
-                ],
-                voteCount: 152,
-              ),
-              const SizedBox(height: AppSpacing.md),
-              _DelegatorCard(
-                name: 'Dimas Ramadhan',
-                badges: const [
-                  _DelegatorBadge(
-                      label: 'KETUA HIMPUNAN', type: _BadgeType.gray),
-                  _DelegatorBadge(
-                      label: 'EKONOMI & BISNIS', type: _BadgeType.green),
-                ],
-                voteCount: 89,
-              ),
-              const SizedBox(height: AppSpacing.xl),
-
-              // Info Box
-              Container(
-                padding: const EdgeInsets.all(AppSpacing.md),
-                decoration: BoxDecoration(
-                  color: AppColors.primary800.withValues(alpha: 0.05),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(
-                      color: AppColors.outlineVariant.withValues(alpha: 0.5)),
-                ),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+          child: delegatesAsync.when(
+            loading: () => const Center(
+              child: CircularProgressIndicator(color: AppColors.goldMid),
+            ),
+            error: (error, _) => Center(
+              child: Padding(
+                padding: const EdgeInsets.all(24.0),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    const Icon(Icons.info_outline,
-                        color: AppColors.primary800, size: 20),
-                    const SizedBox(width: AppSpacing.sm),
-                    Expanded(
-                      child: Text(
-                        'Delegasi bersifat cair. Anda dapat menarik suara kapan saja.',
-                        style: AppTypography.caption.copyWith(
-                          color: AppColors.textSecondary,
-                        ),
-                      ),
+                    const Icon(Icons.error_outline, size: 48, color: AppColors.errorRed),
+                    const SizedBox(height: 12),
+                    Text('Gagal Memuat Daftar Delegator', style: AppTypography.cardTitle),
+                    const SizedBox(height: 8),
+                    GoldButton(
+                      label: 'Coba Lagi',
+                      onPressed: () => ref.invalidate(publicDelegatesProvider),
                     ),
                   ],
                 ),
               ),
-              const SizedBox(height: AppSpacing.xxl),
-            ],
+            ),
+            data: (delegates) {
+              final filtered = delegates.where((d) {
+                if (_searchQuery.isEmpty) return true;
+                return d.fullName.toLowerCase().contains(_searchQuery) ||
+                    (d.faculty ?? '').toLowerCase().contains(_searchQuery) ||
+                    (d.specialization ?? '').toLowerCase().contains(_searchQuery);
+              }).toList();
+
+              if (filtered.isEmpty) {
+                return Center(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 48, horizontal: 24),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.people_outline,
+                            size: 64,
+                            color: AppColors.outline.withValues(alpha: 0.5)),
+                        const SizedBox(height: 16),
+                        Text('Belum Ada Delegator', style: AppTypography.cardTitle),
+                        const SizedBox(height: 8),
+                        Text(
+                          _searchQuery.isNotEmpty
+                              ? 'Tidak ada delegator yang cocok dengan pencarian "$_searchQuery".'
+                              : 'Saat ini belum ada delegator publik yang terdaftar di database untuk pemilihan ini. Anda dapat mendaftarkan diri sebagai delegator publik melalui menu Profil.',
+                          style: AppTypography.bodyText,
+                          textAlign: TextAlign.center,
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              }
+
+              return ListView(
+                padding: const EdgeInsets.symmetric(horizontal: AppSpacing.pagePad),
+                physics: const ClampingScrollPhysics(),
+                children: [
+                  ...filtered.map((delegate) => _DelegatorCard(
+                        delegate: delegate,
+                        onDelegateTap: () => _showDelegateConfirmation(context, delegate),
+                      )),
+                  const SizedBox(height: AppSpacing.xl),
+
+                  // Info Box
+                  Container(
+                    padding: const EdgeInsets.all(AppSpacing.md),
+                    decoration: BoxDecoration(
+                      color: AppColors.primary800.withValues(alpha: 0.05),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                          color: AppColors.outlineVariant.withValues(alpha: 0.5)),
+                    ),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Icon(Icons.info_outline,
+                            color: AppColors.primary800, size: 20),
+                        const SizedBox(width: AppSpacing.sm),
+                        Expanded(
+                          child: Text(
+                            'Delegasi bersifat cair. Anda dapat menarik suara atau mengubah delegator kapan saja selama pemilihan masih berlangsung.',
+                            style: AppTypography.caption.copyWith(
+                              color: AppColors.textSecondary,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: AppSpacing.xxl),
+                ],
+              );
+            },
           ),
         ),
       ],
+    );
+  }
+
+  void _showDelegateConfirmation(BuildContext context, Delegate delegate) {
+    ref.read(delegationActionProvider.notifier).selectDelegate(
+          delegateId: delegate.id,
+          delegateName: delegate.fullName,
+        );
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (_) => _DelegationConfirmModal(
+        delegate: delegate,
+        electionId: widget.electionId,
+      ),
     );
   }
 }
 
 class _DelegatorCard extends StatelessWidget {
   const _DelegatorCard({
-    required this.name,
-    required this.badges,
-    required this.voteCount,
+    required this.delegate,
+    required this.onDelegateTap,
   });
 
-  final String name;
-  final List<Widget> badges;
-  final int voteCount;
+  final Delegate delegate;
+  final VoidCallback onDelegateTap;
 
   @override
   Widget build(BuildContext context) {
+    final badges = <Widget>[];
+    if (delegate.faculty != null && delegate.faculty!.isNotEmpty) {
+      badges.add(_DelegatorBadge(label: delegate.faculty!, type: _BadgeType.green));
+    } else {
+      badges.add(const _DelegatorBadge(label: 'DELEGASI PUBLIK', type: _BadgeType.green));
+    }
+    if (delegate.specialization != null && delegate.specialization!.isNotEmpty) {
+      badges.add(_DelegatorBadge(label: delegate.specialization!, type: _BadgeType.gray));
+    }
+    if (delegate.trustScore > 0) {
+      badges.add(_DelegatorBadge(label: 'TRUST: ${(delegate.trustScore * 10).toStringAsFixed(1)}%', type: _BadgeType.gold));
+    }
+
     return Container(
+      margin: const EdgeInsets.only(bottom: AppSpacing.md),
       padding: const EdgeInsets.all(AppSpacing.md),
       decoration: BoxDecoration(
         color: Colors.white,
@@ -558,12 +717,19 @@ class _DelegatorCard extends StatelessWidget {
                 width: 48,
                 height: 48,
                 decoration: BoxDecoration(
-                  color: const Color(0xFFE5E7EB),
+                  color: AppColors.primary800,
                   shape: BoxShape.circle,
                   border: Border.all(color: AppColors.outlineVariant),
                 ),
-                child: const Icon(Icons.person,
-                    color: AppColors.outline, size: 28),
+                child: Center(
+                  child: Text(
+                    delegate.initials,
+                    style: AppTypography.itemTitle.copyWith(
+                      color: Colors.white,
+                      fontSize: 16,
+                    ),
+                  ),
+                ),
               ),
               const SizedBox(width: AppSpacing.md),
               Expanded(
@@ -571,7 +737,7 @@ class _DelegatorCard extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      name,
+                      delegate.fullName,
                       style: AppTypography.cardTitle.copyWith(
                         color: AppColors.primary800,
                         fontSize: 16,
@@ -583,6 +749,18 @@ class _DelegatorCard extends StatelessWidget {
                       runSpacing: 6,
                       children: badges,
                     ),
+                    if (delegate.delegateBio != null && delegate.delegateBio!.isNotEmpty) ...[
+                      const SizedBox(height: 8),
+                      Text(
+                        delegate.delegateBio!,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: AppTypography.bodyText.copyWith(
+                          fontSize: 12,
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                    ],
                   ],
                 ),
               ),
@@ -608,7 +786,7 @@ class _DelegatorCard extends StatelessWidget {
                   Row(
                     children: [
                       Text(
-                        voteCount.toString(),
+                        delegate.delegationCount.toString(),
                         style: AppTypography.itemTitle.copyWith(
                           fontSize: 16,
                           color: AppColors.primary800,
@@ -625,29 +803,129 @@ class _DelegatorCard extends StatelessWidget {
                 ],
               ),
               // Button Delegasikan
-              Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                decoration: BoxDecoration(
-                  gradient: AppColors.goldGradient,
-                  borderRadius: BorderRadius.circular(999),
+              GestureDetector(
+                onTap: onDelegateTap,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  decoration: BoxDecoration(
+                    gradient: AppColors.goldGradient,
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        'Delegasikan',
+                        style: AppTypography.bodyMedium.copyWith(
+                          color: Colors.white,
+                        ),
+                      ),
+                      const SizedBox(width: 4),
+                      const Icon(Icons.arrow_forward,
+                          color: Colors.white, size: 14),
+                    ],
+                  ),
                 ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _DelegationConfirmModal extends ConsumerWidget {
+  const _DelegationConfirmModal({
+    required this.delegate,
+    required this.electionId,
+  });
+
+  final Delegate delegate;
+  final String electionId;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final actionState = ref.watch(delegationActionProvider);
+
+    return Container(
+      padding: EdgeInsets.only(
+        left: 24,
+        right: 24,
+        top: 24,
+        bottom: MediaQuery.of(context).viewInsets.bottom + 24,
+      ),
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 44,
+                height: 44,
+                decoration: const BoxDecoration(
+                  color: AppColors.primary800,
+                  shape: BoxShape.circle,
+                ),
+                child: Center(
+                  child: Text(
+                    delegate.initials,
+                    style: AppTypography.itemTitle.copyWith(color: Colors.white),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Delegasikan',
-                      style: AppTypography.bodyMedium.copyWith(
-                        color: Colors.white,
-                      ),
+                      delegate.fullName,
+                      style: AppTypography.cardTitle.copyWith(fontSize: 16),
                     ),
-                    const SizedBox(width: 4),
-                    const Icon(Icons.arrow_forward,
-                        color: Colors.white, size: 14),
+                    if (delegate.faculty != null) ...[
+                      const SizedBox(height: 2),
+                      Text(
+                        delegate.faculty!,
+                        style: AppTypography.bodyText.copyWith(fontSize: 13),
+                      ),
+                    ],
                   ],
                 ),
               ),
             ],
+          ),
+          const SizedBox(height: 16),
+          Text(
+            'Konfirmasi Delegasi Suara',
+            style: AppTypography.itemTitle.copyWith(color: AppColors.primary800),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            'Dengan mendelegasikan suara ke ${delegate.fullName}, hak suaramu pada pemilihan ini akan diwakilkan olehnya. Kamu tetap bisa menarik kembali suaramu atau memilih secara mandiri kapan saja sebelum masa pemilihan berakhir.',
+            style: AppTypography.bodyText.copyWith(
+              fontSize: 13,
+              color: AppColors.textSecondary,
+              height: 1.5,
+            ),
+          ),
+          const SizedBox(height: 24),
+          GoldButton(
+            label: actionState.isLoading ? 'Memproses...' : 'Konfirmasi Delegasi',
+            isLoading: actionState.isLoading,
+            onPressed: actionState.isLoading
+                ? null
+                : () {
+                    Navigator.pop(context);
+                    ref.read(delegationActionProvider.notifier).createDelegation(
+                          electionId: electionId,
+                        );
+                  },
           ),
         ],
       ),

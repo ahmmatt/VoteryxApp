@@ -33,6 +33,7 @@ class AdminDelegateReviewScreen extends ConsumerWidget {
             _buildDetailRow('NIM', app.isStudent ? app.nim : 'Bukan Mahasiswa'),
             _buildDetailRow('Keahlian', app.expertise),
             _buildDetailRow('Bio', app.bio),
+            _buildDetailRow('Riwayat Pencapaian / Track Record', app.trackRecord),
             _buildDetailRow('Portofolio', app.portfolioUrl),
             
             const SizedBox(height: 40),

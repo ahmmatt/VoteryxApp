@@ -1,458 +1,491 @@
+// lib/features/auth/presentation/screens/kyc_nik_input_screen.dart
 import 'dart:ui';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:voteryxapp/core/constants/app_colors.dart';
 import 'package:voteryxapp/core/constants/app_spacing.dart';
 import 'package:voteryxapp/core/constants/app_typography.dart';
 import 'package:voteryxapp/core/router/app_router.dart';
+import 'package:voteryxapp/core/utils/app_snackbar.dart';
+import 'package:voteryxapp/core/widgets/gold_button.dart';
 
-class KycNikInputScreen extends StatefulWidget {
+import '../providers/auth_provider.dart';
+
+class KycNikInputScreen extends ConsumerStatefulWidget {
   const KycNikInputScreen({super.key});
 
   @override
-  State<KycNikInputScreen> createState() => _KycNikInputScreenState();
+  ConsumerState<KycNikInputScreen> createState() => _KycNikInputScreenState();
 }
 
-class _KycNikInputScreenState extends State<KycNikInputScreen> {
-  final TextEditingController _nikController = TextEditingController();
+class _KycNikInputScreenState extends ConsumerState<KycNikInputScreen> {
+  final _formKey = GlobalKey<FormState>();
+  final _nikController = TextEditingController();
+  final _passwordController = TextEditingController();
+  final _confirmPasswordController = TextEditingController();
+  bool _obscurePassword = true;
+  bool _obscureConfirm = true;
+  bool _isChecking = false;
 
-  void _showNfcModal() {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
-      isScrollControlled: true,
-      builder: (BuildContext context) {
-        return BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
-          child: Container(
-            padding: const EdgeInsets.all(AppSpacing.xl),
-            decoration: const BoxDecoration(
-              color: Color(0xFFE5E9F0), // Light grayish-blue to match image
-              borderRadius: BorderRadius.only(
-                topLeft: Radius.circular(24),
-                topRight: Radius.circular(24),
-              ),
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const SizedBox(height: AppSpacing.md),
-                // Icon Circle
-                Container(
-                  width: 64,
-                  height: 64,
-                  decoration: const BoxDecoration(
-                    color: AppColors.goldMid,
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Icon(Icons.contactless, color: Colors.white, size: 32),
-                ),
-                const SizedBox(height: AppSpacing.lg),
-                
-                // Title
-                Text(
-                  'Menunggu e-KTP...',
-                  style: AppTypography.headerTitle.copyWith(
-                    color: AppColors.primary900,
-                    fontSize: 20,
-                  ),
-                ),
-                const SizedBox(height: AppSpacing.sm),
-                
-                // Description
-                Text(
-                  'Jangan pindahkan kartu Anda selama\nproses pemindaian berlangsung.',
-                  textAlign: TextAlign.center,
-                  style: AppTypography.bodyMedium.copyWith(
-                    color: AppColors.textSecondary,
-                  ),
-                ),
-                const SizedBox(height: AppSpacing.xl),
-                
-                // Loading dots (simulated)
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    _buildDot(true),
-                    const SizedBox(width: 8),
-                    _buildDot(true),
-                    const SizedBox(width: 8),
-                    _buildDot(true),
-                  ],
-                ),
-                const SizedBox(height: AppSpacing.xl),
-                
-                // Cancel Button
-                SizedBox(
-                  width: double.infinity,
-                  child: OutlinedButton(
-                    onPressed: () {
-                      Navigator.pop(context);
-                      // Fallback ke liveness langsung atau layar NFC manual
-                      context.go(AppRoutes.kycLiveness); 
-                    },
-                    style: OutlinedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      side: BorderSide(color: AppColors.outline.withOpacity(0.3)),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(24),
-                      ),
-                    ),
-                    child: Text(
-                      'Batalkan',
-                      style: AppTypography.buttonText.copyWith(
-                        color: AppColors.primary900,
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: AppSpacing.md),
-              ],
-            ),
-          ),
+  // Password strength (0-4)
+  int _passwordStrength = 0;
+
+  @override
+  void dispose() {
+    _nikController.dispose();
+    _passwordController.dispose();
+    _confirmPasswordController.dispose();
+    super.dispose();
+  }
+
+  int _calculatePasswordStrength(String password) {
+    if (password.isEmpty) return 0;
+    int strength = 0;
+    if (password.length >= 8) strength++;
+    if (password.length >= 12) strength++;
+    if (RegExp(r'[0-9]').hasMatch(password)) strength++;
+    if (RegExp(r'[!@#$%^&*(),.?":{}|<>]').hasMatch(password)) strength++;
+    return strength;
+  }
+
+  String _strengthLabel(int strength) {
+    switch (strength) {
+      case 1:
+        return 'Lemah';
+      case 2:
+        return 'Cukup';
+      case 3:
+        return 'Kuat';
+      case 4:
+        return 'Sangat Kuat';
+      default:
+        return '';
+    }
+  }
+
+  Color _strengthColor(int strength) {
+    switch (strength) {
+      case 1:
+        return AppColors.errorRed;
+      case 2:
+        return AppColors.warningAmber;
+      case 3:
+        return AppColors.successTeal;
+      case 4:
+        return const Color(0xFF00B894);
+      default:
+        return AppColors.outlineVariant;
+    }
+  }
+
+  Future<void> _handleNext() async {
+    if (!(_formKey.currentState?.validate() ?? false)) return;
+
+    setState(() => _isChecking = true);
+
+    try {
+      final nik = _nikController.text.trim();
+      final password = _passwordController.text;
+
+      // Cek duplikasi NIK
+      final isDuplicate = await ref
+          .read(registrationProvider.notifier)
+          .checkNikDuplicate(nik);
+
+      if (!mounted) return;
+
+      if (isDuplicate) {
+        AppSnackBar.showError(
+          context,
+          'NIK ini sudah terdaftar. Silakan masuk.',
         );
-      },
-    );
-
-    // Simulate NFC read success after 3 seconds
-    Future.delayed(const Duration(seconds: 3), () {
-      if (mounted && Navigator.canPop(context)) {
-        Navigator.pop(context); // Close waiting modal
-        _showNfcSuccessModal();
+        setState(() => _isChecking = false);
+        return;
       }
-    });
-  }
 
-  void _showNfcSuccessModal() {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
-      isScrollControlled: true,
-      isDismissible: false,
-      builder: (BuildContext context) {
-        return Container(
-          padding: const EdgeInsets.all(AppSpacing.xl),
-          decoration: const BoxDecoration(
-            color: Color(0xFFF3F4F6), // Very light gray/white
-            borderRadius: BorderRadius.only(
-              topLeft: Radius.circular(24),
-              topRight: Radius.circular(24),
-            ),
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const SizedBox(height: AppSpacing.sm),
-              // Drag handle
-              Container(
-                width: 40,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: Colors.grey[300],
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-              const SizedBox(height: AppSpacing.lg),
-              
-              // Success Icon
-              Container(
-                width: 70,
-                height: 70,
-                decoration: const BoxDecoration(
-                  color: Color(0xFFE8F5E9),
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(Icons.check_circle, color: Color(0xFF10B981), size: 40),
-              ),
-              const SizedBox(height: AppSpacing.lg),
-              
-              // Title
-              Text(
-                'Membaca Chip KTP...\nSukses!',
-                textAlign: TextAlign.center,
-                style: AppTypography.headerTitle.copyWith(
-                  color: AppColors.primary900,
-                  fontSize: 22,
-                ),
-              ),
-              const SizedBox(height: AppSpacing.md),
-              
-              // Description
-              Text(
-                'Data identitas Anda telah berhasil\ndiverifikasi secara aman melalui enkripsi\ntingkat tinggi.',
-                textAlign: TextAlign.center,
-                style: AppTypography.bodyMedium.copyWith(
-                  color: AppColors.textSecondary,
-                  height: 1.5,
-                ),
-              ),
-              const SizedBox(height: AppSpacing.xl),
-              
-              // Identity Card
-              Container(
-                padding: const EdgeInsets.all(AppSpacing.md),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFF9FAFB),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Row(
-                  children: [
-                    CircleAvatar(
-                      radius: 24,
-                      backgroundColor: Colors.grey[300],
-                      backgroundImage: const NetworkImage('https://images.unsplash.com/photo-1500648767791-00dcc994a43e?q=80&w=150&auto=format&fit=crop'), // Mock face
-                    ),
-                    const SizedBox(width: AppSpacing.md),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'IDENTITAS TERBACA',
-                            style: AppTypography.captionBold.copyWith(
-                              color: AppColors.textSecondary,
-                              fontSize: 10,
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            'SITI AMINAH ZAKARIA',
-                            style: AppTypography.cardTitle.copyWith(
-                              color: AppColors.primary900,
-                              fontSize: 14,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const Icon(Icons.verified, color: Color(0xFF10B981)),
-                  ],
-                ),
-              ),
-              const SizedBox(height: AppSpacing.xl),
-              
-              // Continue Button
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: () {
-                    Navigator.pop(context);
-                    context.go(AppRoutes.kycLiveness); // or dashboard, going to Liveness matches stepper
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.goldDark, // Gold button
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(24),
-                    ),
-                    elevation: 0,
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Text(
-                        'Lanjutkan ke Surat Suara',
-                        style: AppTypography.buttonText.copyWith(color: Colors.white),
-                      ),
-                      const SizedBox(width: 8),
-                      const Icon(Icons.arrow_forward, color: Colors.white, size: 20),
-                    ],
-                  ),
-                ),
-              ),
-              const SizedBox(height: AppSpacing.lg),
-            ],
-          ),
-        );
-      },
-    );
-  }
+      // Simpan data akun sementara
+      ref.read(registrationProvider.notifier).setAccountData(
+            nik: nik,
+            password: password,
+          );
 
-  Widget _buildDot(bool active) {
-    return Container(
-      width: 10,
-      height: 10,
-      decoration: BoxDecoration(
-        color: active ? AppColors.goldDark : AppColors.goldMid.withOpacity(0.3),
-        shape: BoxShape.circle,
-      ),
-    );
+      // Lanjut ke pemilihan metode verifikasi e-KTP (NFC atau Foto Manual)
+      if (mounted) {
+        context.push('/kyc/method-select');
+      }
+    } catch (e) {
+      if (mounted) {
+        AppSnackBar.showError(context, 'Gagal memeriksa NIK. Coba lagi.');
+      }
+    } finally {
+      if (mounted) setState(() => _isChecking = false);
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFE8EEF5), // Light background from design
+      backgroundColor: const Color(0xFFEDF1F8),
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: AppColors.primary900),
-          onPressed: () => context.pop(),
+          onPressed: () {
+            if (context.canPop()) {
+              context.pop();
+            } else {
+              context.go(AppRoutes.login);
+            }
+          },
         ),
         title: Text(
-          'Verifikasi Identitas',
+          'Buat Akun',
           style: AppTypography.headerTitle.copyWith(color: AppColors.primary900),
         ),
-        centerTitle: false,
       ),
-      body: Padding(
+      body: SingleChildScrollView(
         padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const SizedBox(height: AppSpacing.md),
-            
-            // Stepper
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                _buildStepItem('NIK', true),
-                _buildStepDivider(false),
-                _buildStepItem('WAJAH', false),
-                _buildStepDivider(false),
-                _buildStepItem('SELESAI', false),
-              ],
-            ),
-            
-            const SizedBox(height: AppSpacing.xxl),
-            
-            // NIK Input Title
-            Text(
-              'MASUKKAN NIK',
-              style: AppTypography.captionBold.copyWith(
-                color: AppColors.textSecondary,
-                letterSpacing: 1.2,
+        child: Form(
+          key: _formKey,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const SizedBox(height: AppSpacing.sm),
+
+              // Step Indicator
+              _buildStepIndicator(currentStep: 0),
+              const SizedBox(height: AppSpacing.xl),
+
+              // Section title
+              Text(
+                'DATA AKUN',
+                style: AppTypography.captionBold.copyWith(
+                  color: AppColors.textSecondary,
+                  letterSpacing: 1.2,
+                ),
               ),
-            ),
-            const SizedBox(height: AppSpacing.sm),
-            
-            // NIK Text Field
-            Container(
-              decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.5),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: AppColors.outline.withOpacity(0.2)),
+              const SizedBox(height: AppSpacing.xs),
+              Text(
+                'NIK kamu digunakan sebagai identitas unik yang terenkripsi. Tidak ada yang bisa membaca nilai aslinya.',
+                style: AppTypography.bodyText.copyWith(fontSize: 12, height: 1.5),
               ),
-              child: TextField(
+              const SizedBox(height: AppSpacing.lg),
+
+              // NIK Input
+              _buildFieldLabel('NOMOR INDUK KEPENDUDUKAN (NIK)'),
+              const SizedBox(height: 8),
+              TextFormField(
                 controller: _nikController,
                 keyboardType: TextInputType.number,
                 maxLength: 16,
                 style: AppTypography.bodyText.copyWith(color: AppColors.primary900),
-                decoration: InputDecoration(
-                  counterText: "",
-                  hintText: '16 digit NIK kamu',
-                  hintStyle: AppTypography.bodyText.copyWith(color: AppColors.outline),
-                  prefixIcon: const Icon(Icons.badge_outlined, color: AppColors.outline),
-                  border: InputBorder.none,
-                  contentPadding: const EdgeInsets.symmetric(vertical: 16),
+                decoration: _inputDeco(
+                  hint: '16 digit NIK kamu',
+                  icon: Icons.badge_outlined,
+                  counterText: '',
                 ),
-                onChanged: (val) {
-                  if (val.length == 16) {
-                    // Auto show modal if 16 digits reached for demo purposes
-                    FocusScope.of(context).unfocus();
-                    _showNfcModal();
+                validator: (v) {
+                  if (v == null || v.trim().isEmpty) return 'NIK wajib diisi';
+                  if (v.trim().length != 16) return 'NIK harus 16 digit';
+                  if (!RegExp(r'^\d+$').hasMatch(v.trim())) {
+                    return 'NIK hanya boleh berisi angka';
                   }
+                  return null;
                 },
               ),
-            ),
-            
-            const Spacer(),
-            
-            // Center Illustration (Mock of phone tapping ID)
-            Center(
-              child: GestureDetector(
-                onTap: _showNfcModal, // Manual trigger for testing
-                child: Container(
-                  width: 200,
-                  height: 250,
-                  decoration: BoxDecoration(
-                    color: AppColors.primary900,
-                    borderRadius: BorderRadius.circular(24),
-                    boxShadow: [
-                      BoxShadow(
-                        color: AppColors.primary900.withOpacity(0.2),
-                        blurRadius: 20,
-                        offset: const Offset(0, 10),
-                      )
-                    ],
+              const SizedBox(height: AppSpacing.md),
+
+              // Password Input
+              _buildFieldLabel('KATA SANDI'),
+              const SizedBox(height: 8),
+              TextFormField(
+                controller: _passwordController,
+                obscureText: _obscurePassword,
+                onChanged: (v) {
+                  setState(() => _passwordStrength = _calculatePasswordStrength(v));
+                },
+                decoration: _inputDeco(
+                  hint: 'Minimal 8 karakter',
+                  icon: Icons.lock_outline_rounded,
+                  suffixIcon: IconButton(
+                    icon: Icon(
+                      _obscurePassword
+                          ? Icons.visibility_outlined
+                          : Icons.visibility_off_outlined,
+                      color: AppColors.outline,
+                      size: 20,
+                    ),
+                    onPressed: () =>
+                        setState(() => _obscurePassword = !_obscurePassword),
                   ),
-                  child: Stack(
-                    alignment: Alignment.center,
-                    children: [
-                      // Phone screen mock
-                      Positioned(
-                        top: 20,
-                        child: Container(
-                          width: 80,
-                          height: 4,
-                          decoration: BoxDecoration(
-                            color: Colors.white.withOpacity(0.2),
-                            borderRadius: BorderRadius.circular(2),
+                ),
+                validator: (v) {
+                  if (v == null || v.isEmpty) return 'Kata sandi wajib diisi';
+                  if (v.length < 8) return 'Minimal 8 karakter';
+                  return null;
+                },
+              ),
+
+              // Password Strength
+              if (_passwordController.text.isNotEmpty) ...[
+                const SizedBox(height: 10),
+                Row(
+                  children: [
+                    Expanded(
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(4),
+                        child: LinearProgressIndicator(
+                          value: _passwordStrength / 4,
+                          minHeight: 5,
+                          backgroundColor: AppColors.outlineVariant,
+                          valueColor: AlwaysStoppedAnimation<Color>(
+                            _strengthColor(_passwordStrength),
                           ),
                         ),
                       ),
-                      // NFC Icon
-                      Container(
-                        padding: const EdgeInsets.all(16),
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          border: Border.all(color: AppColors.goldMid, width: 2),
-                        ),
-                        child: const Icon(Icons.contactless_outlined, color: AppColors.goldMid, size: 32),
+                    ),
+                    const SizedBox(width: 10),
+                    Text(
+                      _strengthLabel(_passwordStrength),
+                      style: AppTypography.captionBold.copyWith(
+                        color: _strengthColor(_passwordStrength),
+                        fontSize: 10,
                       ),
-                      // Mock card behind
-                      Positioned(
-                        right: -30,
-                        bottom: 40,
-                        child: Transform.rotate(
-                          angle: -0.2,
-                          child: const Icon(Icons.keyboard_double_arrow_left, color: AppColors.goldDark, size: 40),
-                        ),
-                      )
-                    ],
+                    ),
+                  ],
+                ),
+              ],
+              const SizedBox(height: AppSpacing.md),
+
+              // Confirm Password
+              _buildFieldLabel('KONFIRMASI KATA SANDI'),
+              const SizedBox(height: 8),
+              TextFormField(
+                controller: _confirmPasswordController,
+                obscureText: _obscureConfirm,
+                decoration: _inputDeco(
+                  hint: 'Ulangi kata sandi',
+                  icon: Icons.lock_reset_rounded,
+                  suffixIcon: IconButton(
+                    icon: Icon(
+                      _obscureConfirm
+                          ? Icons.visibility_outlined
+                          : Icons.visibility_off_outlined,
+                      color: AppColors.outline,
+                      size: 20,
+                    ),
+                    onPressed: () =>
+                        setState(() => _obscureConfirm = !_obscureConfirm),
                   ),
                 ),
+                validator: (v) {
+                  if (v == null || v.isEmpty) return 'Konfirmasi kata sandi wajib diisi';
+                  if (v != _passwordController.text) {
+                    return 'Kata sandi tidak cocok';
+                  }
+                  return null;
+                },
               ),
-            ),
-            
-            const Spacer(flex: 2),
-          ],
+              const SizedBox(height: AppSpacing.xl),
+
+              // Info Box
+              Container(
+                padding: const EdgeInsets.all(AppSpacing.md),
+                decoration: BoxDecoration(
+                  color: AppColors.warningBg,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: AppColors.warningAmber.withValues(alpha: 0.3),
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(
+                      Icons.info_outline_rounded,
+                      color: AppColors.warningAmber,
+                      size: 18,
+                    ),
+                    const SizedBox(width: AppSpacing.sm),
+                    Expanded(
+                      child: Text(
+                        'NIK hanya akan disimpan dalam bentuk hash terenkripsi. Voteryx tidak pernah menyimpan NIK aslimu.',
+                        style: AppTypography.bodyText.copyWith(
+                          fontSize: 11,
+                          height: 1.5,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: AppSpacing.xl),
+
+              // Next Button
+              GoldButton(
+                label: 'Lanjutkan',
+                icon: Icons.arrow_forward_rounded,
+                isLoading: _isChecking,
+                onPressed: _isChecking ? null : _handleNext,
+              ),
+              const SizedBox(height: AppSpacing.md),
+
+              // Login link
+              Center(
+                child: Wrap(
+                  alignment: WrapAlignment.center,
+                  children: [
+                    Text(
+                      'Sudah punya akun? ',
+                      style: AppTypography.bodyText.copyWith(fontSize: 12),
+                    ),
+                    GestureDetector(
+                      onTap: () => context.go(AppRoutes.login),
+                      child: Text(
+                        'Masuk di sini',
+                        style: AppTypography.bodyMedium.copyWith(
+                          color: AppColors.goldDark,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: AppSpacing.xxl),
+            ],
+          ),
         ),
       ),
     );
   }
 
-  Widget _buildStepItem(String title, bool isActive) {
-    return Column(
-      children: [
-        Container(
-          width: 8,
-          height: 8,
-          decoration: BoxDecoration(
-            color: isActive ? AppColors.goldMid : AppColors.outline.withOpacity(0.3),
-            shape: BoxShape.circle,
-          ),
-        ),
-        const SizedBox(height: 8),
-        Text(
-          title,
-          style: AppTypography.captionBold.copyWith(
-            color: isActive ? AppColors.goldMid : AppColors.outline,
-            fontSize: 10,
-            letterSpacing: 0.5,
-          ),
-        ),
-      ],
+  Widget _buildFieldLabel(String label) {
+    return Text(
+      label,
+      style: AppTypography.captionBold.copyWith(
+        color: AppColors.textSecondary,
+        letterSpacing: 0.5,
+      ),
     );
   }
 
-  Widget _buildStepDivider(bool isActive) {
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16).copyWith(bottom: 20),
-      width: 24,
-      height: 2,
-      color: isActive ? AppColors.goldMid : AppColors.outline.withOpacity(0.3),
+  InputDecoration _inputDeco({
+    required String hint,
+    required IconData icon,
+    String? counterText,
+    Widget? suffixIcon,
+  }) {
+    return InputDecoration(
+      hintText: hint,
+      hintStyle: TextStyle(
+        color: AppColors.outline.withValues(alpha: 0.55),
+        fontSize: 13,
+      ),
+      prefixIcon: Icon(icon, color: AppColors.outline, size: 20),
+      suffixIcon: suffixIcon,
+      counterText: counterText,
+      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: BorderSide(color: AppColors.outlineVariant),
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: BorderSide(color: AppColors.outlineVariant),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: const BorderSide(color: AppColors.primary800, width: 2),
+      ),
+      errorBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: const BorderSide(color: AppColors.errorRed),
+      ),
+      focusedErrorBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: const BorderSide(color: AppColors.errorRed, width: 2),
+      ),
+      filled: true,
+      fillColor: Colors.white,
+    );
+  }
+
+  Widget _buildStepIndicator({required int currentStep}) {
+    const steps = ['Akun', 'KTP', 'Wajah', 'Selesai'];
+    return Row(
+      children: List.generate(steps.length * 2 - 1, (index) {
+        if (index.isOdd) {
+          // Divider
+          final stepIndex = (index - 1) ~/ 2;
+          return Expanded(
+            child: Container(
+              height: 2,
+              color: stepIndex < currentStep
+                  ? AppColors.goldMid
+                  : AppColors.outlineVariant,
+            ),
+          );
+        }
+        final stepIndex = index ~/ 2;
+        final isActive = stepIndex == currentStep;
+        final isDone = stepIndex < currentStep;
+        return _StepDot(
+          label: steps[stepIndex],
+          isActive: isActive,
+          isDone: isDone,
+        );
+      }),
+    );
+  }
+}
+
+class _StepDot extends StatelessWidget {
+  const _StepDot({
+    required this.label,
+    required this.isActive,
+    required this.isDone,
+  });
+
+  final String label;
+  final bool isActive;
+  final bool isDone;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        Container(
+          width: 28,
+          height: 28,
+          decoration: BoxDecoration(
+            color: isActive
+                ? AppColors.goldMid
+                : isDone
+                    ? AppColors.goldDark
+                    : AppColors.outlineVariant.withValues(alpha: 0.4),
+            shape: BoxShape.circle,
+          ),
+          child: isDone
+              ? const Icon(Icons.check, color: Colors.white, size: 14)
+              : isActive
+                  ? const Icon(Icons.edit, color: Colors.white, size: 14)
+                  : null,
+        ),
+        const SizedBox(height: 4),
+        Text(
+          label,
+          style: AppTypography.captionBold.copyWith(
+            color: isActive
+                ? AppColors.goldDark
+                : isDone
+                    ? AppColors.goldDark
+                    : AppColors.outline,
+            fontSize: 9,
+          ),
+        ),
+      ],
     );
   }
 }

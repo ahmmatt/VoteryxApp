@@ -1,21 +1,21 @@
 // lib/main.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'core/network/supabase_client.dart';
 import 'core/router/app_router.dart';
 import 'core/theme/app_theme.dart';
 
 /// Entry point Voteryx.
 ///
-/// Catatan setup yang belum selesai:
-/// - Supabase.initialize() akan ditambahkan setelah project
-///   Supabase siap (lihat core/network/supabase_client.dart).
+/// Catatan setup:
+/// - Supabase.initialize() diaktifkan dengan konfigurasi dari supabase_client.dart.
 /// - Drift database initialization akan ditambahkan saat
 ///   fitur offline pertama dibangun.
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // TODO: Uncomment setelah Supabase project siap:
-  // await SupabaseConfig.initialize();
+  // Inisialisasi Supabase
+  await SupabaseConfig.initialize();
 
   runApp(
     // ProviderScope adalah root dari Riverpod state management.

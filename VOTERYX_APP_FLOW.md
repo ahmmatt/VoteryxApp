@@ -160,7 +160,12 @@ terisi)            user review/koreksi)
 | 29 | **Daftar Pemilihan (Mobile)** | List pemilihan dengan status (Live/Terjadwal/Draft/Selesai) dan aksi cepat |
 | 30 | **Inbox Usulan Pemilihan** | Review usulan masuk dari User/organisasi |
 | 31 | **Detail Review Usulan** | Cek kelayakan usulan dan kandidat, approve/tolak |
-| 32 | **Sengketa KYC** | Verifikasi manual untuk kasus KYC gagal, dengan catatan audit wajib |
+| 32 | **Detail Tracking Usulan Admin** | Melacak progres usulan pemilihan dari diajukan, direview, disetujui/ditolak, hingga menjadi draft |
+| 33 | **Detail Kandidat Usulan Admin** | Melihat daftar kandidat yang diajukan dalam sebuah usulan pemilihan, termasuk identitas ringkas dan status kelengkapan |
+| 34 | **Verifikasi Kandidat** | Daftar kandidat yang sudah melengkapi profil dan menunggu verifikasi admin |
+| 35 | **Lihat Berkas Kandidat** | Memeriksa dokumen kandidat seperti formulir pendaftaran, KTM, surat rekomendasi, dan visi-misi |
+| 36 | **Tinjau Kandidat** | Checklist verifikasi kandidat dan pengambilan keputusan admin: setujui atau tolak |
+| 37 | **Sengketa KYC** | Verifikasi manual untuk kasus KYC gagal, dengan catatan audit wajib |
 
 ### 4.4 Role: Admin (Web Dashboard — Setup & Deep Work)
 
@@ -185,22 +190,55 @@ Bukan murni top-down (admin only) maupun murni bottom-up (user bebas membuat sen
    (nama pemilihan, tujuan, daftar nama+NIM calon kandidat)
             │
             ▼
-2. Admin review kelayakan usulan
+2. Admin menerima usulan di Inbox Usulan Pemilihan
+            │
+            ├──► Lacak Detail Usulan
+            │    Admin melihat progres usulan dari diajukan hingga keputusan akhir
+            │
+            └──► Lihat Detail Kandidat
+                 Admin memeriksa daftar kandidat yang diajukan dalam usulan
             │
             ▼
-3. Admin approve → otomatis jadi draft pemilihan
+3. Admin review kelayakan usulan
+            │
+            ▼
+4. Admin approve → otomatis jadi draft pemilihan
    (admin tinggal lengkapi DPT, pengaturan delegasi, jadwal final)
             │
             ▼
-4. Kandidat yang diusulkan menerima notifikasi
-   untuk mengisi profil sendiri (visi misi, track record, program kerja)
+5. Kandidat yang diusulkan menerima notifikasi
+   untuk mengisi profil sendiri
+   (visi misi, track record, program kerja, berkas pendukung)
             │
             ▼
-5. Admin verifikasi profil kandidat → status "Siap Tayang"
+6. Admin membuka halaman Verifikasi Kandidat
+            │
+            ├──► Lihat Berkas Kandidat
+            │    Memeriksa dokumen dan kelengkapan pengajuan kandidat
+            │
+            └──► Tinjau Kandidat
+                 Checklist verifikasi dan keputusan setujui/tolak
             │
             ▼
-6. Pemilihan otomatis menjadi Live pada waktu terjadwal
+7. Kandidat lolos verifikasi → status "Siap Tayang"
+            │
+            ▼
+8. Pemilihan otomatis menjadi Live pada waktu terjadwal
 ```
+
+**Tombol admin yang menjadi bagian dari alur ini:**
+
+| Tombol | Dari Halaman | Menuju Halaman |
+|---|---|---|
+| **Lacak Detail** | Inbox/monitor usulan admin | Detail Tracking Usulan Admin |
+| **Lihat Detail Kandidat** | Inbox/monitor usulan admin | Detail Kandidat Usulan Admin |
+| **Lihat Berkas** | Verifikasi Kandidat | Berkas Kandidat |
+| **Tinjau Sekarang** | Verifikasi Kandidat | Tinjau Kandidat |
+
+> Catatan implementasi:
+> Halaman admin untuk tracking usulan, detail kandidat, lihat berkas, dan tinjau kandidat
+> saat ini sudah tersedia pada sisi Flutter, namun data masih bersifat statis/dummy.
+> Integrasi final dengan Supabase akan dilakukan pada tahap backend dan repository layer.
 
 **Mengapa model ini dipilih:**
 - Mengurangi beban admin secara drastis (tidak perlu mengetik ulang visi-misi tiap kandidat)
@@ -250,8 +288,10 @@ Bukan murni top-down (admin only) maupun murni bottom-up (user bebas membuat sen
 
 - [x] Alur User — selesai didesain (UI/UX + prompt Stitch)
 - [x] Alur Delegate — selesai didesain (UI/UX + prompt Stitch)
-- [x] Alur Admin Mobile — selesai didesain (UI/UX + prompt Stitch)
+- [x] Alur Admin Mobile — selesai didesain dan sebagian sudah diimplementasikan di Flutter
 - [x] Alur Pengajuan Pemilihan — selesai didesain (UI/UX + prompt Stitch)
+- [x] Alur Review Usulan Admin — halaman tracking dan detail kandidat sudah dibuat
+- [x] Alur Verifikasi Kandidat Admin — halaman daftar kandidat, lihat berkas, dan tinjau kandidat sudah dibuat
 - [ ] Web Dashboard Admin — belum didesain detail
 - [ ] Integrasi Supabase — tahap setup arsitektur
 - [ ] Implementasi enkripsi suara (mekanisme kriptografi spesifik) — belum ditentukan

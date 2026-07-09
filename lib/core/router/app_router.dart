@@ -1,10 +1,14 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../features/auth/presentation/screens/login_screen.dart';
 import '../../features/auth/presentation/screens/splash_screen.dart';
 import '../../features/auth/presentation/screens/onboarding_screen.dart';
 import '../../features/auth/presentation/screens/kyc_nik_input_screen.dart';
+import '../../features/auth/presentation/screens/kyc_method_select_screen.dart';
+import '../../features/auth/presentation/screens/kyc_nfc_scan_screen.dart';
 import '../../features/auth/presentation/screens/kyc_nfc_failed_screen.dart';
 import '../../features/auth/presentation/screens/kyc_camera_screen.dart';
 import '../../features/auth/presentation/screens/kyc_photo_error_screen.dart';
@@ -17,7 +21,9 @@ import '../../features/user/election/presentation/screens/vote_confirmation_scre
 import '../../features/user/election/presentation/screens/vote_processing_screen.dart';
 import '../../features/user/election/presentation/screens/vote_receipt_screen.dart';
 import '../../features/user/delegation/presentation/screens/delegation_screen.dart';
+import '../../features/delegates/delegation/presentation/screens/delegate_terms_screen.dart';
 import '../../features/delegates/delegation/presentation/screens/delegate_registration_form_screen.dart';
+import '../../features/delegates/delegation/presentation/screens/delegate_portal_login_screen.dart';
 import '../../features/delegates/delegation/presentation/screens/delegate_review_screen.dart';
 import '../../features/delegates/delegation/presentation/screens/delegate_approved_screen.dart';
 import '../../features/delegates/delegation/presentation/screens/delegate_dashboard_screen.dart';
@@ -45,9 +51,13 @@ import '../../features/admin/election_management/presentation/screens/admin_prop
 import '../../features/admin/election_management/presentation/screens/admin_create_election_candidates_screen.dart';
 import '../../features/admin/election_management/presentation/screens/admin_create_election_review_screen.dart';
 import '../../features/admin/election_management/presentation/screens/admin_inbox_usulan_screen.dart';
+import '../../features/admin/election_management/presentation/screens/admin_proposal_candidate_list_screen.dart';
+import '../../features/admin/election_management/presentation/screens/admin_proposal_track_detail_screen.dart';
 import '../../features/admin/election_management/presentation/screens/admin_review_detail_screen.dart';
 import '../../features/admin/candidate_management/presentation/screens/admin_candidate_management_screen.dart';
 import '../../features/admin/candidate_verification/presentation/screens/admin_candidate_verification_screen.dart';
+import '../../features/admin/candidate_verification/presentation/screens/admin_candidate_documents_screen.dart';
+import '../../features/admin/candidate_verification/presentation/screens/admin_candidate_review_screen.dart';
 import '../../features/admin/voter_management/presentation/screens/admin_voter_management_screen.dart';
 import '../../features/admin/settings/presentation/screens/admin_settings_screen.dart';
 import '../../features/admin/election_detail/presentation/screens/admin_election_live_detail_screen.dart';
@@ -69,6 +79,7 @@ abstract final class AppRoutes {
   static const login = '/login';
 
   static const kycNikInput = '/kyc/nik-input';
+  static const kycMethodSelect = '/kyc/method-select';
   static const kycLiveness = '/kyc/liveness';
   static const kycNfcScan = '/kyc/nfc-scan';
 
@@ -100,12 +111,16 @@ abstract final class AppRoutes {
   // Admin
   static const adminDashboard = '/admin/dashboard';
   static const adminProposals = '/admin/proposals';
+  static const adminProposalTrack = '/admin/proposals/:id/track';
+  static const adminProposalCandidates = '/admin/proposals/:id/candidates';
   static const adminInboxUsulan = '/admin/inbox-usulan';
   static const adminReviewDetail = '/admin/review-detail';
   static const adminCreateCandidates = '/admin/elections/create/candidates';
   static const adminCreateReview = '/admin/elections/create/review';
   static const adminCandidateManage = '/admin/candidates/manage';
   static const adminCandidateVerification = '/admin/candidate-verification';
+  static const adminCandidateDocuments = ':id/documents';
+  static const adminCandidateReview = ':id/review';
   static const adminVoters = '/admin/voters';
   static const adminSettings = '/admin/settings';
   static const adminElectionLive = '/admin/election/live/:id';
@@ -122,6 +137,39 @@ final GoRouter appRouter = GoRouter(
   navigatorKey: _rootNavigatorKey,
   initialLocation: AppRoutes.splash,
   debugLogDiagnostics: true,
+  refreshListenable: _GoRouterRefreshStream(Supabase.instance.client.auth.onAuthStateChange),
+  // ── Navigation Guard ──────────────────────────────────────────────────────
+  redirect: (context, state) {
+    final session = Supabase.instance.client.auth.currentSession;
+    final location = state.matchedLocation;
+
+    // Routes yang boleh diakses tanpa login
+    const publicRoutes = [
+      '/splash',
+      '/onboarding',
+      '/login',
+      '/kyc',
+    ];
+
+    final isPublicRoute = publicRoutes.any(
+      (r) => location == r || location.startsWith(r),
+    );
+
+    // Belum login dan akses route protected → redirect ke login
+    if (session == null && !isPublicRoute) {
+      return AppRoutes.login;
+    }
+
+    // Sudah login dan akses splash/onboarding/login → redirect ke dashboard
+    if (session != null &&
+        (location == '/splash' ||
+            location == '/onboarding' ||
+            location == '/login')) {
+      return AppRoutes.dashboard;
+    }
+
+    return null; // Tidak ada redirect
+  },
   routes: [
     GoRoute(
       path: AppRoutes.splash,
@@ -142,6 +190,16 @@ final GoRouter appRouter = GoRouter(
       path: AppRoutes.kycNikInput,
       name: 'kyc-nik-input',
       builder: (_, __) => const KycNikInputScreen(),
+    ),
+    GoRoute(
+      path: AppRoutes.kycMethodSelect,
+      name: 'kyc-method-select',
+      builder: (_, __) => const KycMethodSelectScreen(),
+    ),
+    GoRoute(
+      path: AppRoutes.kycNfcScan,
+      name: 'kyc-nfc-scan',
+      builder: (_, __) => const KycNfcScanScreen(),
     ),
     GoRoute(
       path: AppRoutes.kycLiveness,
@@ -297,19 +355,26 @@ final GoRouter appRouter = GoRouter(
       path: AppRoutes.electionInfo,
       name: 'election-info',
       parentNavigatorKey: _rootNavigatorKey,
-      builder: (ctx, state) => const ElectionInfoScreen(),
+      builder: (ctx, state) => ElectionInfoScreen(
+        electionId: state.pathParameters['id'] ?? '',
+      ),
     ),
     GoRoute(
       path: '/election/:id',
       name: 'election',
       parentNavigatorKey: _rootNavigatorKey,
-      builder: (ctx, state) => const ElectionDetailScreen(),
+      builder: (ctx, state) => ElectionDetailScreen(
+        electionId: state.pathParameters['id'] ?? '',
+      ),
       routes: [
         GoRoute(
           path: 'candidate/:candidateId',
           name: 'election-candidate',
           parentNavigatorKey: _rootNavigatorKey,
-          builder: (_, __) => const CandidateDetailScreen(),
+          builder: (context, state) => CandidateDetailScreen(
+            electionId: state.pathParameters['id'] ?? '',
+            candidateId: state.pathParameters['candidateId'] ?? '',
+          ),
         ),
         GoRoute(
           path: 'vote-execution',
@@ -356,6 +421,18 @@ final GoRouter appRouter = GoRouter(
       parentNavigatorKey: _rootNavigatorKey,
       builder: (ctx, state) => const ProposalTrackDetailScreen(),
     ),
+    GoRoute(
+      path: AppRoutes.adminProposalTrack,
+      name: 'admin-proposal-track',
+      parentNavigatorKey: _rootNavigatorKey,
+      builder: (ctx, state) => const AdminProposalTrackDetailScreen(),
+    ),
+    GoRoute(
+      path: AppRoutes.adminProposalCandidates,
+      name: 'admin-proposal-candidates',
+      parentNavigatorKey: _rootNavigatorKey,
+      builder: (ctx, state) => const AdminProposalCandidateListScreen(),
+    ),
 
     // Delegate non-nav routes
     GoRoute(
@@ -381,12 +458,25 @@ final GoRouter appRouter = GoRouter(
           nim: extra['nim'] as String? ?? '-',
           faculty: extra['faculty'] as String? ?? '-',
           status: extra['status'] as String? ?? 'Aktif',
-          statusColor: extra['statusColor'] as Color? ?? const Color(0xFF10B981),
+          statusColor:
+              extra['statusColor'] as Color? ?? const Color(0xFF10B981),
           votes: extra['votes'] as int? ?? 1,
           isRevoked: extra['isRevoked'] as bool? ?? false,
           imageUrl: extra['imageUrl'] as String? ?? 'https://i.pravatar.cc/150',
         );
       },
+    ),
+    GoRoute(
+      path: '/delegation/login',
+      name: 'delegate-login',
+      parentNavigatorKey: _rootNavigatorKey,
+      builder: (_, __) => const DelegatePortalLoginScreen(),
+    ),
+    GoRoute(
+      path: '/delegation/terms',
+      name: 'delegate-terms',
+      parentNavigatorKey: _rootNavigatorKey,
+      builder: (_, __) => const DelegateTermsScreen(),
     ),
     GoRoute(
       path: '/delegation/registration',
@@ -458,6 +548,20 @@ final GoRouter appRouter = GoRouter(
       name: 'admin-candidate-verification',
       parentNavigatorKey: _rootNavigatorKey,
       builder: (_, __) => const AdminCandidateVerificationScreen(),
+      routes: [
+        GoRoute(
+          path: AppRoutes.adminCandidateDocuments,
+          name: 'admin-candidate-documents',
+          parentNavigatorKey: _rootNavigatorKey,
+          builder: (_, __) => const AdminCandidateDocumentsScreen(),
+        ),
+        GoRoute(
+          path: AppRoutes.adminCandidateReview,
+          name: 'admin-candidate-review',
+          parentNavigatorKey: _rootNavigatorKey,
+          builder: (_, __) => const AdminCandidateReviewScreen(),
+        ),
+      ],
     ),
     GoRoute(
       path: AppRoutes.adminVoters,
@@ -549,5 +653,26 @@ class _PlaceholderScreen extends StatelessWidget {
         ),
       ),
     );
+  }
+}
+
+class _GoRouterRefreshStream extends ChangeNotifier {
+  _GoRouterRefreshStream(Stream<AuthState> stream) {
+    _subscription = stream.asBroadcastStream().listen((AuthState authState) {
+      final event = authState.event;
+      if (event == AuthChangeEvent.signedIn ||
+          event == AuthChangeEvent.signedOut ||
+          event == AuthChangeEvent.userDeleted) {
+        notifyListeners();
+      }
+    });
+  }
+
+  late final StreamSubscription<AuthState> _subscription;
+
+  @override
+  void dispose() {
+    _subscription.cancel();
+    super.dispose();
   }
 }

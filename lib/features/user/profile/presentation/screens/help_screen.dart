@@ -3,7 +3,6 @@ import 'package:voteryxapp/core/constants/app_colors.dart';
 import 'package:voteryxapp/core/constants/app_typography.dart';
 import 'package:voteryxapp/core/constants/app_spacing.dart';
 import 'package:voteryxapp/core/constants/app_radius.dart';
-import 'package:voteryxapp/core/widgets/gold_button.dart';
 
 class HelpScreen extends StatelessWidget {
   const HelpScreen({super.key});
@@ -45,9 +44,6 @@ class HelpScreen extends StatelessWidget {
             _buildSectionTitle(Icons.people_outline, 'DELEGASI'),
             _buildFaqItem('Bagaimana cara menarik delegasi?'),
             _buildFaqItem('Siapa saja yang bisa menjadi ahli?'),
-            const SizedBox(height: AppSpacing.xl),
-            
-            _buildSupportCard(),
             const SizedBox(height: AppSpacing.xxl),
           ],
         ),
@@ -177,50 +173,5 @@ class HelpScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildSupportCard() {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(AppSpacing.xl),
-      decoration: BoxDecoration(
-        color: AppColors.primary900,
-        borderRadius: BorderRadius.circular(AppRadius.card),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.primary900.withOpacity(0.3),
-            blurRadius: 16,
-            offset: const Offset(0, 8),
-          ),
-        ],
-      ),
-      child: Column(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: AppColors.goldDark.withOpacity(0.15),
-              shape: BoxShape.circle,
-            ),
-            child: const Icon(Icons.support_agent, color: AppColors.goldMid, size: 28),
-          ),
-          const SizedBox(height: AppSpacing.md),
-          Text(
-            'Masih butuh bantuan?',
-            style: AppTypography.cardTitle.copyWith(color: Colors.white),
-          ),
-          const SizedBox(height: AppSpacing.xs),
-          Text(
-            'Tim admin kami siap membantu Anda 24/7.',
-            textAlign: TextAlign.center,
-            style: AppTypography.bodyText.copyWith(color: Colors.white70),
-          ),
-          const SizedBox(height: AppSpacing.xl),
-          GoldButton(
-            label: 'Chat dengan Admin',
-            icon: Icons.chat_bubble_outline,
-            onPressed: () {},
-          ),
-        ],
-      ),
-    );
-  }
 }
+

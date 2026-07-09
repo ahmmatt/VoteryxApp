@@ -1,11 +1,107 @@
+// lib/features/auth/presentation/screens/kyc_camera_screen.dart
+import 'dart:io';
+import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:voteryxapp/core/constants/app_colors.dart';
 import 'package:voteryxapp/core/constants/app_spacing.dart';
 import 'package:voteryxapp/core/constants/app_typography.dart';
+import 'package:voteryxapp/core/router/app_router.dart';
+import 'package:voteryxapp/core/utils/app_snackbar.dart';
+import 'package:voteryxapp/features/auth/data/mock/mock_ktp_database.dart';
+import '../providers/auth_provider.dart';
 
-class KycCameraScreen extends StatelessWidget {
+class KycCameraScreen extends ConsumerStatefulWidget {
   const KycCameraScreen({super.key});
+
+  @override
+  ConsumerState<KycCameraScreen> createState() => _KycCameraScreenState();
+}
+
+class _KycCameraScreenState extends ConsumerState<KycCameraScreen> {
+  CameraController? _cameraController;
+  bool _isCameraInitialized = false;
+  bool _isCapturing = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _initializeCamera();
+  }
+
+  Future<void> _initializeCamera() async {
+    try {
+      final cameras = await availableCameras();
+      if (cameras.isEmpty) return;
+
+      // Cari kamera belakang (back camera) untuk foto KTP
+      final backCamera = cameras.firstWhere(
+        (camera) => camera.lensDirection == CameraLensDirection.back,
+        orElse: () => cameras.first,
+      );
+
+      _cameraController = CameraController(
+        backCamera,
+        ResolutionPreset.high,
+        enableAudio: false,
+      );
+
+      await _cameraController!.initialize();
+      if (mounted) {
+        setState(() {
+          _isCameraInitialized = true;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error initializing camera: $e');
+    }
+  }
+
+  Future<void> _takePhoto() async {
+    if (_isCapturing) return;
+    setState(() => _isCapturing = true);
+
+    try {
+      String? imagePath;
+      if (_isCameraInitialized && _cameraController != null) {
+        final xFile = await _cameraController!.takePicture();
+        imagePath = xFile.path;
+      }
+
+      if (!mounted) return;
+
+      final nik = ref.read(registrationProvider).nik ?? '7307052504070001';
+      
+      // Gunakan MockKtpDatabase untuk menarik data asli dari NIK
+      final ktpData = MockKtpDatabase.lookupByNik(nik, ktpImagePath: imagePath);
+
+      // Simpan data ke dalam registrationProvider
+      ref.read(registrationProvider.notifier).setKtpData(ktpData);
+
+      context.push('/kyc/photo-review');
+    } catch (e) {
+      if (mounted) {
+        AppSnackBar.showError(context, 'Gagal mengambil foto. Coba lagi.');
+      }
+    } finally {
+      if (mounted) setState(() => _isCapturing = false);
+    }
+  }
+
+  void _handleBack() {
+    if (context.canPop()) {
+      context.pop();
+    } else {
+      context.go(AppRoutes.kycMethodSelect);
+    }
+  }
+
+  @override
+  void dispose() {
+    _cameraController?.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -20,7 +116,7 @@ class KycCameraScreen extends StatelessWidget {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  _buildIconButton(Icons.close, () => context.pop()),
+                  _buildIconButton(Icons.arrow_back, _handleBack),
                   Text(
                     'Foto e-KTP',
                     style: AppTypography.headerTitle.copyWith(
@@ -39,89 +135,95 @@ class KycCameraScreen extends StatelessWidget {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
               decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.1),
+                color: Colors.white.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(24),
-                border: Border.all(color: Colors.white.withOpacity(0.2)),
+                border: Border.all(color: Colors.white.withValues(alpha: 0.2)),
               ),
               child: Text(
-                'Posisikan e-KTP di dalam bingkai',
+                'Posisikan e-KTP di dalam bingkai kuning',
                 style: AppTypography.bodyMedium.copyWith(color: Colors.white),
               ),
             ),
             
             const Spacer(),
             
-            // Camera Viewfinder (Simulated)
+            // Camera Viewfinder (Real Camera Feed + Frame Overlay)
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xl),
               child: AspectRatio(
                 aspectRatio: 1.6, // Typical ID card aspect ratio
-                child: Stack(
-                  children: [
-                    // Simulated Camera Feed Background
-                    Container(
-                      decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.05),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                    
-                    // Card Overlay Silhouette
-                    Container(
-                      margin: const EdgeInsets.all(2),
-                      decoration: BoxDecoration(
-                        color: Colors.black.withOpacity(0.4),
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: Row(
-                        children: [
-                          const SizedBox(width: 24),
-                          // Photo Silhouette
-                          Container(
-                            width: 70,
-                            height: 90,
-                            decoration: BoxDecoration(
-                              color: Colors.white.withOpacity(0.1),
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: Icon(Icons.person, color: Colors.white.withOpacity(0.3), size: 40),
-                          ),
-                          const SizedBox(width: 24),
-                          // Text Line Silhouettes
-                          Expanded(
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(16),
+                  child: Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      // Camera Preview or Fallback Loading/Simulation
+                      if (_isCameraInitialized && _cameraController != null)
+                        CameraPreview(_cameraController!)
+                      else
+                        Container(
+                          color: Colors.white.withValues(alpha: 0.05),
+                          child: Center(
                             child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              crossAxisAlignment: CrossAxisAlignment.start,
+                              mainAxisSize: MainAxisSize.min,
                               children: [
-                                _buildSkeletonLine(double.infinity),
-                                _buildSkeletonLine(120),
-                                _buildSkeletonLine(80),
-                                const SizedBox(height: 20),
-                                Align(
-                                  alignment: Alignment.centerRight,
-                                  child: Container(
-                                    width: 30,
-                                    height: 30,
-                                    margin: const EdgeInsets.only(right: 24),
-                                    decoration: BoxDecoration(
-                                      color: Colors.white.withOpacity(0.1),
-                                      borderRadius: BorderRadius.circular(4),
-                                    ),
-                                  ),
+                                const CircularProgressIndicator(color: AppColors.goldMid),
+                                const SizedBox(height: 12),
+                                Text(
+                                  'Menyiapkan Kamera...',
+                                  style: AppTypography.captionBold.copyWith(color: Colors.white70),
                                 ),
                               ],
                             ),
                           ),
-                        ],
+                        ),
+                      
+                      // Card Overlay Silhouette
+                      Container(
+                        margin: const EdgeInsets.all(4),
+                        decoration: BoxDecoration(
+                          color: Colors.black.withValues(alpha: _isCameraInitialized ? 0.2 : 0.4),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Row(
+                          children: [
+                            const SizedBox(width: 24),
+                            // Text Line Silhouettes (Kiri - NIK, Nama, TTL, Alamat dll)
+                            Expanded(
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  _buildSkeletonLine(double.infinity),
+                                  _buildSkeletonLine(120),
+                                  _buildSkeletonLine(80),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(width: 24),
+                            // Photo Silhouette (Kanan - Pasfoto Warga)
+                            Container(
+                              width: 70,
+                              height: 90,
+                              decoration: BoxDecoration(
+                                color: Colors.white.withValues(alpha: 0.1),
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(color: Colors.white.withValues(alpha: 0.2)),
+                              ),
+                              child: Icon(Icons.person, color: Colors.white.withValues(alpha: 0.4), size: 40),
+                            ),
+                            const SizedBox(width: 24),
+                          ],
+                        ),
                       ),
-                    ),
-                    
-                    // Yellow Corner Brackets
-                    const Positioned(top: 0, left: 0, child: _CornerBracket(angle: 0)),
-                    const Positioned(top: 0, right: 0, child: _CornerBracket(angle: 1.5708)), // 90 deg
-                    const Positioned(bottom: 0, right: 0, child: _CornerBracket(angle: 3.14159)), // 180 deg
-                    const Positioned(bottom: 0, left: 0, child: _CornerBracket(angle: 4.71239)), // 270 deg
-                  ],
+                      
+                      // Yellow Corner Brackets
+                      const Positioned(top: 0, left: 0, child: _CornerBracket(angle: 0)),
+                      const Positioned(top: 0, right: 0, child: _CornerBracket(angle: 1.5708)),
+                      const Positioned(bottom: 0, right: 0, child: _CornerBracket(angle: 3.14159)),
+                      const Positioned(bottom: 0, left: 0, child: _CornerBracket(angle: 4.71239)),
+                    ],
+                  ),
                 ),
               ),
             ),
@@ -133,15 +235,15 @@ class KycCameraScreen extends StatelessWidget {
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Container(width: 2, height: 12, color: AppColors.goldMid),
-                const SizedBox(width: 4),
-                Container(width: 2, height: 12, color: AppColors.goldMid),
                 const SizedBox(width: 8),
                 Text(
-                  'Pastikan e-KTP rata dan tidak miring',
+                  'Pastikan e-KTP rata, jelas, dan terkena cahaya cukup',
                   style: AppTypography.captionBold.copyWith(
-                    color: Colors.white.withOpacity(0.7),
+                    color: Colors.white.withValues(alpha: 0.7),
                   ),
                 ),
+                const SizedBox(width: 8),
+                Container(width: 2, height: 12, color: AppColors.goldMid),
               ],
             ),
             
@@ -151,18 +253,18 @@ class KycCameraScreen extends StatelessWidget {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.05),
+                color: Colors.white.withValues(alpha: 0.05),
                 borderRadius: BorderRadius.circular(16),
               ),
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(Icons.lock_outline, color: Colors.white.withOpacity(0.5), size: 14),
+                  Icon(Icons.lock_outline, color: Colors.white.withValues(alpha: 0.5), size: 14),
                   const SizedBox(width: 8),
                   Text(
-                    'Foto hanya diproses di perangkat ini, tidak diunggah',
+                    'Foto hanya diproses secara lokal di perangkat, tidak diunggah sembarangan',
                     style: AppTypography.captionBold.copyWith(
-                      color: Colors.white.withOpacity(0.5),
+                      color: Colors.white.withValues(alpha: 0.5),
                       fontSize: 10,
                     ),
                   ),
@@ -178,40 +280,41 @@ class KycCameraScreen extends StatelessWidget {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  // Gallery
+                  // Gallery / Error Demo
                   _buildIconButton(Icons.image_outlined, () {
-                    // For demo, go to error screen to show the error state
-                    context.go('/kyc/photo-error');
+                    context.push('/kyc/photo-error');
                   }),
                   
                   // Capture Button
                   GestureDetector(
-                    onTap: () {
-                      context.go('/kyc/photo-review');
-                    },
+                    onTap: _takePhoto,
                     child: Container(
-                      width: 70,
-                      height: 70,
+                      width: 74,
+                      height: 74,
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
-                        border: Border.all(color: Colors.white.withOpacity(0.3), width: 3),
+                        border: Border.all(color: Colors.white.withValues(alpha: 0.3), width: 3),
                       ),
                       child: Center(
-                        child: Container(
-                          width: 56,
-                          height: 56,
-                          decoration: const BoxDecoration(
-                            color: AppColors.goldMid,
-                            shape: BoxShape.circle,
-                          ),
-                          child: const Icon(Icons.camera_alt, color: Colors.white, size: 28),
-                        ),
+                        child: _isCapturing
+                            ? const CircularProgressIndicator(color: AppColors.goldMid)
+                            : Container(
+                                width: 58,
+                                height: 58,
+                                decoration: const BoxDecoration(
+                                  color: AppColors.goldMid,
+                                  shape: BoxShape.circle,
+                                ),
+                                child: const Icon(Icons.camera_alt, color: Colors.white, size: 30),
+                              ),
                       ),
                     ),
                   ),
                   
                   // Flip Camera
-                  _buildIconButton(Icons.cameraswitch_outlined, () {}),
+                  _buildIconButton(Icons.cameraswitch_outlined, () {
+                    _initializeCamera();
+                  }),
                 ],
               ),
             ),
@@ -231,7 +334,7 @@ class KycCameraScreen extends StatelessWidget {
         width: 44,
         height: 44,
         decoration: BoxDecoration(
-          color: Colors.white.withOpacity(0.1),
+          color: Colors.white.withValues(alpha: 0.1),
           shape: BoxShape.circle,
         ),
         child: Icon(icon, color: Colors.white, size: 20),
@@ -245,7 +348,7 @@ class KycCameraScreen extends StatelessWidget {
       height: 8,
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.1),
+        color: Colors.white.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(4),
       ),
     );

@@ -1,0 +1,195 @@
+-- ====================================================================
+-- SCHEMA DATABASE VOTERYX (POSTGRESQL - SUPABASE)
+-- Ditata ulang agar 100% sinkron dengan model dan repository Flutter
+-- ====================================================================
+
+-- Drop tabel lama jika ada agar sinkronisasi bersih (untuk dev/reset)
+DROP TABLE IF EXISTS public.delegates CASCADE;
+DROP TABLE IF EXISTS public.delegations CASCADE;
+DROP TABLE IF EXISTS public.votes CASCADE;
+DROP TABLE IF EXISTS public.candidates CASCADE;
+DROP TABLE IF EXISTS public.elections CASCADE;
+DROP TABLE IF EXISTS public.election_proposals CASCADE;
+DROP TABLE IF EXISTS public.users CASCADE;
+
+-- 1. Tabel Profil Pengguna (melengkapi auth.users)
+CREATE TABLE IF NOT EXISTS public.users (
+    id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
+    nik_hash TEXT UNIQUE NOT NULL,
+    full_name TEXT NOT NULL,
+    faculty TEXT,
+    major TEXT,
+    nim TEXT,
+    birth_place TEXT,
+    birth_date TEXT,
+    gender TEXT,
+    address TEXT,
+    phone TEXT,
+    email TEXT,
+    avatar_url TEXT,
+    role TEXT DEFAULT 'voter', -- 'voter', 'delegate', 'admin'
+    kyc_status TEXT DEFAULT 'unverified', -- 'unverified', 'pending', 'verified', 'rejected'
+    vote_weight INTEGER DEFAULT 1,
+    is_delegate_profile_public BOOLEAN DEFAULT false,
+    delegate_bio TEXT,
+    delegate_vision TEXT,
+    trust_score DOUBLE PRECISION DEFAULT 0.0,
+    delegated_to UUID REFERENCES public.users(id) ON DELETE SET NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now())
+);
+
+-- Pastikan kolom KTP & profil ditambahkan jika tabel users sudah ada sebelumnya di Supabase
+ALTER TABLE public.users ADD COLUMN IF NOT EXISTS nim TEXT;
+ALTER TABLE public.users ADD COLUMN IF NOT EXISTS phone TEXT;
+ALTER TABLE public.users ADD COLUMN IF NOT EXISTS major TEXT;
+ALTER TABLE public.users ADD COLUMN IF NOT EXISTS is_delegate_profile_public BOOLEAN DEFAULT false;
+ALTER TABLE public.users ADD COLUMN IF NOT EXISTS delegate_bio TEXT;
+ALTER TABLE public.users ADD COLUMN IF NOT EXISTS delegate_vision TEXT;
+ALTER TABLE public.users ADD COLUMN IF NOT EXISTS birth_place TEXT;
+ALTER TABLE public.users ADD COLUMN IF NOT EXISTS birth_date TEXT;
+ALTER TABLE public.users ADD COLUMN IF NOT EXISTS gender TEXT;
+ALTER TABLE public.users ADD COLUMN IF NOT EXISTS address TEXT;
+
+-- 2. Tabel Pemilihan (Elections)
+CREATE TABLE IF NOT EXISTS public.elections (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    title TEXT NOT NULL,
+    status TEXT DEFAULT 'draft', -- 'live', 'scheduled', 'completed', 'draft'
+    start_date TIMESTAMP WITH TIME ZONE NOT NULL,
+    end_date TIMESTAMP WITH TIME ZONE NOT NULL,
+    description TEXT,
+    organization TEXT,
+    election_type TEXT, -- 'Universitas', 'Fakultas', 'Himpunan', 'BEM'
+    banner_url TEXT,
+    estimated_voters INTEGER DEFAULT 0,
+    public_key TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+-- 3. Tabel Kandidat (Candidates)
+CREATE TABLE IF NOT EXISTS public.candidates (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    election_id UUID REFERENCES public.elections(id) ON DELETE CASCADE NOT NULL,
+    full_name TEXT NOT NULL,
+    nim TEXT,
+    faculty TEXT,
+    major TEXT,
+    photo_url TEXT,
+    visi TEXT,
+    misi TEXT,
+    track_records JSONB DEFAULT '[]'::jsonb,
+    programs JSONB DEFAULT '[]'::jsonb,
+    vote_count INTEGER DEFAULT 0,
+    is_verified BOOLEAN DEFAULT true,
+    candidate_number INTEGER NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+-- 4. Tabel Suara / Voting (Votes)
+CREATE TABLE IF NOT EXISTS public.votes (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    election_id UUID REFERENCES public.elections(id) ON DELETE CASCADE NOT NULL,
+    voter_id UUID REFERENCES public.users(id) ON DELETE CASCADE NOT NULL,
+    candidate_id UUID REFERENCES public.candidates(id) ON DELETE CASCADE,
+    vote_weight INTEGER DEFAULT 1,
+    encrypted_choice TEXT NOT NULL,
+    transaction_hash TEXT UNIQUE NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
+    CONSTRAINT unique_voter_per_election UNIQUE (election_id, voter_id) -- Mencegah double voting!
+);
+
+-- 5. Tabel Delegasi Suara (Delegations - Liquid Democracy)
+CREATE TABLE IF NOT EXISTS public.delegations (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    election_id UUID REFERENCES public.elections(id) ON DELETE CASCADE NOT NULL,
+    delegator_id UUID REFERENCES public.users(id) ON DELETE CASCADE NOT NULL,
+    delegate_id UUID REFERENCES public.users(id) ON DELETE CASCADE NOT NULL,
+    status TEXT DEFAULT 'active', -- 'active', 'revoked'
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+-- 6. Tabel Usulan Pemilihan (Election Proposals)
+CREATE TABLE IF NOT EXISTS public.election_proposals (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    proposer_id UUID REFERENCES public.users(id) ON DELETE CASCADE NOT NULL,
+    title TEXT NOT NULL,
+    election_type TEXT DEFAULT 'BEM',
+    organization TEXT,
+    purpose TEXT,
+    proposed_start_date TIMESTAMP WITH TIME ZONE,
+    proposed_end_date TIMESTAMP WITH TIME ZONE,
+    estimated_voters INTEGER DEFAULT 0,
+    status TEXT DEFAULT 'pending', -- 'pending', 'under_review', 'approved', 'rejected'
+    admin_note TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+-- ====================================================================
+-- ROW LEVEL SECURITY (RLS) POLICIES
+-- ====================================================================
+
+ALTER TABLE public.users ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.elections ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.candidates ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.votes ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.delegations ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.election_proposals ENABLE ROW LEVEL SECURITY;
+
+-- Policy untuk pengembangan cepat (Izinkan read/write tanpa hambatan selama dev)
+CREATE POLICY "Allow public read users" ON public.users FOR SELECT USING (true);
+CREATE POLICY "Allow auth insert users" ON public.users FOR INSERT WITH CHECK (true);
+CREATE POLICY "Allow auth update own profile" ON public.users FOR UPDATE USING (true);
+
+CREATE POLICY "Allow public read elections" ON public.elections FOR SELECT USING (true);
+CREATE POLICY "Allow public read candidates" ON public.candidates FOR SELECT USING (true);
+
+CREATE POLICY "Allow public read delegations" ON public.delegations FOR SELECT USING (true);
+CREATE POLICY "Allow auth insert delegations" ON public.delegations FOR INSERT WITH CHECK (true);
+CREATE POLICY "Allow auth update delegations" ON public.delegations FOR UPDATE USING (true);
+
+CREATE POLICY "Allow public read votes" ON public.votes FOR SELECT USING (true);
+CREATE POLICY "Allow auth insert votes" ON public.votes FOR INSERT WITH CHECK (true);
+
+CREATE POLICY "Allow public read proposals" ON public.election_proposals FOR SELECT USING (true);
+CREATE POLICY "Allow auth insert proposals" ON public.election_proposals FOR INSERT WITH CHECK (true);
+
+-- ====================================================================
+-- DUMMY SEED DATA (AGAR APLIKASI LANGSUNG HIDUP DAN MENARIK)
+-- ====================================================================
+
+-- Insert Dummy Election
+INSERT INTO public.elections (id, title, status, start_date, end_date, description, organization, election_type, estimated_voters)
+VALUES 
+('a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11', 'Pemilihan Ketua BEM Universitas 2024', 'live', now() - interval '1 day', now() + interval '3 days', 'Pemilihan umum raya untuk menentukan Ketua dan Wakil Ketua Badan Eksekutif Mahasiswa tingkat Universitas periode 2024/2025.', 'Universitas Indonesia', 'Universitas', 15000),
+('b0eebc99-9c0b-4ef8-bb6d-6bb9bd380a22', 'Pemilihan Ketua Himpunan Teknik Informatika', 'scheduled', now() + interval '1 day', now() + interval '5 days', 'Pemilihan Ketua Himpunan Mahasiswa Teknik Informatika (HMIF) untuk memimpin aspirasi dan inovasi mahasiswa komputer.', 'Fakultas Teknik', 'Himpunan', 1200)
+ON CONFLICT DO NOTHING;
+
+-- Insert Dummy Candidates untuk BEM Universitas
+INSERT INTO public.candidates (election_id, full_name, candidate_number, faculty, major, visi, misi, programs, track_records, vote_count)
+VALUES 
+(
+  'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11', 
+  'Rizky Pratama & Dinda Kirana', 
+  1, 
+  'Fakultas Teknik', 
+  'Teknik Informatika', 
+  'Mewujudkan BEM Universitas yang Inklusif, Transparan, dan Berdaya Saing Global berbasis Teknologi Digital.', 
+  'Meningkatkan transparansi anggaran kemahasiswaan serta membangun ekosistem riset kolaboratif.', 
+  '[{"title": "Voteryx Fest & Tech Summit", "desc": "Festival teknologi dan inovasi mahasiswa bulanan."}, {"title": "Beasiswa Darurat", "desc": "Bantuan dana darurat untuk mahasiswa berprestasi."}]'::jsonb,
+  '[{"year": "2023", "role": "Ketua Himpunan HMIF"}, {"year": "2022", "role": "Ketua Pelaksana TechFest"}]'::jsonb,
+  2100
+),
+(
+  'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11', 
+  'Ahmad Fauzi & Siti Aisyah', 
+  2, 
+  'Fakultas Hukum', 
+  'Ilmu Hukum', 
+  'BEM Universitas sebagai Rumah Bersama yang Kolaboratif, Aspiratif, dan Mengedepankan Integritas Akademik.', 
+  'Menguatkan solidaritas antar himpunan dan pengembangan karir berskala nasional.', 
+  '[{"title": "Career Expo & Mentoring Network", "desc": "Jaringan bimbingan karir langsung dari praktisi industri."}, {"title": "Pusat Layanan Mental Health", "desc": "Konseling gratis dan rahasia bagi seluruh mahasiswa."}]'::jsonb,
+  '[{"year": "2023", "role": "Wakil Ketua BEM Fakultas Hukum"}, {"year": "2022", "role": "Ketua Departemen Advokasi"}]'::jsonb,
+  2150
+)
+ON CONFLICT DO NOTHING;

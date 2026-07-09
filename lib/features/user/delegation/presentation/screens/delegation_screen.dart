@@ -1,17 +1,44 @@
+// lib/features/user/delegation/presentation/screens/delegation_screen.dart
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:voteryxapp/core/constants/app_colors.dart';
 import 'package:voteryxapp/core/constants/app_typography.dart';
 import 'package:voteryxapp/core/constants/app_spacing.dart';
-import 'package:voteryxapp/core/constants/app_radius.dart';
-import 'package:go_router/go_router.dart';
+import 'package:voteryxapp/core/utils/app_snackbar.dart';
+import 'package:voteryxapp/core/widgets/gold_button.dart';
 
-import '../../../../delegates/delegation/presentation/screens/delegate_detail_screen.dart';
+import 'package:voteryxapp/features/user/delegation/domain/entities/delegate.dart';
+import 'package:voteryxapp/features/user/delegation/presentation/providers/delegation_provider.dart';
 
-class DelegationScreen extends StatelessWidget {
+class DelegationScreen extends ConsumerStatefulWidget {
   const DelegationScreen({super.key});
 
   @override
+  ConsumerState<DelegationScreen> createState() => _DelegationScreenState();
+}
+
+class _DelegationScreenState extends ConsumerState<DelegationScreen> {
+  String _searchQuery = '';
+
+  @override
   Widget build(BuildContext context) {
+    final delegatesAsync = ref.watch(publicDelegatesProvider);
+
+    // Listen untuk delegasi action
+    ref.listen<DelegationActionState>(delegationActionProvider, (_, next) {
+      if (next.error != null) {
+        AppSnackBar.showError(context, next.error!);
+        ref.read(delegationActionProvider.notifier).clearError();
+      }
+      if (next.isSuccess) {
+        AppSnackBar.showSuccess(
+          context,
+          'Suaramu berhasil didelegasikan ke ${next.selectedDelegateName}!',
+        );
+        ref.read(delegationActionProvider.notifier).reset();
+      }
+    });
+
     return ColoredBox(
       color: AppColors.background,
       child: CustomScrollView(
@@ -22,7 +49,16 @@ class DelegationScreen extends StatelessWidget {
             expandedHeight: kToolbarHeight,
             pinned: true,
             automaticallyImplyLeading: false,
-            title: Text('Delegasi', style: AppTypography.headerTitle.copyWith(color: Colors.white)),
+            title: Text(
+              'Delegasi Suara',
+              style: AppTypography.headerTitle.copyWith(color: Colors.white),
+            ),
+            actions: [
+              IconButton(
+                icon: const Icon(Icons.refresh, color: Colors.white),
+                onPressed: () => ref.invalidate(publicDelegatesProvider),
+              ),
+            ],
           ),
           SliverToBoxAdapter(
             child: Padding(
@@ -31,19 +67,94 @@ class DelegationScreen extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const SizedBox(height: AppSpacing.md),
+
+                  // Hero info card
                   _buildHeroCard(),
+
                   const SizedBox(height: AppSpacing.xl),
-                  _buildTopExpertsHeader(),
-                  const SizedBox(height: AppSpacing.md),
-                  _buildTopExpertsList(context),
-                  const SizedBox(height: AppSpacing.xl),
-                  _buildSearchBar(),
-                  const SizedBox(height: AppSpacing.md),
-                  _buildFilterChips(),
-                  const SizedBox(height: AppSpacing.xl),
-                  Text('All Delegates', style: AppTypography.screenTitle),
-                  const SizedBox(height: AppSpacing.md),
-                  _buildAllDelegatesList(context),
+
+                  // Search bar
+                  TextField(
+                    onChanged: (v) => setState(() => _searchQuery = v.toLowerCase().trim()),
+                    decoration: InputDecoration(
+                      hintText: 'Cari delegate...',
+                      hintStyle: AppTypography.bodyText.copyWith(
+                        color: AppColors.textSecondary,
+                      ),
+                      prefixIcon: const Icon(Icons.search, color: AppColors.outline),
+                      contentPadding: const EdgeInsets.symmetric(vertical: 12),
+                      filled: true,
+                      fillColor: Colors.white,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(color: AppColors.outlineVariant),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(color: AppColors.outlineVariant),
+                      ),
+                    ),
+                  ),
+
+                  const SizedBox(height: AppSpacing.lg),
+
+                  Text(
+                    'DAFTAR DELEGATE',
+                    style: AppTypography.captionBold.copyWith(
+                      color: AppColors.textSecondary,
+                      letterSpacing: 1.2,
+                    ),
+                  ),
+                  const SizedBox(height: AppSpacing.sm),
+
+                  // Delegate list
+                  delegatesAsync.when(
+                    data: (delegates) {
+                      final filtered = delegates
+                          .where((d) =>
+                              _searchQuery.isEmpty ||
+                              d.fullName
+                                  .toLowerCase()
+                                  .contains(_searchQuery) ||
+                              (d.faculty ?? '')
+                                  .toLowerCase()
+                                  .contains(_searchQuery) ||
+                              (d.specialization ?? '')
+                                  .toLowerCase()
+                                  .contains(_searchQuery) ||
+                              (d.delegateBio ?? '')
+                                  .toLowerCase()
+                                  .contains(_searchQuery) ||
+                              (d.delegateVision ?? '')
+                                  .toLowerCase()
+                                  .contains(_searchQuery))
+                          .toList();
+
+                      if (filtered.isEmpty) {
+                        return _EmptyDelegateState(searchQuery: _searchQuery);
+                      }
+
+                      return Column(
+                        children: filtered
+                            .map((d) => _DelegateCard(
+                                  delegate: d,
+                                  onDelegate: () =>
+                                      _showDelegateConfirmation(context, d),
+                                ))
+                            .toList(),
+                      );
+                    },
+                    loading: () => const Center(
+                      child: Padding(
+                        padding: EdgeInsets.all(AppSpacing.xxl),
+                        child: CircularProgressIndicator(color: AppColors.goldMid),
+                      ),
+                    ),
+                    error: (err, _) => _ErrorState(
+                      onRetry: () => ref.invalidate(publicDelegatesProvider),
+                    ),
+                  ),
+
                   const SizedBox(height: AppSpacing.xxl),
                 ],
               ),
@@ -56,311 +167,378 @@ class DelegationScreen extends StatelessWidget {
 
   Widget _buildHeroCard() {
     return Container(
-      padding: const EdgeInsets.all(AppSpacing.lg),
+      padding: const EdgeInsets.all(AppSpacing.md),
       decoration: BoxDecoration(
-        color: const Color(0xFF2C3E5E), // Approximate from image
-        borderRadius: BorderRadius.circular(AppRadius.card),
-        gradient: const LinearGradient(
-          colors: [Color(0xFF384666), Color(0xFF2C3E5E)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
+        gradient: AppColors.delegateGradient,
+        borderRadius: BorderRadius.circular(16),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              const Icon(Icons.info, color: AppColors.warningAmber, size: 16),
-              const SizedBox(width: AppSpacing.xs),
-              Text('LIQUID DEMOCRACY', style: AppTypography.labelSmall),
+              const Icon(
+                Icons.transfer_within_a_station_rounded,
+                color: Colors.white,
+                size: 22,
+              ),
+              const SizedBox(width: 8),
+              Text(
+                'LIQUID DEMOCRACY',
+                style: AppTypography.captionBold.copyWith(
+                  color: Colors.white70,
+                  letterSpacing: 1.2,
+                ),
+              ),
             ],
           ),
           const SizedBox(height: AppSpacing.sm),
           Text(
-            'Your Power, Shared.',
-            style: AppTypography.displayHeading
-                .copyWith(color: Colors.white, fontSize: 24),
+            'Delegasikan Suaramu\nke Pakar Terpercaya',
+            style: AppTypography.displayHeading.copyWith(
+              color: Colors.white,
+              fontSize: 20,
+              height: 1.3,
+            ),
           ),
           const SizedBox(height: AppSpacing.sm),
           Text(
-            'Delegate your voting power to experts you trust. They vote on your behalf, but you can revoke or change your delegate at any time instantly.',
-            style: AppTypography.bodyText.copyWith(color: Colors.white70),
+            'Pilih delegate yang kamu percaya untuk mewakili suaramu. Delegasi dapat dicabut selama pemilihan masih berlangsung.',
+            style: AppTypography.bodyText.copyWith(
+              color: Colors.white.withValues(alpha: 0.75),
+              fontSize: 12,
+              height: 1.5,
+            ),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildTopExpertsHeader() {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Text('Top Experts',
-            style: AppTypography.screenTitle.copyWith(fontSize: 20)),
-        Row(
-          children: [
-            Text('View all',
-                style: AppTypography.bodyMedium
-                    .copyWith(color: AppColors.goldDark)),
-            const Icon(Icons.arrow_forward,
-                size: 16, color: AppColors.goldDark),
-          ],
-        )
-      ],
+  void _showDelegateConfirmation(BuildContext context, Delegate delegate) {
+    ref.read(delegationActionProvider.notifier).selectDelegate(
+          delegateId: delegate.id,
+          delegateName: delegate.fullName,
+        );
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (_) => _DelegationConfirmModal(
+        delegate: delegate,
+        onConfirm: (electionId) {
+          Navigator.pop(context);
+          ref.read(delegationActionProvider.notifier).createDelegation(
+                electionId: electionId,
+              );
+        },
+      ),
     );
   }
+}
 
-  Widget _buildTopExpertsList(BuildContext context) {
-    final experts = [
-      {
-        'name': 'Dr. Sarah K.',
-        'faculty': 'ECONOMY',
-        'img': 'https://ui-avatars.com/api/?name=Sarah+K&background=random'
-      },
-      {
-        'name': 'Prof. James',
-        'faculty': 'TECHNOLOGY',
-        'img': 'https://ui-avatars.com/api/?name=James&background=random'
-      },
-      {
-        'name': 'Maya Indah',
-        'faculty': 'SOCIAL',
-        'img': 'https://ui-avatars.com/api/?name=Maya+Indah&background=random'
-      },
-    ];
+class _DelegateCard extends StatelessWidget {
+  const _DelegateCard({required this.delegate, required this.onDelegate});
 
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
+  final Delegate delegate;
+  final VoidCallback onDelegate;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: AppSpacing.sm),
+      padding: const EdgeInsets.all(AppSpacing.md),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppColors.outlineVariant),
+      ),
       child: Row(
-        children: experts.map((e) {
-          return Padding(
-            padding: const EdgeInsets.only(right: AppSpacing.lg),
-            child: GestureDetector(
-              onTap: () {
-                Navigator.of(context, rootNavigator: true).push(
-                  MaterialPageRoute(
-                    builder: (context) => const DelegateDetailScreen(),
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Avatar
+          Container(
+            width: 50,
+            height: 50,
+            decoration: BoxDecoration(
+              gradient: AppColors.delegateGradient,
+              shape: BoxShape.circle,
+            ),
+            child: Center(
+              child: Text(
+                delegate.initials,
+                style: AppTypography.headerTitle.copyWith(
+                  color: Colors.white,
+                  fontSize: 18,
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: AppSpacing.md),
+
+          // Info
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  delegate.fullName,
+                  style: AppTypography.cardTitle.copyWith(fontSize: 14),
+                ),
+                if (delegate.faculty != null) ...[
+                  const SizedBox(height: 2),
+                  Text(
+                    delegate.faculty!,
+                    style: AppTypography.bodyText.copyWith(fontSize: 12),
                   ),
-                );
-              },
-              child: Column(
-                children: [
-                  Stack(
-                    alignment: Alignment.bottomRight,
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(3),
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          border:
-                              Border.all(color: AppColors.goldMid, width: 2),
+                ],
+                if (delegate.delegateBio != null) ...[
+                  const SizedBox(height: 6),
+                  Text(
+                    delegate.delegateBio!,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: AppTypography.bodyText.copyWith(fontSize: 11, height: 1.4),
+                  ),
+                ],
+                const SizedBox(height: 10),
+                Row(
+                  children: [
+                    // Trust score
+                    Row(
+                      children: [
+                        const Icon(Icons.star_rounded, color: AppColors.goldMid, size: 14),
+                        const SizedBox(width: 3),
+                        Text(
+                          delegate.trustScore.toStringAsFixed(1),
+                          style: AppTypography.captionBold.copyWith(
+                            color: AppColors.goldDark,
+                          ),
                         ),
-                        child: ClipOval(
-                          child: Image.network(
-                            e['img']!,
-                            width: 64,
-                            height: 64,
-                            fit: BoxFit.cover,
-                            errorBuilder: (context, error, stackTrace) =>
-                                Container(
-                              width: 64,
-                              height: 64,
-                              color: AppColors.primary800,
-                              child: const Icon(Icons.person,
-                                  color: Colors.white, size: 32),
-                            ),
+                      ],
+                    ),
+                    const Spacer(),
+                    GestureDetector(
+                      onTap: onDelegate,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 7,
+                        ),
+                        decoration: BoxDecoration(
+                          gradient: AppColors.delegateGradient,
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: Text(
+                          'Delegasikan',
+                          style: AppTypography.captionBold.copyWith(
+                            color: Colors.white,
                           ),
                         ),
                       ),
-                      Container(
-                        decoration: const BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: Colors.white,
-                        ),
-                        padding: const EdgeInsets.all(2),
-                        child: const Icon(Icons.verified,
-                            color: AppColors.goldMid, size: 16),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: AppSpacing.sm),
-                  Text(e['name']!, style: AppTypography.bodyMedium),
-                  Text(e['faculty']!,
-                      style: AppTypography.captionBold
-                          .copyWith(color: AppColors.goldMid)),
-                ],
-              ),
-            ),
-          );
-        }).toList(),
-      ),
-    );
-  }
-
-  Widget _buildSearchBar() {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(AppRadius.input),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: TextField(
-        decoration: InputDecoration(
-          hintText: 'Search by name or faculty',
-          hintStyle:
-              AppTypography.bodyText.copyWith(color: AppColors.outlineVariant),
-          prefixIcon: const Icon(Icons.search, color: AppColors.textSecondary),
-          border: InputBorder.none,
-          contentPadding: const EdgeInsets.symmetric(vertical: 14),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildFilterChips() {
-    final chips = ['Semua', 'BEM Aktif', 'Akademik', 'Lingkungan'];
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      child: Row(
-        children: chips.map((c) {
-          final isSelected = c == 'Semua';
-          return Container(
-            margin: const EdgeInsets.only(right: AppSpacing.sm),
-            padding: const EdgeInsets.symmetric(
-                horizontal: AppSpacing.lg, vertical: AppSpacing.sm),
-            decoration: BoxDecoration(
-              color: isSelected ? AppColors.primary900 : Colors.white,
-              borderRadius: BorderRadius.circular(20),
-              border: isSelected
-                  ? null
-                  : Border.all(color: AppColors.outlineVariant, width: 1),
-            ),
-            child: Text(
-              c,
-              style: AppTypography.bodyMedium.copyWith(
-                color: isSelected ? Colors.white : AppColors.textSecondary,
-              ),
-            ),
-          );
-        }).toList(),
-      ),
-    );
-  }
-
-  Widget _buildAllDelegatesList(BuildContext context) {
-    final delegates = [
-      {
-        'name': 'Dian Sastro',
-        'faculty': 'Fakultas Hukum • BEM Aktif',
-        'trust': '98%',
-        'img': 'https://ui-avatars.com/api/?name=Dian+Sastro&background=random'
-      },
-      {
-        'name': 'Rizky Ahmad',
-        'faculty': 'Fakultas Teknik • Akademik',
-        'trust': '95%',
-        'img': 'https://ui-avatars.com/api/?name=Rizky+Ahmad&background=random'
-      },
-      {
-        'name': 'Putri Amalia',
-        'faculty': 'Fakultas Ekonomi • Sosial',
-        'trust': '99%',
-        'img': 'https://ui-avatars.com/api/?name=Putri+Amalia&background=random'
-      },
-    ];
-
-    return Column(
-      children: delegates.map((d) {
-        return GestureDetector(
-          onTap: () {
-            Navigator.of(context, rootNavigator: true).push(
-              MaterialPageRoute(
-                builder: (context) => const DelegateDetailScreen(),
-              ),
-            );
-          },
-          child: Container(
-            margin: const EdgeInsets.only(bottom: AppSpacing.md),
-            padding: const EdgeInsets.all(AppSpacing.md),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(AppRadius.card),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.02),
-                  blurRadius: 8,
-                  offset: const Offset(0, 4),
-                ),
-              ],
-            ),
-            child: Row(
-              children: [
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(AppRadius.card),
-                  child: Image.network(
-                    d['img']!,
-                    width: 60,
-                    height: 60,
-                    fit: BoxFit.cover,
-                    errorBuilder: (context, error, stackTrace) => Container(
-                      width: 60,
-                      height: 60,
-                      color: AppColors.primary800,
-                      child: const Icon(Icons.person,
-                          color: Colors.white, size: 32),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: AppSpacing.sm),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(d['name']!,
-                          style: AppTypography.cardTitle.copyWith(fontSize: 16),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis),
-                      const SizedBox(height: 2),
-                      Text(d['faculty']!,
-                          style: AppTypography.captionBold.copyWith(
-                              color: AppColors.textSecondary, fontSize: 10),
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: AppSpacing.sm),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    Text('${d['trust']} Amanah',
-                        style: AppTypography.bodyMedium
-                            .copyWith(color: AppColors.goldDark, fontSize: 12)),
-                    const SizedBox(height: 4),
-                    Row(
-                      children: [
-                        Text('Lihat\nDetail',
-                            textAlign: TextAlign.right,
-                            style:
-                                AppTypography.caption.copyWith(fontSize: 10)),
-                        const Icon(Icons.chevron_right,
-                            size: 16, color: AppColors.textSecondary),
-                      ],
                     ),
                   ],
                 ),
               ],
             ),
           ),
-        );
-      }).toList(),
+        ],
+      ),
+    );
+  }
+}
+
+class _DelegationConfirmModal extends StatefulWidget {
+  const _DelegationConfirmModal({
+    required this.delegate,
+    required this.onConfirm,
+  });
+
+  final Delegate delegate;
+  final void Function(String electionId) onConfirm;
+
+  @override
+  State<_DelegationConfirmModal> createState() =>
+      _DelegationConfirmModalState();
+}
+
+class _DelegationConfirmModalState extends State<_DelegationConfirmModal> {
+  // Untuk saat ini, minta user ketik election ID secara manual.
+  // Idealnya ini di-inject dari halaman detail pemilihan.
+  final _electionController = TextEditingController();
+
+  @override
+  void dispose() {
+    _electionController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: EdgeInsets.only(
+        left: 24,
+        right: 24,
+        top: 24,
+        bottom: MediaQuery.of(context).viewInsets.bottom + 24,
+      ),
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Handle
+          Center(
+            child: Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: AppColors.outlineVariant,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+          ),
+          const SizedBox(height: AppSpacing.lg),
+
+          Text(
+            'Konfirmasi Delegasi',
+            style: AppTypography.cardTitle.copyWith(fontSize: 18),
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          RichText(
+            text: TextSpan(
+              style: AppTypography.bodyText,
+              children: [
+                const TextSpan(text: 'Kamu akan mendelegasikan suaramu kepada '),
+                TextSpan(
+                  text: widget.delegate.fullName,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.primary900,
+                  ),
+                ),
+                const TextSpan(text: '. Tindakan ini dapat dicabut selama pemilihan masih berlangsung.'),
+              ],
+            ),
+          ),
+          const SizedBox(height: AppSpacing.md),
+
+          Text(
+            'ID PEMILIHAN',
+            style: AppTypography.captionBold.copyWith(
+              color: AppColors.textSecondary,
+              letterSpacing: 0.5,
+            ),
+          ),
+          const SizedBox(height: 8),
+          TextField(
+            controller: _electionController,
+            decoration: InputDecoration(
+              hintText: 'Masukkan ID pemilihan',
+              hintStyle: AppTypography.bodyText.copyWith(
+                color: AppColors.textSecondary,
+              ),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 14,
+                vertical: 12,
+              ),
+            ),
+          ),
+          const SizedBox(height: AppSpacing.lg),
+
+          GoldButton(
+            label: 'Konfirmasi Delegasi',
+            icon: Icons.check_circle_outline,
+            onPressed: () {
+              final id = _electionController.text.trim();
+              if (id.isEmpty) return;
+              widget.onConfirm(id);
+            },
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            style: TextButton.styleFrom(minimumSize: const Size(double.infinity, 44)),
+            child: Text(
+              'Batal',
+              style: AppTypography.bodyMedium.copyWith(
+                color: AppColors.textSecondary,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _EmptyDelegateState extends StatelessWidget {
+  const _EmptyDelegateState({this.searchQuery});
+  final String? searchQuery;
+
+  @override
+  Widget build(BuildContext context) {
+    final isSearching = searchQuery != null && searchQuery!.isNotEmpty;
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: AppSpacing.xxl),
+      child: Column(
+        children: [
+          Icon(
+            isSearching ? Icons.search_off_rounded : Icons.groups_outlined,
+            size: 56,
+            color: AppColors.outlineVariant,
+          ),
+          const SizedBox(height: AppSpacing.md),
+          Text(
+            isSearching ? 'Delegate Tidak Ditemukan' : 'Belum Ada Delegate Tersedia',
+            style: AppTypography.cardTitle.copyWith(color: AppColors.textSecondary),
+          ),
+          const SizedBox(height: AppSpacing.xs),
+          Text(
+            isSearching
+                ? 'Tidak ada delegate yang cocok dengan kata kunci "$searchQuery".'
+                : 'Delegate akan muncul ketika ada user yang mengaktifkan profil publik mereka.',
+            style: AppTypography.bodyText.copyWith(fontSize: 12),
+            textAlign: TextAlign.center,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ErrorState extends StatelessWidget {
+  const _ErrorState({required this.onRetry});
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: AppSpacing.xxl),
+      child: Column(
+        children: [
+          const Icon(Icons.wifi_off_rounded, size: 40, color: AppColors.errorRed),
+          const SizedBox(height: AppSpacing.md),
+          Text(
+            'Gagal Memuat Delegate',
+            style: AppTypography.bodyMedium.copyWith(fontWeight: FontWeight.w600),
+          ),
+          TextButton(
+            onPressed: onRetry,
+            child: Text(
+              'Coba Lagi',
+              style: AppTypography.bodyMedium.copyWith(color: AppColors.goldDark),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

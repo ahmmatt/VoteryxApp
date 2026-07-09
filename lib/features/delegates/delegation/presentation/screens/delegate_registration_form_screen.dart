@@ -7,6 +7,7 @@ import '../../../../../core/constants/app_radius.dart';
 import '../../../../../core/constants/app_spacing.dart';
 import '../../../../../core/constants/app_typography.dart';
 import '../../application/delegate_application_provider.dart';
+import '../../../../user/profile/presentation/providers/profile_provider.dart';
 
 class DelegateRegistrationFormScreen extends ConsumerStatefulWidget {
   const DelegateRegistrationFormScreen({super.key});
@@ -16,13 +17,31 @@ class DelegateRegistrationFormScreen extends ConsumerStatefulWidget {
 }
 
 class _DelegateRegistrationFormScreenState extends ConsumerState<DelegateRegistrationFormScreen> {
-  final _nameController = TextEditingController(text: 'Bima Pradana');
+  final _nameController = TextEditingController();
   final _bioController = TextEditingController();
-  final _portfolioController = TextEditingController(text: 'https://linkedin.com/in/bima-pradana');
-  final _nimController = TextEditingController(text: '221011088');
+  final _trackRecordController = TextEditingController();
+  final _portfolioController = TextEditingController();
+  final _nimController = TextEditingController();
   String _expertise = 'Kebijakan Kampus';
   bool _isStudent = true;
   bool _acceptedDeclaration = false;
+
+  @override
+  void initState() {
+    super.initState();
+    final profile = ref.read(userProfileProvider).valueOrNull;
+    if (profile != null) {
+      if (profile.fullName.trim().isNotEmpty) {
+        _nameController.text = profile.fullName;
+      }
+      if (profile.nim != null && profile.nim!.trim().isNotEmpty) {
+        _nimController.text = profile.nim!;
+      }
+      if (profile.major != null && _expertiseOptions.contains(profile.major!)) {
+        _expertise = profile.major!;
+      }
+    }
+  }
 
   static const _expertiseOptions = [
     'Kebijakan Kampus',
@@ -36,12 +55,23 @@ class _DelegateRegistrationFormScreenState extends ConsumerState<DelegateRegistr
   void dispose() {
     _nameController.dispose();
     _bioController.dispose();
+    _trackRecordController.dispose();
     _portfolioController.dispose();
     _nimController.dispose();
     super.dispose();
   }
 
   void _submitApplication() {
+    if (_nameController.text.trim().isEmpty ||
+        _bioController.text.trim().isEmpty ||
+        _trackRecordController.text.trim().isEmpty ||
+        (_isStudent && _nimController.text.trim().isEmpty)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Harap lengkapi seluruh detail data diri, bio, dan riwayat pencapaian sebelum mengirim.')),
+      );
+      return;
+    }
+
     if (!_acceptedDeclaration) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Centang deklarasi kebenaran data terlebih dahulu.')),
@@ -53,6 +83,7 @@ class _DelegateRegistrationFormScreenState extends ConsumerState<DelegateRegistr
           name: _nameController.text,
           expertise: _expertise,
           bio: _bioController.text,
+          trackRecord: _trackRecordController.text,
           portfolioUrl: _portfolioController.text,
           isStudent: _isStudent,
           nim: _nimController.text,
@@ -83,10 +114,10 @@ class _DelegateRegistrationFormScreenState extends ConsumerState<DelegateRegistr
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('Informasi Tambahan', style: AppTypography.displayHeading.copyWith(fontSize: 24, color: AppColors.primary900)),
+              Text('Langkah 2: Formulir Portofolio', style: AppTypography.displayHeading.copyWith(fontSize: 24, color: AppColors.primary900)),
               const SizedBox(height: 8),
               Text(
-                'Lengkapi profil dan status mahasiswa. Pengajuan akan masuk ke dashboard admin untuk proses approval.',
+                'Lengkapi profil keahlian dan latar belakang Anda. Pengajuan akan diproses oleh admin kampus pada tahap berikutnya.',
                 style: AppTypography.bodyText.copyWith(color: AppColors.textSecondary, height: 1.4),
               ),
               const SizedBox(height: AppSpacing.xl),
@@ -149,6 +180,16 @@ class _DelegateRegistrationFormScreenState extends ConsumerState<DelegateRegistr
                     const SizedBox(height: 6),
                     Align(alignment: Alignment.centerRight, child: Text('MAKSIMUM 500 KATA', style: AppTypography.caption.copyWith(fontSize: 10, color: AppColors.outline))),
                     const SizedBox(height: AppSpacing.lg),
+                    Text('Riwayat Pencapaian / Track Record', style: AppTypography.captionBold.copyWith(color: AppColors.navyMid)),
+                    const SizedBox(height: AppSpacing.xs),
+                    _buildTextField(
+                      controller: _trackRecordController,
+                      hint: 'Sebutkan kepengurusan organisasi, kepanitiaan, atau prestasi yang membuktikan kepemimpinan & kapabilitas Anda...',
+                      maxLines: 4,
+                    ),
+                    const SizedBox(height: 6),
+                    Align(alignment: Alignment.centerRight, child: Text('MAKSIMUM 500 KATA', style: AppTypography.caption.copyWith(fontSize: 10, color: AppColors.outline))),
+                    const SizedBox(height: AppSpacing.lg),
                     Text('Link Portofolio / LinkedIn', style: AppTypography.captionBold.copyWith(color: AppColors.navyMid)),
                     const SizedBox(height: AppSpacing.xs),
                     _buildTextField(controller: _portfolioController, hint: 'https://linkedin.com/in/username', icon: Icons.link),
@@ -188,7 +229,7 @@ class _DelegateRegistrationFormScreenState extends ConsumerState<DelegateRegistr
                       decoration: BoxDecoration(color: const Color(0xFFD1D5DB), borderRadius: BorderRadius.circular(2)),
                       child: FractionallySizedBox(
                         alignment: Alignment.centerLeft,
-                        widthFactor: 0.75,
+                        widthFactor: 0.66,
                         child: Container(
                           decoration: BoxDecoration(gradient: const LinearGradient(colors: [Color(0xFFFFD54F), Color(0xFFF57F17)]), borderRadius: BorderRadius.circular(2)),
                         ),
@@ -196,7 +237,7 @@ class _DelegateRegistrationFormScreenState extends ConsumerState<DelegateRegistr
                     ),
                   ),
                   const SizedBox(width: 16),
-                  Text('TAHAP 3/4', style: AppTypography.captionBold.copyWith(color: AppColors.goldDark)),
+                  Text('TAHAP 2/3', style: AppTypography.captionBold.copyWith(color: AppColors.goldDark)),
                 ],
               ),
               const SizedBox(height: AppSpacing.xxl),

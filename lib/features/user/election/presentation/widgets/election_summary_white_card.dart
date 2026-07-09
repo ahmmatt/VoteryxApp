@@ -19,6 +19,13 @@ class ElectionSummaryWhiteCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final pctText = participationPercentage > 0 && (participationPercentage * 100).round() == 0
+        ? '< 1%'
+        : '${(participationPercentage * 100).round()}%';
+    final progressVal = participationPercentage > 0 && participationPercentage < 0.02
+        ? 0.02
+        : participationPercentage;
+
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(AppSpacing.lg),
@@ -27,7 +34,7 @@ class ElectionSummaryWhiteCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.04),
+            color: Colors.black.withValues(alpha: 0.04),
             blurRadius: 24,
             offset: const Offset(0, 8),
           ),
@@ -55,7 +62,7 @@ class ElectionSummaryWhiteCard extends StatelessWidget {
                 ),
               ),
               Text(
-                '${(participationPercentage * 100).toInt()}%',
+                pctText,
                 style: AppTypography.bodyMedium.copyWith(
                   fontWeight: FontWeight.w800,
                   color: AppColors.goldDark,
@@ -67,7 +74,7 @@ class ElectionSummaryWhiteCard extends StatelessWidget {
           ClipRRect(
             borderRadius: BorderRadius.circular(4),
             child: LinearProgressIndicator(
-              value: participationPercentage,
+              value: progressVal,
               backgroundColor: AppColors.outlineVariant,
               valueColor: const AlwaysStoppedAnimation<Color>(AppColors.goldMid),
               minHeight: 8,

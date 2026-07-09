@@ -1,21 +1,25 @@
+// lib/features/user/profile/presentation/screens/profile_screen.dart
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:voteryxapp/core/constants/app_colors.dart';
 import 'package:voteryxapp/core/constants/app_typography.dart';
 import 'package:voteryxapp/core/constants/app_spacing.dart';
-import 'package:voteryxapp/core/constants/app_radius.dart';
-import 'package:voteryxapp/core/widgets/user_bottom_nav_bar.dart';
 import 'package:voteryxapp/core/router/app_router.dart';
 
+import '../providers/profile_provider.dart';
 import 'history_screen.dart';
 import 'help_screen.dart';
 import 'profile_settings_screen.dart';
+import 'package:voteryxapp/features/user/notifications/presentation/widgets/notifications_modal.dart';
 
-class ProfileScreen extends StatelessWidget {
+class ProfileScreen extends ConsumerWidget {
   const ProfileScreen({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final profileAsync = ref.watch(userProfileProvider);
+
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
@@ -23,141 +27,166 @@ class ProfileScreen extends StatelessWidget {
         backgroundColor: AppColors.primary800,
         elevation: 0,
         automaticallyImplyLeading: false,
-        title: Text('Profile', style: AppTypography.headerTitle.copyWith(color: Colors.white)),
+        title: Text(
+          'Profil Saya',
+          style: AppTypography.headerTitle.copyWith(color: Colors.white),
+        ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.settings, color: Colors.white),
+            icon: const Icon(Icons.notifications_none_rounded, color: Colors.white),
+            tooltip: 'Notifikasi',
             onPressed: () {
-              Navigator.of(context, rootNavigator: true).push(
-                MaterialPageRoute(
-                  builder: (context) => const ProfileSettingsScreen(),
-                ),
-              );
+              showNotificationsModal(context, ref);
             },
           ),
+          const SizedBox(width: AppSpacing.xs),
         ],
       ),
-      body: SingleChildScrollView(
-        child: Column(
-          children: [
-            _buildProfileHeader(),
-            const SizedBox(height: AppSpacing.lg),
-            _buildStatsCard(),
-            const SizedBox(height: AppSpacing.xl),
-            _buildMenuSection(context),
-            const SizedBox(height: AppSpacing.xxl),
-            _buildSecureBadge(),
-            const SizedBox(height: AppSpacing.xxl),
-          ],
+      body: profileAsync.when(
+        data: (profile) => SingleChildScrollView(
+          child: Column(
+            children: [
+              _buildProfileHeader(
+                name: profile?.fullName ?? 'Pengguna Voteryx',
+                faculty: profile?.faculty ?? '',
+                kycStatus: profile?.kycStatus ?? 'pending',
+              ),
+              const SizedBox(height: AppSpacing.lg),
+              _buildMenuSection(context, ref),
+              const SizedBox(height: AppSpacing.xxl),
+              _buildSecureBadge(),
+              const SizedBox(height: AppSpacing.xxl),
+            ],
+          ),
+        ),
+        loading: () => const Center(
+          child: CircularProgressIndicator(color: AppColors.goldMid),
+        ),
+        error: (_, __) => Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(Icons.person_off_outlined, size: 48, color: AppColors.outline),
+              const SizedBox(height: AppSpacing.md),
+              Text('Gagal memuat profil', style: AppTypography.bodyMedium),
+              TextButton(
+                onPressed: () => ref.invalidate(userProfileProvider),
+                child: const Text('Coba Lagi'),
+              ),
+            ],
+          ),
         ),
       ),
     );
   }
 
-  Widget _buildProfileHeader() {
-    return Column(
-      children: [
-        const SizedBox(height: AppSpacing.xl),
-        Stack(
-          alignment: Alignment.bottomRight,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(4),
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: Colors.white,
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.05),
-                    blurRadius: 10,
-                    offset: const Offset(0, 4),
-                  ),
-                ],
-              ),
-              child: ClipOval(
-                child: Image.network(
-                  'https://ui-avatars.com/api/?name=Ahmad+Fauzi&background=random',
-                  width: 100,
-                  height: 100,
-                  fit: BoxFit.cover,
-                  errorBuilder: (context, error, stackTrace) => Container(
+  Widget _buildProfileHeader({
+    required String name,
+    required String faculty,
+    required String kycStatus,
+  }) {
+    return Container(
+      width: double.infinity,
+      color: AppColors.primary800,
+      padding: const EdgeInsets.only(
+        top: AppSpacing.xl,
+        bottom: AppSpacing.xxl,
+        left: AppSpacing.pagePad,
+        right: AppSpacing.pagePad,
+      ),
+      child: Column(
+        children: [
+          Stack(
+            alignment: Alignment.bottomRight,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(4),
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: Colors.white,
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.05),
+                      blurRadius: 10,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: ClipOval(
+                  child: Image.network(
+                    'https://ui-avatars.com/api/?name=${Uri.encodeComponent(name)}&background=0F1F3D&color=fff&size=200',
                     width: 100,
                     height: 100,
-                    color: AppColors.primary800,
-                    child: const Icon(Icons.person, color: Colors.white, size: 50),
+                    fit: BoxFit.cover,
+                    errorBuilder: (context, error, stackTrace) => Container(
+                      width: 100,
+                      height: 100,
+                      color: AppColors.primary800,
+                      child: Center(
+                        child: Text(
+                          name.isNotEmpty ? name[0].toUpperCase() : '?',
+                          style: AppTypography.displayHeading.copyWith(
+                            color: Colors.white,
+                            fontSize: 36,
+                          ),
+                        ),
+                      ),
+                    ),
                   ),
                 ),
               ),
-            ),
-            Container(
-              decoration: const BoxDecoration(
-                shape: BoxShape.circle,
-                color: Colors.white,
+              Container(
+                decoration: const BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: Colors.white,
+                ),
+                padding: const EdgeInsets.all(2),
+                child: Icon(
+                  kycStatus == 'verified'
+                      ? Icons.verified
+                      : Icons.pending_outlined,
+                  color: kycStatus == 'verified'
+                      ? AppColors.successTeal
+                      : AppColors.warningAmber,
+                  size: 24,
+                ),
               ),
-              padding: const EdgeInsets.all(2),
-              child: const Icon(Icons.verified, color: AppColors.successTeal, size: 24),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.md),
+          Text(
+            name,
+            style: AppTypography.displayHeading.copyWith(
+              color: Colors.white,
+              fontSize: 20,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            kycStatus == 'verified'
+                ? 'Warga Terverifikasi · Pemilih Aktif'
+                : 'Menunggu Verifikasi KYC',
+            style: AppTypography.bodyText.copyWith(
+              color: Colors.white.withValues(alpha: 0.75),
+              fontSize: 12,
+            ),
+          ),
+          if (faculty.isNotEmpty) ...[
+            const SizedBox(height: 4),
+            Text(
+              faculty,
+              style: AppTypography.captionBold.copyWith(
+                color: AppColors.goldMid,
+                fontSize: 11,
+              ),
             ),
           ],
-        ),
-        const SizedBox(height: AppSpacing.md),
-        Text('Ahmad Fauzi', style: AppTypography.screenTitle),
-        const SizedBox(height: 4),
-        Text('Warga Terverifikasi • NIK **** **** **** 8901', style: AppTypography.bodyText),
-        const SizedBox(height: 2),
-        Text(
-          'Mahasiswa: NIM 1202190045 • Fakultas Teknik Informatika',
-          style: AppTypography.captionBold.copyWith(color: AppColors.textSecondary),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildStatsCard() {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: AppSpacing.lg),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(AppRadius.card),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.02),
-              blurRadius: 10,
-              offset: const Offset(0, 4),
-            ),
-          ],
-        ),
-        child: Row(
-          children: [
-            Expanded(child: _buildStatItem('BOBOT SUARA', '1')),
-            Container(width: 1, height: 40, color: AppColors.outlineVariant.withValues(alpha: 0.5)),
-            Expanded(child: _buildStatItem('DELEGASI', '0')),
-            Container(width: 1, height: 40, color: AppColors.outlineVariant.withValues(alpha: 0.5)),
-            Expanded(child: _buildStatItem('VERIFIKASI', 'Aktif', valueColor: AppColors.goldDark)),
-          ],
-        ),
+        ],
       ),
     );
   }
 
-  Widget _buildStatItem(String label, String value, {Color? valueColor}) {
-    return Column(
-      children: [
-        Text(label, style: AppTypography.captionBold),
-        const SizedBox(height: AppSpacing.sm),
-        Text(
-          value,
-          style: AppTypography.displayHeading.copyWith(
-            color: valueColor ?? AppColors.textPrimary,
-            fontSize: 24,
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildMenuSection(BuildContext context) {
+  Widget _buildMenuSection(BuildContext context, WidgetRef ref) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
       child: Column(
@@ -184,23 +213,22 @@ class ProfileScreen extends StatelessWidget {
             title: 'Pengaturan Profil',
             onTap: () {
               Navigator.of(context, rootNavigator: true).push(
-                MaterialPageRoute(builder: (context) => const ProfileSettingsScreen()),
+                MaterialPageRoute(
+                  builder: (context) => const ProfileSettingsScreen(),
+                ),
               );
             },
           ),
           _buildMenuItem(
-            icon: Icons.switch_account_outlined,
-            title: 'Beralih ke Mode Delegate',
+            icon: Icons.assignment_ind_outlined,
+            title: 'Masuk ke Portal Delegasi',
             onTap: () {
-              // Navigasi ke portal Delegate
-              context.go('/delegation/home');
-            },
-          ),
-          _buildMenuItem(
-            icon: Icons.group_add_outlined,
-            title: 'Usulan Pemilihan',
-            onTap: () {
-              context.pushNamed('proposal-status');
+              final profile = ref.read(userProfileProvider).valueOrNull;
+              if (profile != null && (profile.role == 'delegate' || profile.isDelegateProfilePublic)) {
+                context.pushNamed('delegate-login');
+              } else {
+                context.pushNamed('delegate-terms');
+              }
             },
           ),
           _buildMenuItem(
@@ -214,11 +242,40 @@ class ProfileScreen extends StatelessWidget {
           ),
           _buildMenuItem(
             icon: Icons.logout,
-            title: 'Keluar (Logout)',
+            title: 'Keluar',
             iconColor: AppColors.errorRed,
             trailingColor: AppColors.errorRed,
-            onTap: () {
-              context.go(AppRoutes.login);
+            onTap: () async {
+              final confirmed = await showDialog<bool>(
+                context: context,
+                builder: (ctx) => AlertDialog(
+                  title: Text(
+                    'Keluar dari Voteryx?',
+                    style: AppTypography.cardTitle,
+                  ),
+                  content: Text(
+                    'Kamu akan keluar dari sesi ini. Pastikan kamu sudah menyimpan semua perubahan.',
+                    style: AppTypography.bodyText,
+                  ),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(ctx, false),
+                      child: const Text('Batal'),
+                    ),
+                    TextButton(
+                      onPressed: () => Navigator.pop(ctx, true),
+                      child: Text(
+                        'Keluar',
+                        style: TextStyle(color: AppColors.errorRed),
+                      ),
+                    ),
+                  ],
+                ),
+              );
+              if (confirmed == true && context.mounted) {
+                await ref.read(userProfileProvider.notifier).signOut();
+                if (context.mounted) context.go(AppRoutes.login);
+              }
             },
           ),
         ],
@@ -237,7 +294,7 @@ class ProfileScreen extends StatelessWidget {
     return Container(
       margin: const EdgeInsets.only(bottom: AppSpacing.sm),
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(AppRadius.card),
+        borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.015),
@@ -248,18 +305,29 @@ class ProfileScreen extends StatelessWidget {
       ),
       child: Material(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(AppRadius.card),
+        borderRadius: BorderRadius.circular(12),
         child: ListTile(
-          contentPadding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg, vertical: AppSpacing.xs),
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.lg,
+            vertical: AppSpacing.xs,
+          ),
           leading: Icon(icon, color: iconColor ?? AppColors.navyMid, size: 22),
-          title: Text(title, style: AppTypography.itemTitle.copyWith(fontSize: 14)),
+          title: Text(
+            title,
+            style: AppTypography.bodyMedium.copyWith(
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
           trailing: Icon(
             trailingIcon ?? Icons.chevron_right,
             color: trailingColor ?? AppColors.textSecondary,
             size: 20,
           ),
           onTap: onTap,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadius.card)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
         ),
       ),
     );
@@ -267,9 +335,12 @@ class ProfileScreen extends StatelessWidget {
 
   Widget _buildSecureBadge() {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg, vertical: AppSpacing.sm),
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.lg,
+        vertical: AppSpacing.sm,
+      ),
       decoration: BoxDecoration(
-        color: const Color(0xFFE4E9F7), // Light navy tint
+        color: const Color(0xFFE4E9F7),
         borderRadius: BorderRadius.circular(20),
       ),
       child: Row(
@@ -277,12 +348,20 @@ class ProfileScreen extends StatelessWidget {
         children: [
           const Icon(Icons.lock_outline, size: 14, color: AppColors.primary900),
           const SizedBox(width: AppSpacing.xs),
-          Text('Certified Secure by Voteryx', style: AppTypography.captionBold.copyWith(color: AppColors.primary900)),
+          Text(
+            'Certified Secure by Voteryx',
+            style: AppTypography.captionBold.copyWith(
+              color: AppColors.primary900,
+            ),
+          ),
           const SizedBox(width: AppSpacing.xs),
-          const Icon(Icons.shield_outlined, size: 14, color: AppColors.primary900),
+          const Icon(
+            Icons.shield_outlined,
+            size: 14,
+            color: AppColors.primary900,
+          ),
         ],
       ),
     );
   }
 }
-

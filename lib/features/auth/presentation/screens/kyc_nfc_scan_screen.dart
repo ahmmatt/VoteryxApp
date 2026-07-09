@@ -1,15 +1,18 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:voteryxapp/core/constants/app_colors.dart';
 import 'package:voteryxapp/core/constants/app_typography.dart';
 import 'package:voteryxapp/core/constants/app_spacing.dart';
 import 'package:voteryxapp/core/widgets/gold_button.dart';
+import 'package:voteryxapp/features/auth/data/mock/mock_ktp_database.dart';
+import '../providers/auth_provider.dart';
 
-class KycNfcScanScreen extends StatelessWidget {
+class KycNfcScanScreen extends ConsumerWidget {
   const KycNfcScanScreen({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     return Scaffold(
       backgroundColor: AppColors.primary900,
       appBar: AppBar(
@@ -17,7 +20,13 @@ class KycNfcScanScreen extends StatelessWidget {
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Colors.white),
-          onPressed: () => context.pop(),
+          onPressed: () {
+            if (context.canPop()) {
+              context.pop();
+            } else {
+              context.go('/kyc/method-select');
+            }
+          },
         ),
       ),
       body: SafeArea(
@@ -63,7 +72,10 @@ class KycNfcScanScreen extends StatelessWidget {
               GoldButton(
                 label: 'Simulasi Berhasil NFC',
                 onPressed: () {
-                  context.go('/kyc/liveness');
+                  final nik = ref.read(registrationProvider).nik ?? '7307052504070001';
+                  final ktpData = MockKtpDatabase.lookupByNik(nik);
+                  ref.read(registrationProvider.notifier).setKtpData(ktpData);
+                  context.push('/kyc/photo-review');
                 },
               ),
               const SizedBox(height: AppSpacing.md),
@@ -71,16 +83,16 @@ class KycNfcScanScreen extends StatelessWidget {
               TextButton(
                 onPressed: () {
                   // Fallback ke foto manual jika NFC gagal
-                  context.go('/kyc/liveness'); // Secara logika akan ke /kyc/manual-photo
+                  context.push('/kyc/camera');
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
-                      content: Text('Beralih ke mode foto manual.'),
+                      content: Text('Beralih ke mode foto kamera manual.'),
                       backgroundColor: AppColors.navy600,
                     ),
                   );
                 },
                 child: Text(
-                  'NFC bermasalah? Lewati & Gunakan Foto Manual',
+                  'NFC bermasalah? Beralih ke Foto Kamera Manual',
                   style: AppTypography.captionBold.copyWith(
                     color: Colors.white70,
                     decoration: TextDecoration.underline,

@@ -8,6 +8,7 @@ class DelegateApplication {
     required this.name,
     required this.expertise,
     required this.bio,
+    required this.trackRecord,
     required this.portfolioUrl,
     required this.isStudent,
     required this.nim,
@@ -18,6 +19,7 @@ class DelegateApplication {
   final String name;
   final String expertise;
   final String bio;
+  final String trackRecord;
   final String portfolioUrl;
   final bool isStudent;
   final String nim;
@@ -28,6 +30,7 @@ class DelegateApplication {
     String? name,
     String? expertise,
     String? bio,
+    String? trackRecord,
     String? portfolioUrl,
     bool? isStudent,
     String? nim,
@@ -38,6 +41,7 @@ class DelegateApplication {
       name: name ?? this.name,
       expertise: expertise ?? this.expertise,
       bio: bio ?? this.bio,
+      trackRecord: trackRecord ?? this.trackRecord,
       portfolioUrl: portfolioUrl ?? this.portfolioUrl,
       isStudent: isStudent ?? this.isStudent,
       nim: nim ?? this.nim,
@@ -54,6 +58,7 @@ class DelegateApplicationController extends StateNotifier<List<DelegateApplicati
             name: 'Dian Sastro',
             expertise: 'Kebijakan Kampus',
             bio: 'Aktif dalam forum aspirasi mahasiswa dan terbiasa menyusun ringkasan isu untuk pemilih.',
+            trackRecord: 'Ketua BEM Fakultas 2023, Juara 1 Debat Konstitusi Nasional, Pengurus Advokasi Mahasiswa.',
             portfolioUrl: 'https://linkedin.com/in/dian-sastro',
             isStudent: true,
             nim: '221011001',
@@ -65,6 +70,7 @@ class DelegateApplicationController extends StateNotifier<List<DelegateApplicati
     required String name,
     required String expertise,
     required String bio,
+    required String trackRecord,
     required String portfolioUrl,
     required bool isStudent,
     required String nim,
@@ -75,6 +81,7 @@ class DelegateApplicationController extends StateNotifier<List<DelegateApplicati
       name: name.trim().isEmpty ? 'Pengguna Voteryx' : name.trim(),
       expertise: expertise,
       bio: bio.trim().isEmpty ? 'Belum ada bio rinci.' : bio.trim(),
+      trackRecord: trackRecord.trim().isEmpty ? 'Belum dicantumkan.' : trackRecord.trim(),
       portfolioUrl: portfolioUrl.trim(),
       isStudent: isStudent,
       nim: isStudent ? nim.trim() : '',
