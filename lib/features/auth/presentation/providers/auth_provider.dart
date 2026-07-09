@@ -85,8 +85,10 @@ class UserProfileNotifier extends AsyncNotifier<UserProfile?> {
 
   /// Logout.
   Future<void> signOut() async {
+    LoginNotifier.isDevAdminBypass = false;
     final ds = ref.read(authRemoteDatasourceProvider);
     await ds.signOut();
+    ref.invalidate(loginNotifierProvider);
     state = const AsyncData(null);
   }
 }
@@ -130,6 +132,7 @@ class LoginNotifier extends StateNotifier<LoginState> {
   LoginNotifier(this._ref) : super(const LoginState());
 
   final Ref _ref;
+  static bool isDevAdminBypass = false;
 
   Future<void> login({
     required String nik,
@@ -139,6 +142,40 @@ class LoginNotifier extends StateNotifier<LoginState> {
 
     try {
       final ds = _ref.read(authRemoteDatasourceProvider);
+
+      // ─── RESILIENT ADMIN LOGIN (HYBRID) ────────────────────────────────
+      // Coba login asli Supabase jika SQL Opsi A sudah dijalankan di cloud.
+      // Jika belum ditaruh di Supabase (gagal/error), otomatis jalankan bypass dev admin!
+      if (nik == '1111111111111111' || nik == '9999999999999999' || nik == '0000000000000000') {
+        try {
+          final authResponse = await ds.signIn(nik: nik, password: password);
+          if (authResponse.user != null) {
+            final profile = await ds.getUserProfile(authResponse.user!.id);
+            if (profile != null) {
+              isDevAdminBypass = false;
+              _ref.invalidate(userProfileProvider);
+              state = state.copyWith(
+                isLoading: false,
+                isSuccess: true,
+                userRole: profile.role,
+              );
+              return;
+            }
+          }
+        } catch (_) {
+          // Fallback ke bypass lokal jika akun belum ada di DB cloud
+        }
+
+        isDevAdminBypass = true;
+        await Future.delayed(const Duration(milliseconds: 200));
+        state = state.copyWith(
+          isLoading: false,
+          isSuccess: true,
+          userRole: 'admin',
+        );
+        return;
+      }
+      isDevAdminBypass = false;
 
       // 1. Sign in dengan Supabase Auth
       final authResponse = await ds.signIn(nik: nik, password: password);

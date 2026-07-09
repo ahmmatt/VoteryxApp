@@ -236,7 +236,7 @@ class DelegateReviewScreen extends StatelessWidget {
                         color: Colors.transparent,
                         child: InkWell(
                           onTap: () {
-                            context.pushReplacementNamed('dashboard');
+                            context.goNamed('dashboard');
                           },
                           borderRadius: BorderRadius.circular(AppRadius.button),
                           child: Row(

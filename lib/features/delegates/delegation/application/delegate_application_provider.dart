@@ -1,4 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:voteryxapp/core/network/supabase_client.dart';
 
 enum DelegateApplicationStatus { none, pending, approved, rejected }
 
@@ -64,9 +65,109 @@ class DelegateApplicationController extends StateNotifier<List<DelegateApplicati
             nim: '221011001',
             status: DelegateApplicationStatus.pending,
           ),
-        ]);
+        ]) {
+    fetchFromDb();
+  }
 
-  void submit({
+  Future<void> fetchFromDb() async {
+    try {
+      final response = await SupabaseConfig.client
+          .from('delegate_applications')
+          .select('*')
+          .order('created_at', ascending: false);
+
+      List<DelegateApplication> dbList = (response as List).map((row) {
+        final statusStr = row['status']?.toString() ?? 'pending';
+        DelegateApplicationStatus st = DelegateApplicationStatus.pending;
+        if (statusStr == 'approved') st = DelegateApplicationStatus.approved;
+        if (statusStr == 'rejected') st = DelegateApplicationStatus.rejected;
+
+        return DelegateApplication(
+          id: row['id']?.toString() ?? '',
+          name: row['name']?.toString() ?? 'Pengguna Voteryx',
+          expertise: row['expertise']?.toString() ?? 'Umum',
+          bio: row['bio']?.toString() ?? '-',
+          trackRecord: row['track_record']?.toString() ?? '-',
+          portfolioUrl: row['portfolio_url']?.toString() ?? '',
+          isStudent: row['is_student'] == true,
+          nim: row['nim']?.toString() ?? '',
+          status: st,
+        );
+      }).toList();
+
+      // Jika tabel di cloud masih kosong, otomatis seed Dian Sastro ke Supabase!
+      if (dbList.isEmpty) {
+        try {
+          await SupabaseConfig.client.from('delegate_applications').insert({
+            'id': 'DEL-REQ-2407-001',
+            'name': 'Dian Sastro',
+            'expertise': 'Kebijakan Kampus',
+            'bio': 'Aktif dalam forum aspirasi mahasiswa dan terbiasa menyusun ringkasan isu untuk pemilih.',
+            'track_record': 'Ketua BEM Fakultas 2023, Juara 1 Debat Konstitusi Nasional, Pengurus Advokasi Mahasiswa.',
+            'portfolio_url': 'https://linkedin.com/in/dian-sastro',
+            'is_student': true,
+            'nim': '221011001',
+            'status': 'pending',
+          });
+          dbList = [
+            const DelegateApplication(
+              id: 'DEL-REQ-2407-001',
+              name: 'Dian Sastro',
+              expertise: 'Kebijakan Kampus',
+              bio: 'Aktif dalam forum aspirasi mahasiswa dan terbiasa menyusun ringkasan isu untuk pemilih.',
+              trackRecord: 'Ketua BEM Fakultas 2023, Juara 1 Debat Konstitusi Nasional, Pengurus Advokasi Mahasiswa.',
+              portfolioUrl: 'https://linkedin.com/in/dian-sastro',
+              isStudent: true,
+              nim: '221011001',
+              status: DelegateApplicationStatus.pending,
+            )
+          ];
+        } catch (_) {}
+      }
+
+      // Ambil juga pengguna di tabel users yang sudah mendaftar delegasi atau memiliki delegate_bio
+      try {
+        final usersResp = await SupabaseConfig.client
+            .from('users')
+            .select('*')
+            .or('role.eq.delegate,delegate_bio.neq.null,is_delegate_profile_public.eq.true');
+
+        final userList = (usersResp as List).map((u) {
+          final nimVal = u['nim']?.toString() ?? '';
+          final idVal = 'DEL-USER-${u['id']?.toString().substring(0, 8) ?? nimVal}';
+          final nameVal = u['full_name']?.toString() ?? 'Delegator Voteryx';
+          return DelegateApplication(
+            id: idVal,
+            name: nameVal,
+            expertise: u['delegate_vision']?.toString() ?? u['major']?.toString() ?? 'Umum',
+            bio: u['delegate_bio']?.toString() ?? 'Delegator terdaftar.',
+            trackRecord: 'Terverifikasi via akun pengguna Voteryx.',
+            portfolioUrl: '-',
+            isStudent: nimVal.isNotEmpty,
+            nim: nimVal,
+            status: u['role'] == 'delegate'
+                ? DelegateApplicationStatus.approved
+                : DelegateApplicationStatus.pending,
+          );
+        }).toList();
+
+        // Gabungkan list tanpa duplikasi NIM / ID
+        for (final uApp in userList) {
+          if (!dbList.any((d) => (d.nim.isNotEmpty && d.nim == uApp.nim) || d.name == uApp.name)) {
+            dbList.add(uApp);
+          }
+        }
+      } catch (_) {}
+
+      if (dbList.isNotEmpty) {
+        state = dbList;
+      }
+    } catch (_) {
+      // Abaikan jika tabel belum ada di cloud Supabase
+    }
+  }
+
+  Future<void> submit({
     required String name,
     required String expertise,
     required String bio,
@@ -74,10 +175,11 @@ class DelegateApplicationController extends StateNotifier<List<DelegateApplicati
     required String portfolioUrl,
     required bool isStudent,
     required String nim,
-  }) {
+  }) async {
     final timestamp = DateTime.now().millisecondsSinceEpoch.toString().substring(7);
+    final id = 'DEL-REQ-$timestamp';
     final application = DelegateApplication(
-      id: 'DEL-REQ-$timestamp',
+      id: id,
       name: name.trim().isEmpty ? 'Pengguna Voteryx' : name.trim(),
       expertise: expertise,
       bio: bio.trim().isEmpty ? 'Belum ada bio rinci.' : bio.trim(),
@@ -89,9 +191,40 @@ class DelegateApplicationController extends StateNotifier<List<DelegateApplicati
     );
 
     state = [application, ...state];
+
+    try {
+      final currentUserId = SupabaseConfig.client.auth.currentUser?.id;
+      await SupabaseConfig.client.from('delegate_applications').insert({
+        'id': id,
+        'user_id': currentUserId,
+        'name': application.name,
+        'expertise': application.expertise,
+        'bio': application.bio,
+        'track_record': application.trackRecord,
+        'portfolio_url': application.portfolioUrl,
+        'is_student': application.isStudent,
+        'nim': application.nim,
+        'status': 'pending',
+      });
+
+      // Update juga tabel users jika user saat ini login agar datanya langsung menyatu
+      if (currentUserId != null) {
+        await SupabaseConfig.client.from('users').update({
+          'delegate_bio': application.bio,
+          'delegate_vision': application.expertise,
+          'is_delegate_profile_public': true,
+        }).eq('id', currentUserId);
+      } else if (application.nim.isNotEmpty) {
+        await SupabaseConfig.client.from('users').update({
+          'delegate_bio': application.bio,
+          'delegate_vision': application.expertise,
+          'is_delegate_profile_public': true,
+        }).eq('nim', application.nim);
+      }
+    } catch (_) {}
   }
 
-  void approve(String id) {
+  Future<void> approve(String id) async {
     state = [
       for (final item in state)
         if (item.id == id)
@@ -99,9 +232,28 @@ class DelegateApplicationController extends StateNotifier<List<DelegateApplicati
         else
           item,
     ];
+
+    try {
+      await SupabaseConfig.client
+          .from('delegate_applications')
+          .update({'status': 'approved'}).eq('id', id);
+
+      final app = state.firstWhere((e) => e.id == id);
+      if (app.nim.isNotEmpty) {
+        await SupabaseConfig.client
+            .from('users')
+            .update({
+              'role': 'delegate',
+              'is_delegate_profile_public': true,
+              'delegate_bio': app.bio,
+              'delegate_vision': app.expertise,
+            })
+            .eq('nim', app.nim);
+      }
+    } catch (_) {}
   }
 
-  void reject(String id) {
+  Future<void> reject(String id) async {
     state = [
       for (final item in state)
         if (item.id == id)
@@ -109,6 +261,12 @@ class DelegateApplicationController extends StateNotifier<List<DelegateApplicati
         else
           item,
     ];
+
+    try {
+      await SupabaseConfig.client
+          .from('delegate_applications')
+          .update({'status': 'rejected'}).eq('id', id);
+    } catch (_) {}
   }
 }
 

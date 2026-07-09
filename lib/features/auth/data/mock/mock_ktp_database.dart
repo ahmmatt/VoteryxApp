@@ -4,6 +4,8 @@ import '../../presentation/providers/auth_provider.dart';
 /// Database simulasi e-KTP pintar (Mock KTP Lookup Service)
 /// Berisi data asli/realistis dari daftar kependudukan untuk simulasi pembacaan NFC dan OCR Kamera.
 class MockKtpDatabase {
+  static int get totalRecords => _records.length;
+
   static final Map<String, KtpData> _records = {
     '7307052504070001': const KtpData(
       nik: '7307052504070001',

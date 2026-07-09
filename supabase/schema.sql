@@ -109,7 +109,22 @@ CREATE TABLE IF NOT EXISTS public.delegations (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
--- 6. Tabel Usulan Pemilihan (Election Proposals)
+-- 6. Tabel Pengajuan Delegasi (Delegate Applications)
+CREATE TABLE IF NOT EXISTS public.delegate_applications (
+    id TEXT PRIMARY KEY,
+    user_id UUID REFERENCES public.users(id) ON DELETE SET NULL,
+    name TEXT NOT NULL,
+    expertise TEXT,
+    bio TEXT,
+    track_record TEXT,
+    portfolio_url TEXT,
+    is_student BOOLEAN DEFAULT true,
+    nim TEXT,
+    status TEXT DEFAULT 'pending', -- 'pending', 'approved', 'rejected'
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+-- 7. Tabel Usulan Pemilihan (Election Proposals)
 CREATE TABLE IF NOT EXISTS public.election_proposals (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     proposer_id UUID REFERENCES public.users(id) ON DELETE CASCADE NOT NULL,
@@ -134,6 +149,7 @@ ALTER TABLE public.elections ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.candidates ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.votes ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.delegations ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.delegate_applications ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.election_proposals ENABLE ROW LEVEL SECURITY;
 
 -- Policy untuk pengembangan cepat (Izinkan read/write tanpa hambatan selama dev)
@@ -147,6 +163,10 @@ CREATE POLICY "Allow public read candidates" ON public.candidates FOR SELECT USI
 CREATE POLICY "Allow public read delegations" ON public.delegations FOR SELECT USING (true);
 CREATE POLICY "Allow auth insert delegations" ON public.delegations FOR INSERT WITH CHECK (true);
 CREATE POLICY "Allow auth update delegations" ON public.delegations FOR UPDATE USING (true);
+
+CREATE POLICY "Allow public read delegate_applications" ON public.delegate_applications FOR SELECT USING (true);
+CREATE POLICY "Allow auth insert delegate_applications" ON public.delegate_applications FOR INSERT WITH CHECK (true);
+CREATE POLICY "Allow auth update delegate_applications" ON public.delegate_applications FOR UPDATE USING (true);
 
 CREATE POLICY "Allow public read votes" ON public.votes FOR SELECT USING (true);
 CREATE POLICY "Allow auth insert votes" ON public.votes FOR INSERT WITH CHECK (true);

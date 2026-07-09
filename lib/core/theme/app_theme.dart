@@ -157,7 +157,7 @@ abstract final class AppTheme {
           backgroundColor: AppColors.navyMid,
           foregroundColor: Colors.white,
           elevation: 0,
-          minimumSize: const Size(double.infinity, 44),
+          minimumSize: const Size(0, 44),
           tapTargetSize: MaterialTapTargetSize.shrinkWrap,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(AppRadius.button),
@@ -173,7 +173,7 @@ abstract final class AppTheme {
       outlinedButtonTheme: OutlinedButtonThemeData(
         style: OutlinedButton.styleFrom(
           foregroundColor: AppColors.textPrimary,
-          minimumSize: const Size(double.infinity, 44),
+          minimumSize: const Size(0, 44),
           tapTargetSize: MaterialTapTargetSize.shrinkWrap,
           side: const BorderSide(color: Color(0x33000000)), // 20% hitam
           shape: RoundedRectangleBorder(

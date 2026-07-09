@@ -198,7 +198,7 @@ class DelegateApprovedScreen extends StatelessWidget {
                         child: InkWell(
                           onTap: () {
                             // Link to home
-                            context.pushNamed('delegate-home');
+                            context.goNamed('delegate-home');
                           },
                           borderRadius: BorderRadius.circular(AppRadius.button),
                           child: Row(

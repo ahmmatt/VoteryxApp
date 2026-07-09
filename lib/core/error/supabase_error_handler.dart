@@ -10,8 +10,11 @@ extension AuthExceptionMessage on AuthException {
     // Cek berdasarkan status code dan message
     final msg = message.toLowerCase();
     if (msg.contains('invalid login credentials') ||
-        msg.contains('invalid_credentials')) {
-      return 'NIK atau kata sandi salah. Silakan coba lagi.';
+        msg.contains('invalid_credentials') ||
+        msg.contains('invalid credentials') ||
+        msg.contains('invalid_grant') ||
+        msg.contains('user not found')) {
+      return 'NIK atau kata sandi salah (atau akun belum terdaftar di Supabase). Silakan coba lagi.';
     }
     if (msg.contains('email not confirmed') ||
         msg.contains('email_not_confirmed')) {
@@ -35,7 +38,7 @@ extension AuthExceptionMessage on AuthException {
     }
     // Fallback: tampilkan pesan asli tapi lebih bersih
     debugPrint('[AuthException] $message');
-    return 'Terjadi kesalahan autentikasi. Coba lagi.';
+    return 'Terjadi kesalahan autentikasi: $message';
   }
 }
 

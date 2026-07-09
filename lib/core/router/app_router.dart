@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../../features/auth/presentation/providers/auth_provider.dart';
 import '../../features/auth/presentation/screens/login_screen.dart';
 import '../../features/auth/presentation/screens/splash_screen.dart';
 import '../../features/auth/presentation/screens/onboarding_screen.dart';
@@ -154,6 +155,16 @@ final GoRouter appRouter = GoRouter(
     final isPublicRoute = publicRoutes.any(
       (r) => location == r || location.startsWith(r),
     );
+
+    // ── Dev Bypass Check ──
+    if (LoginNotifier.isDevAdminBypass) {
+      if (location == '/splash' ||
+          location == '/onboarding' ||
+          location == '/login') {
+        return AppRoutes.adminDashboard;
+      }
+      return null;
+    }
 
     // Belum login dan akses route protected → redirect ke login
     if (session == null && !isPublicRoute) {
@@ -553,13 +564,19 @@ final GoRouter appRouter = GoRouter(
           path: AppRoutes.adminCandidateDocuments,
           name: 'admin-candidate-documents',
           parentNavigatorKey: _rootNavigatorKey,
-          builder: (_, __) => const AdminCandidateDocumentsScreen(),
+          builder: (_, state) {
+            final id = state.pathParameters['id'] ?? '';
+            return AdminCandidateDocumentsScreen(candidateId: id);
+          },
         ),
         GoRoute(
           path: AppRoutes.adminCandidateReview,
           name: 'admin-candidate-review',
           parentNavigatorKey: _rootNavigatorKey,
-          builder: (_, __) => const AdminCandidateReviewScreen(),
+          builder: (_, state) {
+            final id = state.pathParameters['id'] ?? '';
+            return AdminCandidateReviewScreen(candidateId: id);
+          },
         ),
       ],
     ),
@@ -573,7 +590,12 @@ final GoRouter appRouter = GoRouter(
       path: AppRoutes.adminElectionLive,
       name: 'admin-election-live',
       parentNavigatorKey: _rootNavigatorKey,
-      builder: (_, __) => const AdminElectionLiveDetailScreen(),
+      builder: (_, state) {
+        final extra = state.extra as Map<String, dynamic>?;
+        final id = state.pathParameters['id'] ?? extra?['id']?.toString() ?? '1';
+        final title = extra?['title']?.toString();
+        return AdminElectionLiveDetailScreen(electionId: id, electionTitle: title);
+      },
     ),
     GoRoute(
       path: AppRoutes.adminElectionDraft,

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import '../../../../../core/constants/app_colors.dart';
 import '../../../../../core/constants/app_spacing.dart';
 import '../../../../../core/constants/app_typography.dart';
@@ -518,11 +519,7 @@ class _ProposalCreateScreenState extends State<ProposalCreateScreen> {
                   text: 'Kirim Usulan',
                   icon: Icons.send,
                   onTap: () {
-                    Navigator.of(context).pushReplacement(
-                      MaterialPageRoute(
-                        builder: (context) => const MyElectionProposalsScreen(),
-                      ),
-                    );
+                    context.goNamed('proposal-status');
                   },
                 ),
                 const SizedBox(height: AppSpacing.md),

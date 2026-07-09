@@ -1,16 +1,21 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../../../../core/constants/app_colors.dart';
-import '../../../../../core/constants/app_radius.dart';
-import '../../../../../core/constants/app_spacing.dart';
-import '../../../../../core/constants/app_typography.dart';
+import 'package:voteryxapp/core/constants/app_colors.dart';
+import 'package:voteryxapp/core/constants/app_radius.dart';
+import 'package:voteryxapp/core/constants/app_spacing.dart';
+import 'package:voteryxapp/core/constants/app_typography.dart';
+import 'package:voteryxapp/features/admin/candidate_verification/presentation/providers/admin_candidate_verification_provider.dart';
 
-class AdminCandidateReviewScreen extends StatelessWidget {
-  const AdminCandidateReviewScreen({super.key});
+class AdminCandidateReviewScreen extends ConsumerWidget {
+  final String candidateId;
+  const AdminCandidateReviewScreen({super.key, required this.candidateId});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final candidatesAsync = ref.watch(adminCandidateVerificationProvider);
+
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
@@ -20,77 +25,103 @@ class AdminCandidateReviewScreen extends StatelessWidget {
         leading: IconButton(
             icon: const Icon(Icons.arrow_back, color: Colors.white),
             onPressed: () => context.pop()),
-        title: Text('Tinjau Kandidat',
+        title: Text('Tinjau & Verifikasi Paslon',
             style: AppTypography.headerTitle.copyWith(color: Colors.white)),
       ),
-      body: Container(
-        decoration: const BoxDecoration(gradient: AppColors.pageGradient),
-        child: ListView(
-          padding: const EdgeInsets.all(AppSpacing.lg),
-          children: [
-            _buildProfileCard(),
-            const SizedBox(height: AppSpacing.xl),
-            Text('Checklist Verifikasi',
-                style: AppTypography.screenTitle.copyWith(fontSize: 18)),
-            const SizedBox(height: AppSpacing.md),
-            _buildChecklistCard(),
-            const SizedBox(height: AppSpacing.xl),
-            _buildDecisionCard(),
-            const SizedBox(height: AppSpacing.xxl),
-          ],
-        ),
+      body: candidatesAsync.when(
+        loading: () => const Center(child: CircularProgressIndicator(color: AppColors.goldMid)),
+        error: (err, _) => Center(child: Text('Gagal memuat detail kandidat: $err')),
+        data: (candidates) {
+          final c = candidates.firstWhere(
+            (element) => element['id'] == candidateId,
+            orElse: () => candidates.isNotEmpty ? candidates.first : <String, dynamic>{},
+          );
+
+          if (c.isEmpty) {
+            return const Center(child: Text('Data kandidat tidak ditemukan.'));
+          }
+
+          final name = c['full_name']?.toString() ?? 'Kandidat';
+          final candNo = c['candidate_number']?.toString() ?? '1';
+          final faculty = c['faculty']?.toString() ?? c['major']?.toString() ?? 'Fakultas Teknik';
+          final isVerified = c['is_verified'] == true;
+          final electionTitle = (c['elections'] is Map) ? (c['elections']['title']?.toString() ?? 'Pemilihan BEM') : 'Pemilihan BEM';
+          final imageUrl = c['photo_url']?.toString() ?? 'https://i.pravatar.cc/150?img=12';
+          final visi = c['visi']?.toString() ?? 'Mewujudkan lingkungan kampus kolaboratif.';
+          final hasPrograms = c['programs'] != null && (c['programs'] is List) && (c['programs'] as List).isNotEmpty;
+
+          return ListView(
+            padding: const EdgeInsets.all(AppSpacing.lg),
+            children: [
+              _buildProfileCard(name, faculty, candNo, electionTitle, isVerified, imageUrl),
+              const SizedBox(height: AppSpacing.xl),
+              Text('Checklist Kelayakan & Verifikasi',
+                  style: AppTypography.screenTitle.copyWith(fontSize: 18)),
+              const SizedBox(height: AppSpacing.md),
+              _buildChecklistCard(isVerified, hasPrograms, visi.isNotEmpty),
+              const SizedBox(height: AppSpacing.xl),
+              _buildDecisionCard(context, ref, candidateId, name, isVerified),
+              const SizedBox(height: AppSpacing.xxl),
+            ],
+          );
+        },
       ),
     );
   }
 
-  Widget _buildProfileCard() {
+  Widget _buildProfileCard(String name, String faculty, String candNo, String electionTitle, bool isVerified, String imageUrl) {
     return Container(
       padding: const EdgeInsets.all(AppSpacing.lg),
       decoration: BoxDecoration(
-        gradient: const LinearGradient(
-            colors: [Color(0xFFFFFFFF), Color(0xFFFDF9F0)],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight),
+        color: Colors.white,
         borderRadius: BorderRadius.circular(AppRadius.card),
-        border: Border.all(color: AppColors.goldMid.withOpacity(0.35)),
+        border: Border.all(color: AppColors.goldMid.withValues(alpha: 0.35)),
         boxShadow: [
           BoxShadow(
-              color: AppColors.goldMid.withOpacity(0.08),
-              blurRadius: 18,
-              offset: const Offset(0, 8))
+              color: Colors.black.withValues(alpha: 0.03),
+              blurRadius: 14,
+              offset: const Offset(0, 6))
         ],
       ),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Row(children: [
-          Container(
-            width: 62,
-            height: 62,
-            decoration: BoxDecoration(
-                color: AppColors.navy600.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(16)),
-            child: const Icon(Icons.person,
-                color: AppColors.textSecondary, size: 32),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(16),
+            child: Image.network(
+              imageUrl,
+              width: 62,
+              height: 62,
+              fit: BoxFit.cover,
+              errorBuilder: (context, error, stackTrace) => Container(
+                width: 62,
+                height: 62,
+                decoration: BoxDecoration(
+                    color: AppColors.navy600.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(16)),
+                child: const Icon(Icons.person, color: AppColors.textSecondary, size: 32),
+              ),
+            ),
           ),
           const SizedBox(width: AppSpacing.md),
           Expanded(
               child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                Text('Arjuna Pratama',
+                Text(name,
                     style: AppTypography.screenTitle
                         .copyWith(fontSize: 18, color: AppColors.primary900)),
                 const SizedBox(height: 4),
-                Text('Fakultas Teknik • NIM 2021001234',
+                Text('$faculty • No. Urut $candNo',
                     style: AppTypography.caption
                         .copyWith(color: AppColors.textSecondary)),
               ])),
         ]),
         const SizedBox(height: AppSpacing.lg),
-        _buildInfoRow('Pemilihan', 'Pemilihan Ketua BEM 2026'),
+        _buildInfoRow('Pemilihan', electionTitle),
         const Divider(height: 24, color: AppColors.outlineVariant),
-        _buildInfoRow('Diajukan', '2 Jam Lalu'),
+        _buildInfoRow('Nomor Urut', 'Paslon Nomor $candNo'),
         const Divider(height: 24, color: AppColors.outlineVariant),
-        _buildInfoRow('Status', 'Menunggu Review Admin'),
+        _buildInfoRow('Status Database', isVerified ? '✅ TERVERIFIKASI RESMI' : '⏳ MENUNGGU REVIEW'),
       ]),
     );
   }
@@ -111,7 +142,7 @@ class AdminCandidateReviewScreen extends StatelessWidget {
     ]);
   }
 
-  Widget _buildChecklistCard() {
+  Widget _buildChecklistCard(bool isVerified, bool hasPrograms, bool hasVisi) {
     return Container(
       padding: const EdgeInsets.all(AppSpacing.md),
       decoration: BoxDecoration(
@@ -119,13 +150,15 @@ class AdminCandidateReviewScreen extends StatelessWidget {
           borderRadius: BorderRadius.circular(AppRadius.card),
           border: Border.all(color: AppColors.outlineVariant)),
       child: Column(children: [
-        _buildChecklistItem('Identitas mahasiswa valid', true),
+        _buildChecklistItem('Identitas paslon & fakultas valid', true),
         const Divider(height: 24, color: AppColors.outlineVariant),
-        _buildChecklistItem('Berkas pendaftaran lengkap', true),
+        _buildChecklistItem('Berkas pendaftaran dan KTM lengkap', true),
         const Divider(height: 24, color: AppColors.outlineVariant),
-        _buildChecklistItem('Visi & misi sudah diunggah', true),
+        _buildChecklistItem('Visi & misi kandidat telah diisi', hasVisi),
         const Divider(height: 24, color: AppColors.outlineVariant),
-        _buildChecklistItem('Tidak ada konflik kelayakan', false),
+        _buildChecklistItem('Program kerja paslon terdefinisi', hasPrograms),
+        const Divider(height: 24, color: AppColors.outlineVariant),
+        _buildChecklistItem('Status verifikasi diaktifkan oleh Admin', isVerified),
       ]),
     );
   }
@@ -142,7 +175,7 @@ class AdminCandidateReviewScreen extends StatelessWidget {
     ]);
   }
 
-  Widget _buildDecisionCard() {
+  Widget _buildDecisionCard(BuildContext context, WidgetRef ref, String candidateId, String name, bool isVerified) {
     return Container(
       padding: const EdgeInsets.all(AppSpacing.lg),
       decoration: BoxDecoration(
@@ -150,36 +183,59 @@ class AdminCandidateReviewScreen extends StatelessWidget {
           borderRadius: BorderRadius.circular(AppRadius.card),
           border: Border.all(color: AppColors.outlineVariant)),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Text('Keputusan Admin',
+        Text('Keputusan Verifikasi Admin',
             style:
                 AppTypography.itemTitle.copyWith(color: AppColors.primary900)),
         const SizedBox(height: AppSpacing.sm),
         Text(
-            'Berikan keputusan setelah memastikan seluruh checklist dan dokumen kandidat valid.',
+            'Dengan menekan tombol Setujui, kandidat akan berstatus TERVERIFIKASI di database Supabase dan sah berpartisipasi dalam pemilihan live.',
             style: AppTypography.caption
                 .copyWith(color: AppColors.textSecondary, height: 1.45)),
         const SizedBox(height: AppSpacing.lg),
         Row(children: [
           Expanded(
               child: OutlinedButton.icon(
-                  onPressed: () {},
+                  onPressed: () async {
+                    final success = await ref
+                        .read(adminCandidateVerificationProvider.notifier)
+                        .updateVerificationStatus(candidateId, false);
+                    if (context.mounted && success) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text('⚠️ Verifikasi untuk $name dibatalkan.')),
+                      );
+                      context.pop();
+                    }
+                  },
                   icon: const Icon(Icons.close, size: 18),
-                  label: const Text('Tolak'),
+                  label: const Text('Batalkan / Tolak'),
                   style: OutlinedButton.styleFrom(
                       foregroundColor: AppColors.errorRed,
                       side: const BorderSide(color: AppColors.errorRed),
-                      padding: const EdgeInsets.symmetric(vertical: 12)))),
+                      padding: const EdgeInsets.symmetric(vertical: 14)))),
           const SizedBox(width: AppSpacing.md),
           Expanded(
               child: ElevatedButton.icon(
-                  onPressed: () {},
+                  onPressed: () async {
+                    final success = await ref
+                        .read(adminCandidateVerificationProvider.notifier)
+                        .updateVerificationStatus(candidateId, true);
+                    if (context.mounted && success) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text('✅ Kandidat $name berhasil diverifikasi & disetujui!'),
+                          backgroundColor: Colors.green,
+                        ),
+                      );
+                      context.pop();
+                    }
+                  },
                   icon: const Icon(Icons.check, size: 18, color: Colors.white),
-                  label: const Text('Setujui'),
+                  label: const Text('Setujui & Verifikasi'),
                   style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.goldMid,
+                      backgroundColor: AppColors.successTeal,
                       foregroundColor: Colors.white,
                       elevation: 0,
-                      padding: const EdgeInsets.symmetric(vertical: 12)))),
+                      padding: const EdgeInsets.symmetric(vertical: 14)))),
         ]),
       ]),
     );
