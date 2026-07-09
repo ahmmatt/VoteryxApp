@@ -1,42 +1,48 @@
-// lib/features/profile/presentation/screens/delegate_edit_bio_screen.dart
+// lib/features/delegates/profile/presentation/screens/delegate_edit_bio_screen.dart
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../../core/constants/app_colors.dart';
 import '../../../../../core/constants/app_spacing.dart';
 import '../../../../../core/constants/app_typography.dart';
 import '../../../../../core/constants/app_radius.dart';
+import 'package:voteryxapp/features/user/profile/presentation/providers/profile_provider.dart';
 
-/// Layar Edit Bio & Visi — form untuk mengedit profil publik delegate.
-/// Menampilkan field bio singkat dengan counter karakter, field visi,
-/// dan preview publik sebelum menyimpan perubahan.
-class DelegateEditBioScreen extends StatefulWidget {
+/// Layar Edit Bio & Visi — mengambil data dari database dan menyimpan kembali ke Supabase.
+class DelegateEditBioScreen extends ConsumerStatefulWidget {
   const DelegateEditBioScreen({super.key});
 
   @override
-  State<DelegateEditBioScreen> createState() => _DelegateEditBioScreenState();
+  ConsumerState<DelegateEditBioScreen> createState() => _DelegateEditBioScreenState();
 }
 
-class _DelegateEditBioScreenState extends State<DelegateEditBioScreen> {
+class _DelegateEditBioScreenState extends ConsumerState<DelegateEditBioScreen> {
   static const int _maxBioChars = 150;
 
   late final TextEditingController _bioController;
   late final TextEditingController _visiController;
   final FocusNode _bioFocus = FocusNode();
   final FocusNode _visiFocus = FocusNode();
+  bool _initialized = false;
 
   @override
   void initState() {
     super.initState();
-    _bioController = TextEditingController(
-      text:
-          'Saya adalah delegasi yang berkomitmen untuk mewujudkan transparansi dalam setiap pengambilan kebijakan kampus melalui teknologi digital.',
-    );
-    _visiController = TextEditingController(
-      text:
-          '1. Meningkatkan partisipasi mahasiswa dalam forum terbuka universitas hingga 40%.\n'
-          '2. Menginisiasi portal aspirasi digital yang terintegrasi langsung dengan birokrasi fakultas.\n'
-          '3. Menjamin keterbukaan alokasi anggaran kegiatan mahasiswa melalui laporan transparan.',
-    );
+    _bioController = TextEditingController();
+    _visiController = TextEditingController();
     _bioController.addListener(() => setState(() {}));
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (!_initialized) {
+      final profile = ref.read(userProfileProvider).valueOrNull;
+      if (profile != null) {
+        _bioController.text = profile.delegateBio ?? '';
+        _visiController.text = profile.delegateVision ?? '';
+      }
+      _initialized = true;
+    }
   }
 
   @override
@@ -51,8 +57,39 @@ class _DelegateEditBioScreenState extends State<DelegateEditBioScreen> {
   int get _bioLength => _bioController.text.length;
   bool get _isOverLimit => _bioLength > _maxBioChars;
 
+  Future<void> _save() async {
+    if (_isOverLimit) return;
+    await ref.read(profileUpdateProvider.notifier).updateProfile(
+          delegateBio: _bioController.text.trim(),
+          delegateVision: _visiController.text.trim(),
+        );
+    if (!mounted) return;
+    final state = ref.read(profileUpdateProvider);
+    if (state.error == null) {
+      // Invalidate supaya halaman profil refresh
+      ref.invalidate(userProfileProvider);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Bio & Visi berhasil disimpan'),
+          backgroundColor: Color(0xFF10B981),
+        ),
+      );
+      Navigator.pop(context);
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Gagal menyimpan: ${state.error}'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    final updateState = ref.watch(profileUpdateProvider);
+    final isLoading = updateState.isLoading;
+
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: _buildAppBar(context),
@@ -87,7 +124,7 @@ class _DelegateEditBioScreenState extends State<DelegateEditBioScreen> {
             ),
           ),
           // Pinned save button
-          _buildSaveButton(context),
+          _buildSaveButton(context, isLoading),
         ],
       ),
     );
@@ -136,7 +173,7 @@ class _DelegateEditBioScreenState extends State<DelegateEditBioScreen> {
               ),
               const SizedBox(height: 4),
               Text(
-                'Informasi ini akan ditampilkan kepada seluruh pemilih.',
+                'Informasi ini akan ditampilkan kepada seluruh pemilih dan wajib diisi agar mandator dapat mendelegasikan suara.',
                 style: AppTypography.bodyText.copyWith(
                   color: AppColors.textSecondary,
                   fontSize: 13,
@@ -168,13 +205,12 @@ class _DelegateEditBioScreenState extends State<DelegateEditBioScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Section label
           Row(
             children: [
               const Icon(Icons.person_outlined, color: AppColors.goldDark, size: 18),
               const SizedBox(width: 6),
               Text(
-                'Bio Singkat',
+                'Bio Singkat *',
                 style: AppTypography.bodyMedium.copyWith(
                   color: AppColors.primary900,
                   fontWeight: FontWeight.w700,
@@ -184,7 +220,6 @@ class _DelegateEditBioScreenState extends State<DelegateEditBioScreen> {
             ],
           ),
           const SizedBox(height: 12),
-          // Text field
           Stack(
             children: [
               TextField(
@@ -216,7 +251,6 @@ class _DelegateEditBioScreenState extends State<DelegateEditBioScreen> {
                   hintText: 'Tulis bio singkat Anda...',
                 ),
               ),
-              // Character counter
               Positioned(
                 bottom: 8,
                 right: 8,
@@ -240,7 +274,6 @@ class _DelegateEditBioScreenState extends State<DelegateEditBioScreen> {
             ],
           ),
           const SizedBox(height: 8),
-          // Hint text
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -248,7 +281,7 @@ class _DelegateEditBioScreenState extends State<DelegateEditBioScreen> {
               const SizedBox(width: 4),
               Expanded(
                 child: Text(
-                  'Gunakan bahasa yang profesional dan mudah dimengerti.',
+                  'Gunakan bahasa yang profesional dan mudah dimengerti. Wajib diisi.',
                   style: AppTypography.caption.copyWith(
                     color: AppColors.outline,
                     fontSize: 11,
@@ -281,13 +314,12 @@ class _DelegateEditBioScreenState extends State<DelegateEditBioScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Section label
           Row(
             children: [
               const Icon(Icons.remove_red_eye_outlined, color: AppColors.goldDark, size: 18),
               const SizedBox(width: 6),
               Text(
-                'Visi Delegasi',
+                'Visi Delegasi *',
                 style: AppTypography.bodyMedium.copyWith(
                   color: AppColors.primary900,
                   fontWeight: FontWeight.w700,
@@ -323,7 +355,7 @@ class _DelegateEditBioScreenState extends State<DelegateEditBioScreen> {
                 borderRadius: BorderRadius.circular(AppRadius.input),
                 borderSide: const BorderSide(color: AppColors.goldMid, width: 1.5),
               ),
-              hintText: 'Tuliskan visi Anda sebagai delegate...',
+              hintText: 'Tuliskan visi Anda sebagai delegate... (wajib diisi)',
             ),
           ),
         ],
@@ -370,7 +402,7 @@ class _DelegateEditBioScreenState extends State<DelegateEditBioScreen> {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  'Tampilan ini akan muncul di kartu kandidat saat proses voting berlangsung. Pastikan semua data sudah benar.',
+                  'Tampilan ini akan muncul di kartu kandidat saat proses voting berlangsung. Pastikan semua data sudah benar sebelum disimpan.',
                   style: AppTypography.caption.copyWith(
                     color: AppColors.outline,
                     fontSize: 12,
@@ -386,7 +418,7 @@ class _DelegateEditBioScreenState extends State<DelegateEditBioScreen> {
   }
 
   // ─────────────────── Save Button ───────────────────────────────
-  Widget _buildSaveButton(BuildContext context) {
+  Widget _buildSaveButton(BuildContext context, bool isLoading) {
     return Container(
       padding: EdgeInsets.fromLTRB(
         AppSpacing.md,
@@ -399,10 +431,16 @@ class _DelegateEditBioScreenState extends State<DelegateEditBioScreen> {
         width: double.infinity,
         height: 52,
         child: ElevatedButton.icon(
-          onPressed: _isOverLimit ? null : () => Navigator.pop(context),
-          icon: const Icon(Icons.save_outlined, size: 18),
+          onPressed: (isLoading || _isOverLimit) ? null : _save,
+          icon: isLoading
+              ? const SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                )
+              : const Icon(Icons.save_outlined, size: 18),
           label: Text(
-            'Simpan Perubahan',
+            isLoading ? 'Menyimpan...' : 'Simpan Perubahan',
             style: AppTypography.bodyMedium.copyWith(
               color: Colors.white,
               fontWeight: FontWeight.w700,

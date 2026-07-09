@@ -120,8 +120,8 @@ abstract final class AppRoutes {
   static const adminCreateReview = '/admin/elections/create/review';
   static const adminCandidateManage = '/admin/candidates/manage';
   static const adminCandidateVerification = '/admin/candidate-verification';
-  static const adminCandidateDocuments = ':id/documents';
-  static const adminCandidateReview = ':id/review';
+  static const adminCandidateDocuments = '/admin/candidate-verification/:id/documents';
+  static const adminCandidateReview = '/admin/candidate-verification/:id/review';
   static const adminVoters = '/admin/voters';
   static const adminSettings = '/admin/settings';
   static const adminElectionLive = '/admin/election/live/:id';
@@ -132,7 +132,24 @@ abstract final class AppRoutes {
   static const adminDelegateReview = '/admin/delegate-review/:id';
 }
 
-final GlobalKey<NavigatorState> _rootNavigatorKey = GlobalKey<NavigatorState>();
+final GlobalKey<NavigatorState> _rootNavigatorKey = GlobalKey<NavigatorState>(debugLabel: 'rootNav');
+
+// User branches keys
+final GlobalKey<NavigatorState> _userDashboardBranchKey = GlobalKey<NavigatorState>(debugLabel: 'userDashboardBranch');
+final GlobalKey<NavigatorState> _userDelegationBranchKey = GlobalKey<NavigatorState>(debugLabel: 'userDelegationBranch');
+final GlobalKey<NavigatorState> _userProposalBranchKey = GlobalKey<NavigatorState>(debugLabel: 'userProposalBranch');
+final GlobalKey<NavigatorState> _userProfileBranchKey = GlobalKey<NavigatorState>(debugLabel: 'userProfileBranch');
+
+// Admin branches keys
+final GlobalKey<NavigatorState> _adminDashboardBranchKey = GlobalKey<NavigatorState>(debugLabel: 'adminDashboardBranch');
+final GlobalKey<NavigatorState> _adminProposalsBranchKey = GlobalKey<NavigatorState>(debugLabel: 'adminProposalsBranch');
+final GlobalKey<NavigatorState> _adminDelegateAppsBranchKey = GlobalKey<NavigatorState>(debugLabel: 'adminDelegateAppsBranch');
+final GlobalKey<NavigatorState> _adminSettingsBranchKey = GlobalKey<NavigatorState>(debugLabel: 'adminSettingsBranch');
+
+// Delegate branches keys
+final GlobalKey<NavigatorState> _delegateHomeBranchKey = GlobalKey<NavigatorState>(debugLabel: 'delegateHomeBranch');
+final GlobalKey<NavigatorState> _delegateHistoryBranchKey = GlobalKey<NavigatorState>(debugLabel: 'delegateHistoryBranch');
+final GlobalKey<NavigatorState> _delegateProfileBranchKey = GlobalKey<NavigatorState>(debugLabel: 'delegateProfileBranch');
 
 final GoRouter appRouter = GoRouter(
   navigatorKey: _rootNavigatorKey,
@@ -251,34 +268,58 @@ final GoRouter appRouter = GoRouter(
         return UserMainLayout(navigationShell: navigationShell);
       },
       branches: [
-        StatefulShellBranch(routes: [
-          GoRoute(
-            path: AppRoutes.dashboard,
-            name: 'dashboard',
-            builder: (_, __) => const DashboardScreen(),
-          ),
-        ]),
-        StatefulShellBranch(routes: [
-          GoRoute(
-            path: AppRoutes.delegation,
-            name: 'delegation',
-            builder: (_, __) => const DelegationScreen(),
-          ),
-        ]),
-        StatefulShellBranch(routes: [
-          GoRoute(
-            path: AppRoutes.proposalStatus,
-            name: 'proposal-status',
-            builder: (_, __) => const MyElectionProposalsScreen(),
-          ),
-        ]),
-        StatefulShellBranch(routes: [
-          GoRoute(
-            path: AppRoutes.profile,
-            name: 'profile',
-            builder: (_, __) => const ProfileScreen(),
-          ),
-        ]),
+        StatefulShellBranch(
+          navigatorKey: _userDashboardBranchKey,
+          routes: [
+            GoRoute(
+              path: AppRoutes.dashboard,
+              name: 'dashboard',
+              pageBuilder: (context, state) => const NoTransitionPage<void>(
+                key: ValueKey('user-dashboard-page'),
+                child: DashboardScreen(),
+              ),
+            ),
+          ],
+        ),
+        StatefulShellBranch(
+          navigatorKey: _userDelegationBranchKey,
+          routes: [
+            GoRoute(
+              path: AppRoutes.delegation,
+              name: 'delegation',
+              pageBuilder: (context, state) => const NoTransitionPage<void>(
+                key: ValueKey('user-delegation-page'),
+                child: DelegationScreen(),
+              ),
+            ),
+          ],
+        ),
+        StatefulShellBranch(
+          navigatorKey: _userProposalBranchKey,
+          routes: [
+            GoRoute(
+              path: AppRoutes.proposalStatus,
+              name: 'proposal-status',
+              pageBuilder: (context, state) => const NoTransitionPage<void>(
+                key: ValueKey('user-proposal-page'),
+                child: MyElectionProposalsScreen(),
+              ),
+            ),
+          ],
+        ),
+        StatefulShellBranch(
+          navigatorKey: _userProfileBranchKey,
+          routes: [
+            GoRoute(
+              path: AppRoutes.profile,
+              name: 'profile',
+              pageBuilder: (context, state) => const NoTransitionPage<void>(
+                key: ValueKey('user-profile-page'),
+                child: ProfileScreen(),
+              ),
+            ),
+          ],
+        ),
       ],
     ),
 
@@ -290,34 +331,58 @@ final GoRouter appRouter = GoRouter(
         return AdminMainLayout(navigationShell: navigationShell);
       },
       branches: [
-        StatefulShellBranch(routes: [
-          GoRoute(
-            path: AppRoutes.adminDashboard,
-            name: 'admin-dashboard',
-            builder: (_, __) => const AdminDashboardScreen(),
-          ),
-        ]),
-        StatefulShellBranch(routes: [
-          GoRoute(
-            path: AppRoutes.adminProposals,
-            name: 'admin-proposals',
-            builder: (_, __) => const AdminProposalMonitorScreen(),
-          ),
-        ]),
-        StatefulShellBranch(routes: [
-          GoRoute(
-            path: AppRoutes.adminDelegateApplications,
-            name: 'admin-delegate-applications',
-            builder: (_, __) => const AdminDelegateApplicationsScreen(),
-          ),
-        ]),
-        StatefulShellBranch(routes: [
-          GoRoute(
-            path: AppRoutes.adminSettings,
-            name: 'admin-settings',
-            builder: (_, __) => const AdminSettingsScreen(),
-          ),
-        ]),
+        StatefulShellBranch(
+          navigatorKey: _adminDashboardBranchKey,
+          routes: [
+            GoRoute(
+              path: AppRoutes.adminDashboard,
+              name: 'admin-dashboard',
+              pageBuilder: (context, state) => const NoTransitionPage<void>(
+                key: ValueKey('admin-dashboard-page'),
+                child: AdminDashboardScreen(),
+              ),
+            ),
+          ],
+        ),
+        StatefulShellBranch(
+          navigatorKey: _adminProposalsBranchKey,
+          routes: [
+            GoRoute(
+              path: AppRoutes.adminProposals,
+              name: 'admin-proposals',
+              pageBuilder: (context, state) => const NoTransitionPage<void>(
+                key: ValueKey('admin-proposals-page'),
+                child: AdminProposalMonitorScreen(),
+              ),
+            ),
+          ],
+        ),
+        StatefulShellBranch(
+          navigatorKey: _adminDelegateAppsBranchKey,
+          routes: [
+            GoRoute(
+              path: AppRoutes.adminDelegateApplications,
+              name: 'admin-delegate-applications',
+              pageBuilder: (context, state) => const NoTransitionPage<void>(
+                key: ValueKey('admin-delegate-applications-page'),
+                child: AdminDelegateApplicationsScreen(),
+              ),
+            ),
+          ],
+        ),
+        StatefulShellBranch(
+          navigatorKey: _adminSettingsBranchKey,
+          routes: [
+            GoRoute(
+              path: AppRoutes.adminSettings,
+              name: 'admin-settings',
+              pageBuilder: (context, state) => const NoTransitionPage<void>(
+                key: ValueKey('admin-settings-page'),
+                child: AdminSettingsScreen(),
+              ),
+            ),
+          ],
+        ),
       ],
     ),
 
@@ -329,27 +394,45 @@ final GoRouter appRouter = GoRouter(
         return DelegateMainLayout(navigationShell: navigationShell);
       },
       branches: [
-        StatefulShellBranch(routes: [
-          GoRoute(
-            path: '/delegation/home',
-            name: 'delegate-home',
-            builder: (_, __) => const DelegateHomeScreen(),
-          ),
-        ]),
-        StatefulShellBranch(routes: [
-          GoRoute(
-            path: '/delegation/history',
-            name: 'delegate-history',
-            builder: (_, __) => const DelegateExecutionHistoryScreen(),
-          ),
-        ]),
-        StatefulShellBranch(routes: [
-          GoRoute(
-            path: '/delegation/profile/me',
-            name: 'delegate-profile',
-            builder: (_, __) => const DelegateProfileScreen(),
-          ),
-        ]),
+        StatefulShellBranch(
+          navigatorKey: _delegateHomeBranchKey,
+          routes: [
+            GoRoute(
+              path: '/delegation/home',
+              name: 'delegate-home',
+              pageBuilder: (context, state) => const NoTransitionPage<void>(
+                key: ValueKey('delegate-home-page'),
+                child: DelegateHomeScreen(),
+              ),
+            ),
+          ],
+        ),
+        StatefulShellBranch(
+          navigatorKey: _delegateHistoryBranchKey,
+          routes: [
+            GoRoute(
+              path: '/delegation/history',
+              name: 'delegate-history',
+              pageBuilder: (context, state) => const NoTransitionPage<void>(
+                key: ValueKey('delegate-history-page'),
+                child: DelegateExecutionHistoryScreen(),
+              ),
+            ),
+          ],
+        ),
+        StatefulShellBranch(
+          navigatorKey: _delegateProfileBranchKey,
+          routes: [
+            GoRoute(
+              path: '/delegation/profile/me',
+              name: 'delegate-profile',
+              pageBuilder: (context, state) => const NoTransitionPage<void>(
+                key: ValueKey('delegate-profile-page'),
+                child: DelegateProfileScreen(),
+              ),
+            ),
+          ],
+        ),
       ],
     ),
 
@@ -371,41 +454,39 @@ final GoRouter appRouter = GoRouter(
       ),
     ),
     GoRoute(
-      path: '/election/:id',
+      path: AppRoutes.electionDetail,
       name: 'election',
       parentNavigatorKey: _rootNavigatorKey,
       builder: (ctx, state) => ElectionDetailScreen(
         electionId: state.pathParameters['id'] ?? '',
       ),
-      routes: [
-        GoRoute(
-          path: 'candidate/:candidateId',
-          name: 'election-candidate',
-          parentNavigatorKey: _rootNavigatorKey,
-          builder: (context, state) => CandidateDetailScreen(
-            electionId: state.pathParameters['id'] ?? '',
-            candidateId: state.pathParameters['candidateId'] ?? '',
-          ),
-        ),
-        GoRoute(
-          path: 'vote-execution',
-          name: 'election-vote',
-          parentNavigatorKey: _rootNavigatorKey,
-          builder: (context, state) => const VoteConfirmationScreen(),
-        ),
-        GoRoute(
-          path: 'processing',
-          name: 'election-processing',
-          parentNavigatorKey: _rootNavigatorKey,
-          builder: (context, state) => const VoteProcessingScreen(),
-        ),
-        GoRoute(
-          path: 'receipt',
-          name: 'election-receipt',
-          parentNavigatorKey: _rootNavigatorKey,
-          builder: (context, state) => const VoteReceiptScreen(),
-        ),
-      ],
+    ),
+    GoRoute(
+      path: AppRoutes.electionCandidate,
+      name: 'election-candidate',
+      parentNavigatorKey: _rootNavigatorKey,
+      builder: (context, state) => CandidateDetailScreen(
+        electionId: state.pathParameters['id'] ?? '',
+        candidateId: state.pathParameters['candidateId'] ?? '',
+      ),
+    ),
+    GoRoute(
+      path: AppRoutes.electionVote,
+      name: 'election-vote',
+      parentNavigatorKey: _rootNavigatorKey,
+      builder: (context, state) => const VoteConfirmationScreen(),
+    ),
+    GoRoute(
+      path: AppRoutes.electionProcessing,
+      name: 'election-processing',
+      parentNavigatorKey: _rootNavigatorKey,
+      builder: (context, state) => const VoteProcessingScreen(),
+    ),
+    GoRoute(
+      path: AppRoutes.electionReceipt,
+      name: 'election-receipt',
+      parentNavigatorKey: _rootNavigatorKey,
+      builder: (context, state) => const VoteReceiptScreen(),
     ),
 
     GoRoute(
@@ -559,26 +640,24 @@ final GoRouter appRouter = GoRouter(
       name: 'admin-candidate-verification',
       parentNavigatorKey: _rootNavigatorKey,
       builder: (_, __) => const AdminCandidateVerificationScreen(),
-      routes: [
-        GoRoute(
-          path: AppRoutes.adminCandidateDocuments,
-          name: 'admin-candidate-documents',
-          parentNavigatorKey: _rootNavigatorKey,
-          builder: (_, state) {
-            final id = state.pathParameters['id'] ?? '';
-            return AdminCandidateDocumentsScreen(candidateId: id);
-          },
-        ),
-        GoRoute(
-          path: AppRoutes.adminCandidateReview,
-          name: 'admin-candidate-review',
-          parentNavigatorKey: _rootNavigatorKey,
-          builder: (_, state) {
-            final id = state.pathParameters['id'] ?? '';
-            return AdminCandidateReviewScreen(candidateId: id);
-          },
-        ),
-      ],
+    ),
+    GoRoute(
+      path: AppRoutes.adminCandidateDocuments,
+      name: 'admin-candidate-documents',
+      parentNavigatorKey: _rootNavigatorKey,
+      builder: (_, state) {
+        final id = state.pathParameters['id'] ?? '';
+        return AdminCandidateDocumentsScreen(candidateId: id);
+      },
+    ),
+    GoRoute(
+      path: AppRoutes.adminCandidateReview,
+      name: 'admin-candidate-review',
+      parentNavigatorKey: _rootNavigatorKey,
+      builder: (_, state) {
+        final id = state.pathParameters['id'] ?? '';
+        return AdminCandidateReviewScreen(candidateId: id);
+      },
     ),
     GoRoute(
       path: AppRoutes.adminVoters,

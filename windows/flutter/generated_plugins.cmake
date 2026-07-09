@@ -4,6 +4,7 @@
 
 list(APPEND FLUTTER_PLUGIN_LIST
   app_links
+  file_selector_windows
   flutter_secure_storage_windows
   passkeys_windows
   sqlite3_flutter_libs

@@ -20,6 +20,7 @@ class ElectionRepository {
 
     return (response as List)
         .map((e) => ElectionModel.fromJson(e as Map<String, dynamic>))
+        .where((e) => e.candidateCount >= 2 && e.title.isNotEmpty && e.status != 'draft')
         .toList();
   }
 

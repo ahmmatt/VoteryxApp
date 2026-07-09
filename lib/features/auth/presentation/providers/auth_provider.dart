@@ -1,4 +1,5 @@
 // lib/features/auth/presentation/providers/auth_provider.dart
+import 'dart:typed_data';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -52,6 +53,14 @@ class UserProfileNotifier extends AsyncNotifier<UserProfile?> {
     return await ds.getUserProfile(user.id);
   }
 
+  /// Unggah foto profil dan ambil URL publiknya.
+  Future<String?> uploadAvatar(Uint8List bytes, String fileExtension) async {
+    final ds = ref.read(authRemoteDatasourceProvider);
+    final user = ds.currentUser;
+    if (user == null) throw Exception('Tidak ada sesi aktif.');
+    return await ds.uploadAvatar(user.id, bytes, fileExtension);
+  }
+
   /// Update profil user.
   Future<void> updateProfile({
     String? fullName,
@@ -60,8 +69,11 @@ class UserProfileNotifier extends AsyncNotifier<UserProfile?> {
     String? faculty,
     String? nim,
     String? major,
+    String? avatarUrl,
     String? delegateBio,
     String? delegateVision,
+    List<String>? delegateSkills,
+    List<Map<String, dynamic>>? delegateTrackRecords,
     bool? isDelegateProfilePublic,
   }) async {
     final ds = ref.read(authRemoteDatasourceProvider);
@@ -76,8 +88,11 @@ class UserProfileNotifier extends AsyncNotifier<UserProfile?> {
       faculty: faculty,
       nim: nim,
       specialization: major,
+      avatarUrl: avatarUrl,
       delegateBio: delegateBio,
       delegateVision: delegateVision,
+      delegateSkills: delegateSkills,
+      delegateTrackRecords: delegateTrackRecords,
       isDelegateProfilePublic: isDelegateProfilePublic,
     );
     ref.invalidateSelf();

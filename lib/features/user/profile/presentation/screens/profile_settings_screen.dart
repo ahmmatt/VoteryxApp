@@ -1,6 +1,8 @@
 // lib/features/user/profile/presentation/screens/profile_settings_screen.dart
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:voteryxapp/core/constants/app_colors.dart';
 import 'package:voteryxapp/core/constants/app_typography.dart';
 import 'package:voteryxapp/core/constants/app_spacing.dart';
@@ -25,8 +27,11 @@ class _ProfileSettingsScreenState extends ConsumerState<ProfileSettingsScreen> {
   late TextEditingController _nimController;
   late TextEditingController _facultyController;
   late TextEditingController _majorController;
+  late TextEditingController _delegateBioController;
+  late TextEditingController _delegateVisionController;
 
   bool _isInitialized = false;
+  Uint8List? _pickedAvatarBytes;
 
   @override
   void initState() {
@@ -37,6 +42,8 @@ class _ProfileSettingsScreenState extends ConsumerState<ProfileSettingsScreen> {
     _nimController = TextEditingController();
     _facultyController = TextEditingController();
     _majorController = TextEditingController();
+    _delegateBioController = TextEditingController();
+    _delegateVisionController = TextEditingController();
   }
 
   @override
@@ -47,6 +54,8 @@ class _ProfileSettingsScreenState extends ConsumerState<ProfileSettingsScreen> {
     _nimController.dispose();
     _facultyController.dispose();
     _majorController.dispose();
+    _delegateBioController.dispose();
+    _delegateVisionController.dispose();
     super.dispose();
   }
 
@@ -58,6 +67,8 @@ class _ProfileSettingsScreenState extends ConsumerState<ProfileSettingsScreen> {
     _nimController.text = profile.nim ?? '';
     _facultyController.text = profile.faculty ?? '';
     _majorController.text = profile.major ?? '';
+    _delegateBioController.text = profile.delegateBio ?? '';
+    _delegateVisionController.text = profile.delegateVision ?? '';
     _isInitialized = true;
   }
 
@@ -71,6 +82,9 @@ class _ProfileSettingsScreenState extends ConsumerState<ProfileSettingsScreen> {
           nim: _nimController.text.trim(),
           faculty: _facultyController.text.trim(),
           major: _majorController.text.trim(),
+          avatarBytes: _pickedAvatarBytes,
+          delegateBio: _delegateBioController.text.trim(),
+          delegateVision: _delegateVisionController.text.trim(),
         );
 
     final updateState = ref.read(profileUpdateProvider);
@@ -94,6 +108,86 @@ class _ProfileSettingsScreenState extends ConsumerState<ProfileSettingsScreen> {
           ),
         );
         Navigator.of(context).pop();
+      }
+    }
+  }
+
+  Future<void> _showAvatarPickerOptions(BuildContext context) async {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: AppColors.background,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadius.card)),
+      ),
+      builder: (BuildContext ctx) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: AppSpacing.md, horizontal: AppSpacing.lg),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: AppColors.outlineVariant,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.lg),
+                Text(
+                  'Ganti Foto Profil',
+                  style: AppTypography.cardTitle.copyWith(color: AppColors.textPrimary),
+                ),
+                const SizedBox(height: AppSpacing.lg),
+                ListTile(
+                  leading: const Icon(Icons.camera_alt_outlined, color: AppColors.goldMid),
+                  title: Text('Ambil Foto dari Kamera', style: AppTypography.bodyText.copyWith(color: AppColors.textPrimary)),
+                  onTap: () {
+                    Navigator.of(ctx).pop();
+                    _pickAvatarImage(ImageSource.camera);
+                  },
+                ),
+                ListTile(
+                  leading: const Icon(Icons.photo_library_outlined, color: AppColors.goldMid),
+                  title: Text('Pilih dari Galeri', style: AppTypography.bodyText.copyWith(color: AppColors.textPrimary)),
+                  onTap: () {
+                    Navigator.of(ctx).pop();
+                    _pickAvatarImage(ImageSource.gallery);
+                  },
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _pickAvatarImage(ImageSource source) async {
+    try {
+      final picker = ImagePicker();
+      final pickedFile = await picker.pickImage(
+        source: source,
+        maxWidth: 800,
+        maxHeight: 800,
+        imageQuality: 85,
+      );
+      if (pickedFile != null) {
+        final bytes = await pickedFile.readAsBytes();
+        setState(() {
+          _pickedAvatarBytes = bytes;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error picking image: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Gagal mengambil foto: $e'),
+            backgroundColor: AppColors.errorRed,
+          ),
+        );
       }
     }
   }
@@ -130,7 +224,7 @@ class _ProfileSettingsScreenState extends ConsumerState<ProfileSettingsScreen> {
               key: _formKey,
               child: Column(
                 children: [
-                  _buildAvatarSection(profile.fullName),
+                  _buildAvatarSection(profile.fullName, profile.avatarUrl),
                   const SizedBox(height: AppSpacing.xxl),
                   _buildEditableField(
                     label: 'Nama Lengkap',
@@ -159,28 +253,40 @@ class _ProfileSettingsScreenState extends ConsumerState<ProfileSettingsScreen> {
                   ),
                   const SizedBox(height: AppSpacing.lg),
                   _buildEditableField(
-                    label: 'NIM Mahasiswa (Opsional)',
-                    controller: _nimController,
+                    label: 'Fakultas',
+                    controller: _facultyController,
                     icon: Icons.school_outlined,
                   ),
                   const SizedBox(height: AppSpacing.lg),
                   _buildEditableField(
-                    label: 'Institusi/Fakultas (Opsional)',
-                    controller: _facultyController,
-                    icon: Icons.account_balance_outlined,
+                    label: 'NIM',
+                    controller: _nimController,
+                    icon: Icons.badge_outlined,
                   ),
                   const SizedBox(height: AppSpacing.lg),
                   _buildEditableField(
-                    label: 'Spesialisasi / Bidang Keahlian (Opsional)',
+                    label: 'Jurusan / Spesialisasi',
                     controller: _majorController,
-                    icon: Icons.psychology_outlined,
+                    icon: Icons.menu_book_outlined,
                   ),
+                  if (profile.isDelegate) ...[
+                    const SizedBox(height: AppSpacing.lg),
+                    _buildEditableField(
+                      label: 'Bio Delegasi',
+                      controller: _delegateBioController,
+                      icon: Icons.info_outline,
+                      maxLines: 3,
+                    ),
+                    const SizedBox(height: AppSpacing.lg),
+                    _buildEditableField(
+                      label: 'Visi Delegasi',
+                      controller: _delegateVisionController,
+                      icon: Icons.visibility_outlined,
+                      maxLines: 3,
+                    ),
+                  ],
                   const SizedBox(height: AppSpacing.xxl),
-                  GoldButton(
-                    label: updateState.isLoading ? 'Menyimpan...' : 'Simpan Perubahan',
-                    onPressed: updateState.isLoading ? () {} : _saveProfile,
-                  ),
-                  const SizedBox(height: AppSpacing.xxl),
+                  _buildSaveButton(updateState),
                 ],
               ),
             ),
@@ -196,47 +302,77 @@ class _ProfileSettingsScreenState extends ConsumerState<ProfileSettingsScreen> {
     );
   }
 
-  Widget _buildAvatarSection(String name) {
+  Widget _buildAvatarSection(String name, String? avatarUrl) {
+    final hasPhoto = avatarUrl != null && avatarUrl.trim().isNotEmpty;
+
     return Column(
       children: [
-        Stack(
-          alignment: Alignment.bottomRight,
-          children: [
-            Container(
-              width: 100,
-              height: 100,
-              decoration: BoxDecoration(
-                color: AppColors.primary900,
-                shape: BoxShape.circle,
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.1),
-                    blurRadius: 10,
-                    offset: const Offset(0, 4),
-                  ),
-                ],
+        GestureDetector(
+          onTap: () => _showAvatarPickerOptions(context),
+          child: Stack(
+            alignment: Alignment.bottomRight,
+            children: [
+              Container(
+                width: 100,
+                height: 100,
+                decoration: BoxDecoration(
+                  color: AppColors.primary900,
+                  shape: BoxShape.circle,
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.1),
+                      blurRadius: 10,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                alignment: Alignment.center,
+                child: _pickedAvatarBytes != null
+                    ? ClipOval(
+                        child: Image.memory(
+                          _pickedAvatarBytes!,
+                          width: 100,
+                          height: 100,
+                          fit: BoxFit.cover,
+                        ),
+                      )
+                    : (hasPhoto
+                        ? ClipOval(
+                            child: Image.network(
+                              avatarUrl,
+                              width: 100,
+                              height: 100,
+                              fit: BoxFit.cover,
+                              errorBuilder: (_, __, ___) => Text(
+                                name.isNotEmpty ? name[0].toUpperCase() : 'U',
+                                style: AppTypography.displayHeading.copyWith(color: Colors.white, fontSize: 40),
+                              ),
+                            ),
+                          )
+                        : Text(
+                            name.isNotEmpty ? name[0].toUpperCase() : 'U',
+                            style: AppTypography.displayHeading.copyWith(color: Colors.white, fontSize: 40),
+                          )),
               ),
-              alignment: Alignment.center,
-              child: Text(
-                name.isNotEmpty ? name[0].toUpperCase() : 'U',
-                style: AppTypography.displayHeading.copyWith(color: Colors.white, fontSize: 40),
+              Container(
+                decoration: BoxDecoration(
+                  color: AppColors.goldMid,
+                  shape: BoxShape.circle,
+                  border: Border.all(color: AppColors.background, width: 3),
+                ),
+                padding: const EdgeInsets.all(6),
+                child: const Icon(Icons.camera_alt_outlined, color: Colors.white, size: 18),
               ),
-            ),
-            Container(
-              decoration: BoxDecoration(
-                color: AppColors.goldMid,
-                shape: BoxShape.circle,
-                border: Border.all(color: AppColors.background, width: 3),
-              ),
-              padding: const EdgeInsets.all(6),
-              child: const Icon(Icons.camera_alt_outlined, color: Colors.white, size: 18),
-            ),
-          ],
+            ],
+          ),
         ),
         const SizedBox(height: AppSpacing.md),
         Text(
-          'FOTO PROFIL ASLI DATABASE',
-          style: AppTypography.captionBold.copyWith(color: AppColors.textSecondary, letterSpacing: 1.2),
+          _pickedAvatarBytes != null ? 'FOTO BARU DIPILIH (TEKAN SIMPAN)' : 'FOTO PROFIL ASLI DATABASE',
+          style: AppTypography.captionBold.copyWith(
+            color: _pickedAvatarBytes != null ? AppColors.goldMid : AppColors.textSecondary,
+            letterSpacing: 1.2,
+          ),
         ),
       ],
     );
@@ -332,6 +468,13 @@ class _ProfileSettingsScreenState extends ConsumerState<ProfileSettingsScreen> {
           ),
         ],
       ],
+    );
+  }
+
+  Widget _buildSaveButton(ProfileUpdateState updateState) {
+    return GoldButton(
+      label: updateState.isLoading ? 'Menyimpan...' : 'Simpan Perubahan',
+      onPressed: updateState.isLoading ? () {} : _saveProfile,
     );
   }
 }

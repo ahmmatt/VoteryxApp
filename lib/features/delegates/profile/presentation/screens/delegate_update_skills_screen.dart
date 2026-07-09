@@ -1,9 +1,11 @@
 // lib/features/profile/presentation/screens/delegate_update_skills_screen.dart
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../../core/constants/app_colors.dart';
 import '../../../../../core/constants/app_spacing.dart';
 import '../../../../../core/constants/app_typography.dart';
 import '../../../../../core/constants/app_radius.dart';
+import 'package:voteryxapp/features/user/profile/presentation/providers/profile_provider.dart';
 
 // ─────────────────── Model ─────────────────────────────────────────────────
 
@@ -24,48 +26,47 @@ class _SkillItem {
 
 /// Layar Update Keahlian — memungkinkan delegate mencari, menambah,
 /// dan menghapus keahlian dari profil publik mereka.
-class DelegateUpdateSkillsScreen extends StatefulWidget {
+class DelegateUpdateSkillsScreen extends ConsumerStatefulWidget {
   const DelegateUpdateSkillsScreen({super.key});
 
   @override
-  State<DelegateUpdateSkillsScreen> createState() =>
+  ConsumerState<DelegateUpdateSkillsScreen> createState() =>
       _DelegateUpdateSkillsScreenState();
 }
 
 class _DelegateUpdateSkillsScreenState
-    extends State<DelegateUpdateSkillsScreen> {
+    extends ConsumerState<DelegateUpdateSkillsScreen> {
   final TextEditingController _searchController = TextEditingController();
+  bool _initialized = false;
 
-  // Skills aktif milik user
-  final List<_SkillItem> _currentSkills = [
-    const _SkillItem(
-      name: 'Kebijakan Kampus',
-      isVerified: true,
-      icon: Icons.account_balance_outlined,
-    ),
-    const _SkillItem(
-      name: 'Advokasi',
-      isVerified: true,
-      icon: Icons.gavel_rounded,
-    ),
-    const _SkillItem(
-      name: 'Penulisan Laporan',
-      isVerified: false,
-      icon: Icons.edit_document,
-    ),
-    const _SkillItem(
-      name: 'Kepemimpinan',
-      isVerified: false,
-      icon: Icons.stars_outlined,
-    ),
-  ];
+  // Skills aktif milik user — dimuat dari database (kosong jika baru)
+  final List<_SkillItem> _currentSkills = [];
 
   // Saran skill yang belum dimiliki
   static const List<String> _suggestions = [
     'Manajemen Krisis',
     'Diplomasi',
     'Analisis Data',
+    'Kepemimpinan',
+    'Advokasi',
+    'Kebijakan Kampus',
   ];
+
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (!_initialized) {
+      final profile = ref.read(userProfileProvider).valueOrNull;
+      final savedSkills = profile?.delegateSkills ?? [];
+      if (savedSkills.isNotEmpty) {
+        _currentSkills.addAll(
+          savedSkills.map((name) => _SkillItem(name: name)),
+        );
+      }
+      _initialized = true;
+    }
+  }
 
   @override
   void dispose() {
@@ -81,6 +82,16 @@ class _DelegateUpdateSkillsScreenState
     if (_currentSkills.any((s) => s.name == name)) return;
     setState(() {
       _currentSkills.add(_SkillItem(name: name));
+    });
+  }
+
+  void _addFromSearch() {
+    final text = _searchController.text.trim();
+    if (text.isEmpty) return;
+    if (_currentSkills.any((s) => s.name.toLowerCase() == text.toLowerCase())) return;
+    setState(() {
+      _currentSkills.add(_SkillItem(name: text));
+      _searchController.clear();
     });
   }
 
@@ -176,7 +187,12 @@ class _DelegateUpdateSkillsScreenState
           ),
 
           // ── Pinned Save Button ─────────────────────────────────────────
-          _buildSaveButton(context),
+          Consumer(
+            builder: (context, ref, _) {
+              final updateState = ref.watch(profileUpdateProvider);
+              return _buildSaveButton(context, updateState.isLoading);
+            },
+          ),
         ],
       ),
     );
@@ -263,26 +279,39 @@ class _DelegateUpdateSkillsScreenState
         borderRadius: BorderRadius.circular(AppRadius.input),
         border: Border.all(color: AppColors.outlineVariant),
       ),
-      child: TextField(
-        controller: _searchController,
-        style: AppTypography.bodyText.copyWith(
-          color: AppColors.primary900,
-          fontSize: 14,
-        ),
-        decoration: InputDecoration(
-          hintText: 'Ketik keahlian (misal: Negosiasi, Riset...)',
-          hintStyle: AppTypography.bodyText.copyWith(
-            color: AppColors.outline,
-            fontSize: 13,
+      child: Row(
+        children: [
+          Expanded(
+            child: TextField(
+              controller: _searchController,
+              style: AppTypography.bodyText.copyWith(
+                color: AppColors.primary900,
+                fontSize: 14,
+              ),
+              decoration: InputDecoration(
+                hintText: 'Ketik keahlian (misal: Negosiasi, Riset...)',
+                hintStyle: AppTypography.bodyText.copyWith(
+                  color: AppColors.outline,
+                  fontSize: 13,
+                ),
+                prefixIcon: const Icon(
+                  Icons.search_rounded,
+                  color: AppColors.textSecondary,
+                  size: 20,
+                ),
+                border: InputBorder.none,
+                contentPadding: const EdgeInsets.symmetric(vertical: 14),
+              ),
+            ),
           ),
-          prefixIcon: const Icon(
-            Icons.search_rounded,
-            color: AppColors.textSecondary,
-            size: 20,
+          GestureDetector(
+            onTap: _addFromSearch,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+              child: const Icon(Icons.add_circle, color: AppColors.goldDark, size: 22),
+            ),
           ),
-          border: InputBorder.none,
-          contentPadding: const EdgeInsets.symmetric(vertical: 14),
-        ),
+        ],
       ),
     );
   }
@@ -368,7 +397,7 @@ class _DelegateUpdateSkillsScreenState
   }
 
   // ─────────────────── Save Button ─────────────────────────────────
-  Widget _buildSaveButton(BuildContext context) {
+  Widget _buildSaveButton(BuildContext context, bool isLoading) {
     return SafeArea(
       top: false,
       child: Padding(
@@ -382,10 +411,40 @@ class _DelegateUpdateSkillsScreenState
           width: double.infinity,
           height: 52,
           child: ElevatedButton.icon(
-            onPressed: () => Navigator.pop(context),
-            icon: const Icon(Icons.check_rounded, size: 18),
+            onPressed: isLoading ? null : () async {
+              final skillNames = _currentSkills.map((s) => s.name).toList();
+              await ref.read(profileUpdateProvider.notifier).updateProfile(
+                delegateSkills: skillNames,
+              );
+              if (!context.mounted) return;
+              final state = ref.read(profileUpdateProvider);
+              if (state.error == null) {
+                ref.invalidate(userProfileProvider);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Keahlian berhasil disimpan'),
+                    backgroundColor: Color(0xFF10B981),
+                  ),
+                );
+                Navigator.pop(context);
+              } else {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('Gagal menyimpan: ${state.error}'),
+                    backgroundColor: Colors.red,
+                  ),
+                );
+              }
+            },
+            icon: isLoading
+                ? const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                  )
+                : const Icon(Icons.check_rounded, size: 18),
             label: Text(
-              'Simpan Keahlian',
+              isLoading ? 'Menyimpan...' : 'Simpan Keahlian',
               style: AppTypography.bodyMedium.copyWith(
                 color: Colors.white,
                 fontWeight: FontWeight.w700,

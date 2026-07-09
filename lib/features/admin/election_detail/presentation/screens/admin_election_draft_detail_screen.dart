@@ -1,15 +1,80 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import '../../../../../core/constants/app_colors.dart';
-import '../../../../../core/constants/app_spacing.dart';
-import '../../../../../core/constants/app_typography.dart';
-import '../../../../../core/constants/app_radius.dart';
+import 'package:voteryxapp/core/constants/app_colors.dart';
+import 'package:voteryxapp/core/constants/app_spacing.dart';
+import 'package:voteryxapp/core/constants/app_typography.dart';
+import 'package:voteryxapp/core/constants/app_radius.dart';
+import 'package:voteryxapp/core/network/supabase_client.dart';
+import 'package:voteryxapp/features/admin/dashboard/presentation/providers/admin_dashboard_provider.dart';
 
-class AdminElectionDraftDetailScreen extends StatelessWidget {
+class AdminElectionDraftDetailScreen extends ConsumerWidget {
   const AdminElectionDraftDetailScreen({super.key});
 
+  Future<void> _checkAndAccElection(BuildContext context, WidgetRef ref) async {
+    try {
+      // Cek jumlah kandidat yang terdaftar dan terverifikasi untuk pemilihan ini
+      final candidatesResp = await SupabaseConfig.client
+          .from('candidates')
+          .select('id, is_verified')
+          .eq('election_id', 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11');
+      
+      final List candidates = candidatesResp as List;
+      
+      if (candidates.length < 2) {
+        if (!context.mounted) return;
+        showDialog(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            title: Row(
+              children: [
+                Icon(Icons.warning_amber_rounded, color: AppColors.errorRed, size: 28),
+                const SizedBox(width: 10),
+                Expanded(child: Text('Gagal Meng-ACC Pemilihan', style: AppTypography.cardTitle)),
+              ],
+            ),
+            content: Text(
+              'Pemilihan belum bisa di-ACC dan ditampilkan di Halaman User karena jumlah paslon kandidat yang terdaftar di database masih kurang dari 2 paslon.\n\nSilakan lengkapi data minimal 2 kandidat terlebih dahulu!',
+              style: AppTypography.bodySmall.copyWith(color: AppColors.textSecondary, height: 1.5),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: Text('Mengerti', style: TextStyle(color: AppColors.primary800, fontWeight: FontWeight.bold)),
+              ),
+            ],
+          ),
+        );
+        return;
+      }
+
+      // Update status pemilihan menjadi 'live'
+      await SupabaseConfig.client
+          .from('elections')
+          .update({'status': 'live'})
+          .eq('id', 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11');
+
+      ref.invalidate(adminDashboardProvider);
+
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Pemilihan berhasil di-ACC dan terbit ke Halaman User!'),
+          backgroundColor: AppColors.successTeal,
+        ),
+      );
+      context.pop();
+    } catch (e) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Terjadi kesalahan: $e'), backgroundColor: AppColors.errorRed),
+      );
+    }
+  }
+
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
@@ -20,7 +85,7 @@ class AdminElectionDraftDetailScreen extends StatelessWidget {
           icon: const Icon(Icons.arrow_back, color: Colors.white),
           onPressed: () => context.pop(),
         ),
-        title: Text('Detail Pemilihan', style: AppTypography.headerTitle),
+        title: Text('Detail Pemilihan', style: AppTypography.headerTitle.copyWith(color: Colors.white)),
       ),
       body: SingleChildScrollView(
         child: Column(
@@ -61,12 +126,33 @@ class AdminElectionDraftDetailScreen extends StatelessWidget {
                   ),
                   const SizedBox(height: 24),
                   
-                  // Action Button
+                  // Action Buttons
                   SizedBox(
                     width: double.infinity,
                     height: 48,
                     child: ElevatedButton(
-                      onPressed: () {},
+                      onPressed: () => context.pushNamed('admin-candidate-verification'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.primary800,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                        elevation: 0,
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Text('Lanjutkan Input & Verifikasi Kandidat', style: AppTypography.bodyMedium.copyWith(color: Colors.white, fontWeight: FontWeight.bold)),
+                          const SizedBox(width: 8),
+                          const Icon(Icons.arrow_forward, color: Colors.white, size: 20),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 48,
+                    child: ElevatedButton(
+                      onPressed: () => _checkAndAccElection(context, ref),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: AppColors.goldMid,
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
@@ -75,9 +161,9 @@ class AdminElectionDraftDetailScreen extends StatelessWidget {
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Text('Lanjutkan Input Kandidat', style: AppTypography.bodyMedium.copyWith(color: Colors.white, fontWeight: FontWeight.bold)),
+                          const Icon(Icons.check_circle_outline, color: Colors.white, size: 20),
                           const SizedBox(width: 8),
-                          const Icon(Icons.arrow_forward, color: Colors.white, size: 20),
+                          Text('Terbitkan & ACC ke Halaman User (Live)', style: AppTypography.bodyMedium.copyWith(color: Colors.white, fontWeight: FontWeight.bold)),
                         ],
                       ),
                     ),

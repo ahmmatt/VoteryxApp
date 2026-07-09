@@ -175,7 +175,7 @@ class _ElectionListScreenState extends ConsumerState<ElectionListScreen> {
 
   Widget _buildElectionsList(List<Election> elections, Set<String> participatedIds) {
     final activeList = elections
-        .where((e) => e.status == 'live' || e.status == 'scheduled')
+        .where((e) => (e.status == 'live' || e.status == 'scheduled') && e.candidateCount >= 2)
         .toList();
     final completedList = elections
         .where((e) => e.status == 'completed' || e.status == 'ended')

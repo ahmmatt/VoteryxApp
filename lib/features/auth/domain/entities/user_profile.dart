@@ -12,12 +12,15 @@ class UserProfile {
     this.nim,
     this.phone,
     this.email,
+    this.avatarUrl,
     required this.role,
     required this.kycStatus,
     required this.voteWeight,
     this.isDelegateProfilePublic = false,
     this.delegateBio,
     this.delegateVision,
+    this.delegateSkills,
+    this.delegateTrackRecords,
     this.trustScore = 0.0,
     this.createdAt,
   });
@@ -30,6 +33,9 @@ class UserProfile {
 
   /// Nama lengkap dari data KTP.
   final String fullName;
+
+  /// URL foto profil pengguna (`avatar_url`).
+  final String? avatarUrl;
 
   /// Fakultas dari data KTP.
   final String? faculty;
@@ -64,7 +70,13 @@ class UserProfile {
   /// Visi sebagai delegate.
   final String? delegateVision;
 
-  /// Trust score dari komunitas (0.0 - 5.0).
+  /// Daftar keahlian delegate (list of string).
+  final List<String>? delegateSkills;
+
+  /// Track record / pengalaman delegate (list of map: title, description, year).
+  final List<Map<String, dynamic>>? delegateTrackRecords;
+
+  /// Trust score dari komunitas (0.0 - 100.0).
   final double trustScore;
 
   /// Waktu akun dibuat.
@@ -72,6 +84,13 @@ class UserProfile {
 
   /// Apakah user ini sudah terverifikasi KYC.
   bool get isVerified => kycStatus == 'verified';
+
+  /// Apakah profil delegate sudah lengkap (bio + visi + skills + track record).
+  bool get isDelegateProfileComplete =>
+      (delegateBio != null && delegateBio!.trim().isNotEmpty) &&
+      (delegateVision != null && delegateVision!.trim().isNotEmpty) &&
+      (delegateSkills != null && delegateSkills!.isNotEmpty) &&
+      (delegateTrackRecords != null && delegateTrackRecords!.isNotEmpty);
 
   /// Apakah user ini adalah delegate aktif.
   bool get isDelegate => role == 'delegate' || isDelegateProfilePublic;
@@ -86,12 +105,15 @@ class UserProfile {
     String? nim,
     String? phone,
     String? email,
+    String? avatarUrl,
     String? role,
     String? kycStatus,
     int? voteWeight,
     bool? isDelegateProfilePublic,
     String? delegateBio,
     String? delegateVision,
+    List<String>? delegateSkills,
+    List<Map<String, dynamic>>? delegateTrackRecords,
     double? trustScore,
   }) {
     return UserProfile(
@@ -103,12 +125,15 @@ class UserProfile {
       nim: nim ?? this.nim,
       phone: phone ?? this.phone,
       email: email ?? this.email,
+      avatarUrl: avatarUrl ?? this.avatarUrl,
       role: role ?? this.role,
       kycStatus: kycStatus ?? this.kycStatus,
       voteWeight: voteWeight ?? this.voteWeight,
       isDelegateProfilePublic: isDelegateProfilePublic ?? this.isDelegateProfilePublic,
       delegateBio: delegateBio ?? this.delegateBio,
       delegateVision: delegateVision ?? this.delegateVision,
+      delegateSkills: delegateSkills ?? this.delegateSkills,
+      delegateTrackRecords: delegateTrackRecords ?? this.delegateTrackRecords,
       trustScore: trustScore ?? this.trustScore,
       createdAt: createdAt,
     );

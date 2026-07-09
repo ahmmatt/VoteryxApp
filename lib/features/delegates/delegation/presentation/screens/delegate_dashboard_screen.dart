@@ -1,27 +1,41 @@
-// lib/features/delegation/presentation/screens/delegate_dashboard_screen.dart
+// lib/features/delegates/delegation/presentation/screens/delegate_dashboard_screen.dart
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../../core/constants/app_colors.dart';
 import '../../../../../core/constants/app_spacing.dart';
 import '../../../../../core/constants/app_typography.dart';
 import '../../../../../core/constants/app_radius.dart';
+import 'package:voteryxapp/features/delegates/delegation/application/delegate_dashboard_provider.dart';
 
 /// Layar Manajemen Mandat — menampilkan total bobot suara,
-/// daftar mandator beserta statusnya, dan tombol eksekusi.
-class DelegateDashboardScreen extends StatefulWidget {
+/// daftar mandator beserta statusnya, dan tombol eksekusi secara dinamis dari database.
+class DelegateDashboardScreen extends ConsumerStatefulWidget {
   const DelegateDashboardScreen({super.key});
 
   @override
-  State<DelegateDashboardScreen> createState() =>
+  ConsumerState<DelegateDashboardScreen> createState() =>
       _DelegateDashboardScreenState();
 }
 
-class _DelegateDashboardScreenState extends State<DelegateDashboardScreen> {
+class _DelegateDashboardScreenState extends ConsumerState<DelegateDashboardScreen> {
   int _selectedTab = 0;
-  final List<String> _tabs = ['Semua (12)', 'Aktif (10)', 'Menunggu (2)'];
 
   @override
   Widget build(BuildContext context) {
+    final dashboardAsync = ref.watch(delegateDashboardProvider);
+    final data = dashboardAsync.valueOrNull ?? const DelegateDashboardData();
+
+    final allMandates = data.mandates;
+    final activeCount = allMandates.where((m) => m.status == 'active').length;
+    final pendingCount = allMandates.where((m) => m.status == 'pending').length;
+
+    final tabs = [
+      'Semua (${allMandates.length})',
+      'Aktif ($activeCount)',
+      'Menunggu ($pendingCount)',
+    ];
+
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: _buildAppBar(context),
@@ -33,26 +47,32 @@ class _DelegateDashboardScreenState extends State<DelegateDashboardScreen> {
             decoration: const BoxDecoration(gradient: AppColors.pageGradient),
           ),
           // Scrollable content
-          SingleChildScrollView(
-            padding: const EdgeInsets.only(
-              left: AppSpacing.lg,
-              right: AppSpacing.lg,
-              top: AppSpacing.lg,
-              bottom: 88, // Space for pinned bottom button
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _buildTotalSuaraCard(),
-                const SizedBox(height: AppSpacing.xl),
-                _buildTabBar(),
-                const SizedBox(height: AppSpacing.xl),
-                _buildMandatorList(),
-              ],
+          RefreshIndicator(
+            onRefresh: () async {
+              ref.invalidate(delegateDashboardProvider);
+            },
+            child: SingleChildScrollView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              padding: const EdgeInsets.only(
+                left: AppSpacing.lg,
+                right: AppSpacing.lg,
+                top: AppSpacing.lg,
+                bottom: 100, // Space for pinned bottom button
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildTotalSuaraCard(data),
+                  const SizedBox(height: AppSpacing.xl),
+                  _buildTabBar(tabs),
+                  const SizedBox(height: AppSpacing.xl),
+                  _buildMandatorList(allMandates),
+                ],
+              ),
             ),
           ),
           // Pinned bottom CTA button
-          _buildPinnedButton(),
+          _buildPinnedButton(data),
         ],
       ),
     );
@@ -70,13 +90,13 @@ class _DelegateDashboardScreenState extends State<DelegateDashboardScreen> {
       ),
       title: Text(
         'Manajemen Mandat',
-        style: AppTypography.headerTitle,
+        style: AppTypography.headerTitle.copyWith(color: Colors.white),
       ),
     );
   }
 
   // ──────────────────── Total Bobot Suara Card ────────────────────
-  Widget _buildTotalSuaraCard() {
+  Widget _buildTotalSuaraCard(DelegateDashboardData data) {
     return Container(
       padding: const EdgeInsets.all(AppSpacing.xl),
       decoration: BoxDecoration(
@@ -88,7 +108,7 @@ class _DelegateDashboardScreenState extends State<DelegateDashboardScreen> {
         borderRadius: BorderRadius.circular(AppRadius.card),
         boxShadow: [
           BoxShadow(
-            color: AppColors.goldMid.withOpacity(0.12),
+            color: AppColors.goldMid.withValues(alpha: 0.12),
             blurRadius: 16,
             offset: const Offset(0, 6),
           ),
@@ -115,7 +135,7 @@ class _DelegateDashboardScreenState extends State<DelegateDashboardScreen> {
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
                     Text(
-                      '47',
+                      '${data.totalVotesHeld}',
                       style: AppTypography.displayHeading.copyWith(
                         fontSize: 52,
                         height: 1.0,
@@ -143,9 +163,9 @@ class _DelegateDashboardScreenState extends State<DelegateDashboardScreen> {
                       child: ClipRRect(
                         borderRadius: BorderRadius.circular(4),
                         child: LinearProgressIndicator(
-                          value: 0.85,
+                          value: (data.trustScore / 100).clamp(0.1, 1.0),
                           minHeight: 6,
-                          backgroundColor: Colors.white.withOpacity(0.5),
+                          backgroundColor: Colors.white.withValues(alpha: 0.5),
                           valueColor: const AlwaysStoppedAnimation<Color>(
                             AppColors.goldDark,
                           ),
@@ -154,7 +174,7 @@ class _DelegateDashboardScreenState extends State<DelegateDashboardScreen> {
                     ),
                     const SizedBox(width: 12),
                     Text(
-                      'Ketua BEM\n2026',
+                      data.urgentElectionTitle ?? 'Ketua BEM\n2026',
                       style: AppTypography.captionBold.copyWith(
                         fontSize: 10,
                         color: AppColors.goldDark,
@@ -189,7 +209,7 @@ class _DelegateDashboardScreenState extends State<DelegateDashboardScreen> {
                     ),
                   ),
                   Text(
-                    '85%',
+                    '${data.trustScore.round()}%',
                     style: AppTypography.displayHeading.copyWith(
                       fontSize: 18,
                       color: AppColors.primary900,
@@ -206,14 +226,14 @@ class _DelegateDashboardScreenState extends State<DelegateDashboardScreen> {
   }
 
   // ─────────────────────────── Tab Bar ───────────────────────────
-  Widget _buildTabBar() {
+  Widget _buildTabBar(List<String> tabs) {
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
       child: Row(
-        children: List.generate(_tabs.length, (i) {
+        children: List.generate(tabs.length, (i) {
           final isSelected = i == _selectedTab;
           return Padding(
-            padding: EdgeInsets.only(right: i < _tabs.length - 1 ? 8 : 0),
+            padding: EdgeInsets.only(right: i < tabs.length - 1 ? 8 : 0),
             child: GestureDetector(
               onTap: () => setState(() => _selectedTab = i),
               child: AnimatedContainer(
@@ -233,7 +253,7 @@ class _DelegateDashboardScreenState extends State<DelegateDashboardScreen> {
                   boxShadow: isSelected
                       ? [
                           BoxShadow(
-                            color: AppColors.goldMid.withOpacity(0.25),
+                            color: AppColors.goldMid.withValues(alpha: 0.25),
                             blurRadius: 8,
                             offset: const Offset(0, 2),
                           ),
@@ -241,11 +261,10 @@ class _DelegateDashboardScreenState extends State<DelegateDashboardScreen> {
                       : null,
                 ),
                 child: Text(
-                  _tabs[i],
+                  tabs[i],
                   style: AppTypography.bodyMedium.copyWith(
                     color: isSelected ? Colors.white : AppColors.textSecondary,
-                    fontWeight:
-                        isSelected ? FontWeight.w700 : FontWeight.w400,
+                    fontWeight: isSelected ? FontWeight.w700 : FontWeight.w400,
                   ),
                 ),
               ),
@@ -257,78 +276,50 @@ class _DelegateDashboardScreenState extends State<DelegateDashboardScreen> {
   }
 
   // ──────────────────── Mandator List ────────────────────────────
-  final List<Map<String, dynamic>> _mandatorData = const [
-    {
-      'name': 'Siti Rahma',
-      'nim': '220104052',
-      'faculty': 'Ilmu Komputer',
-      'votes': 1,
-      'status': 'Menunggu',
-      'statusColor': AppColors.goldDark,
-      'imageUrl': 'https://i.pravatar.cc/150?img=5',
-      'isRevoked': false,
-    },
-    {
-      'name': 'Ahmad Fauzi',
-      'nim': '220104099',
-      'faculty': 'Teknik Mesin',
-      'votes': 1,
-      'status': 'Aktif',
-      'statusColor': Color(0xFF10B981),
-      'imageUrl': 'https://i.pravatar.cc/150?img=11',
-      'isRevoked': false,
-    },
-    {
-      'name': 'Dian Kartika',
-      'nim': '220104011',
-      'faculty': 'Psikologi',
-      'votes': 0,
-      'status': 'Mandat telah ditarik oleh pemberi',
-      'statusColor': Colors.red,
-      'imageUrl': 'https://i.pravatar.cc/150?img=9',
-      'isRevoked': true,
-    },
-    {
-      'name': 'Kevin Pratama',
-      'nim': '220104105',
-      'faculty': 'Ekonomi',
-      'votes': 1,
-      'status': 'Aktif',
-      'statusColor': Color(0xFF10B981),
-      'imageUrl': 'https://i.pravatar.cc/150?img=12',
-      'isRevoked': false,
-    },
-  ];
-
-  Widget _buildMandatorList() {
+  Widget _buildMandatorList(List<DelegateMandateItem> allMandates) {
     // 0: Semua, 1: Aktif, 2: Menunggu
-    final filteredData = _mandatorData.where((m) {
+    final filteredData = allMandates.where((m) {
       if (_selectedTab == 0) return true;
-      if (_selectedTab == 1) return m['status'] == 'Aktif';
-      if (_selectedTab == 2) return m['status'] == 'Menunggu';
+      if (_selectedTab == 1) return m.status == 'active';
+      if (_selectedTab == 2) return m.status == 'pending';
       return true;
     }).toList();
 
     if (filteredData.isEmpty) {
       return const Center(
         child: Padding(
-          padding: EdgeInsets.all(20.0),
-          child: Text('Tidak ada data untuk tab ini'),
+          padding: EdgeInsets.all(40.0),
+          child: Text('Tidak ada data mandator untuk tab ini'),
         ),
       );
     }
 
     return Column(
-      children: filteredData.map((data) => _buildMandatorCard(
-        name: data['name'] as String,
-        nim: data['nim'] as String,
-        faculty: data['faculty'] as String,
-        votes: data['votes'] as int,
-        status: data['status'] as String,
-        statusColor: data['statusColor'] as Color,
-        imageUrl: data['imageUrl'] as String,
-        isRevoked: data['isRevoked'] as bool,
-      )).toList(),
+      children: filteredData.map((data) {
+        String statusText = 'Aktif';
+        Color statusColor = const Color(0xFF10B981);
+        bool isRevoked = false;
+
+        if (data.status == 'revoked') {
+          statusText = 'Mandat telah ditarik oleh pemberi';
+          statusColor = Colors.red;
+          isRevoked = true;
+        } else if (data.status == 'pending') {
+          statusText = 'Menunggu Verifikasi';
+          statusColor = AppColors.goldDark;
+        }
+
+        return _buildMandatorCard(
+          name: data.delegatorName,
+          nim: data.delegatorNim ?? '220104000',
+          faculty: data.delegatorFaculty ?? 'Fakultas',
+          votes: data.delegatorVoteWeight,
+          status: statusText,
+          statusColor: statusColor,
+          imageUrl: data.delegatorAvatarUrl ?? 'https://i.pravatar.cc/150?img=11',
+          isRevoked: isRevoked,
+        );
+      }).toList(),
     );
   }
 
@@ -343,20 +334,22 @@ class _DelegateDashboardScreenState extends State<DelegateDashboardScreen> {
     bool isRevoked = false,
   }) {
     return GestureDetector(
-      onTap: isRevoked ? null : () => context.pushNamed(
-        'mandator-profile',
-        pathParameters: {'name': name.replaceAll(' ', '-').toLowerCase()},
-        extra: {
-          'name': name,
-          'nim': nim,
-          'faculty': faculty,
-          'status': status,
-          'statusColor': statusColor,
-          'votes': votes,
-          'isRevoked': isRevoked,
-          'imageUrl': imageUrl,
-        },
-      ),
+      onTap: isRevoked
+          ? null
+          : () => context.pushNamed(
+                'mandator-profile',
+                pathParameters: {'name': name.replaceAll(' ', '-').toLowerCase()},
+                extra: {
+                  'name': name,
+                  'nim': nim,
+                  'faculty': faculty,
+                  'status': status,
+                  'statusColor': statusColor,
+                  'votes': votes,
+                  'isRevoked': isRevoked,
+                  'imageUrl': imageUrl,
+                },
+              ),
       child: Container(
         margin: const EdgeInsets.only(bottom: AppSpacing.md),
         padding: const EdgeInsets.symmetric(
@@ -367,11 +360,11 @@ class _DelegateDashboardScreenState extends State<DelegateDashboardScreen> {
           color: isRevoked ? const Color(0xFFF5F5F5) : Colors.white,
           borderRadius: BorderRadius.circular(AppRadius.card),
           border: isRevoked
-              ? Border.all(color: Colors.red.withOpacity(0.15))
+              ? Border.all(color: Colors.red.withValues(alpha: 0.15))
               : null,
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(isRevoked ? 0.01 : 0.03),
+              color: Colors.black.withValues(alpha: isRevoked ? 0.01 : 0.03),
               blurRadius: 12,
               offset: const Offset(0, 4),
             ),
@@ -381,115 +374,115 @@ class _DelegateDashboardScreenState extends State<DelegateDashboardScreen> {
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
             // Avatar
-          _buildAvatar(imageUrl, isRevoked),
-          const SizedBox(width: 12),
-          // Info
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Name row + badge
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Expanded(
-                      child: Text(
-                        name,
-                        style: AppTypography.displayHeading.copyWith(
-                          fontSize: 18,
-                          color: isRevoked
-                              ? AppColors.textSecondary
-                              : AppColors.primary900,
-                          decoration: isRevoked
-                              ? TextDecoration.lineThrough
-                              : null,
-                          decorationColor: AppColors.textSecondary,
-                          height: 1.2,
+            _buildAvatar(imageUrl, isRevoked),
+            const SizedBox(width: 12),
+            // Info
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Name row + badge
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        child: Text(
+                          name,
+                          style: AppTypography.displayHeading.copyWith(
+                            fontSize: 18,
+                            color: isRevoked
+                                ? AppColors.textSecondary
+                                : AppColors.primary900,
+                            decoration: isRevoked
+                                ? TextDecoration.lineThrough
+                                : null,
+                            decorationColor: AppColors.textSecondary,
+                            height: 1.2,
+                          ),
                         ),
                       ),
-                    ),
-                    if (isRevoked)
-                      Padding(
-                        padding: const EdgeInsets.only(left: 6, top: 2),
-                        child: Text(
-                          'DICABUT',
-                          style: AppTypography.captionBold.copyWith(
-                            color: Colors.red.withOpacity(0.7),
-                            fontSize: 10,
-                            letterSpacing: 0.5,
-                          ),
-                        ),
-                      )
-                    else
-                      Padding(
-                        padding: const EdgeInsets.only(left: 6, top: 2),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 8,
-                            vertical: 4,
-                          ),
-                          decoration: BoxDecoration(
-                            color: AppColors.goldMid.withOpacity(0.2),
-                            borderRadius: BorderRadius.circular(6),
-                          ),
+                      if (isRevoked)
+                        Padding(
+                          padding: const EdgeInsets.only(left: 6, top: 2),
                           child: Text(
-                            '$votes\nsuara',
-                            textAlign: TextAlign.center,
+                            'DICABUT',
                             style: AppTypography.captionBold.copyWith(
-                              color: AppColors.goldDark,
+                              color: Colors.red.withValues(alpha: 0.7),
                               fontSize: 10,
-                              height: 1.3,
+                              letterSpacing: 0.5,
+                            ),
+                          ),
+                        )
+                      else
+                        Padding(
+                          padding: const EdgeInsets.only(left: 6, top: 2),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 4,
+                            ),
+                            decoration: BoxDecoration(
+                              color: AppColors.goldMid.withValues(alpha: 0.2),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Text(
+                              '$votes\nsuara',
+                              textAlign: TextAlign.center,
+                              style: AppTypography.captionBold.copyWith(
+                                color: AppColors.goldDark,
+                                fontSize: 10,
+                                height: 1.3,
+                              ),
                             ),
                           ),
                         ),
-                      ),
-                  ],
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  '$nim • $faculty',
-                  style: AppTypography.caption.copyWith(
-                    color: AppColors.outline,
-                    fontSize: 11,
+                    ],
                   ),
-                ),
-                const SizedBox(height: 8),
-                // Status row
-                Row(
-                  children: [
-                    Container(
-                      width: 7,
-                      height: 7,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: statusColor,
-                      ),
+                  const SizedBox(height: 4),
+                  Text(
+                    '$nim • $faculty',
+                    style: AppTypography.caption.copyWith(
+                      color: AppColors.outline,
+                      fontSize: 11,
                     ),
-                    const SizedBox(width: 6),
-                    Expanded(
-                      child: Text(
-                        isRevoked ? status : 'Status: $status',
-                        style: AppTypography.captionBold.copyWith(
+                  ),
+                  const SizedBox(height: 8),
+                  // Status row
+                  Row(
+                    children: [
+                      Container(
+                        width: 7,
+                        height: 7,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
                           color: statusColor,
-                          fontSize: 11,
                         ),
                       ),
-                    ),
-                  ],
-                ),
-              ],
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: Text(
+                          isRevoked ? status : 'Status: $status',
+                          style: AppTypography.captionBold.copyWith(
+                            color: statusColor,
+                            fontSize: 11,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
             ),
-          ),
-          const SizedBox(width: 8),
-          // Trailing icon
-          if (isRevoked)
-            Icon(Icons.do_not_disturb_alt, color: Colors.red.withOpacity(0.6), size: 22)
-          else
-            const Icon(Icons.chevron_right, color: AppColors.outline, size: 22),
-        ],
+            const SizedBox(width: 8),
+            // Trailing icon
+            if (isRevoked)
+              Icon(Icons.do_not_disturb_alt, color: Colors.red.withValues(alpha: 0.6), size: 22)
+            else
+              const Icon(Icons.chevron_right, color: AppColors.outline, size: 22),
+          ],
+        ),
       ),
-      ), // Close GestureDetector child
-    ); // Close GestureDetector
+    );
   }
 
   Widget _buildAvatar(String imageUrl, bool isRevoked) {
@@ -501,7 +494,7 @@ class _DelegateDashboardScreenState extends State<DelegateDashboardScreen> {
         border: Border.all(
           color: isRevoked
               ? AppColors.outlineVariant
-              : AppColors.goldMid.withOpacity(0.3),
+              : AppColors.goldMid.withValues(alpha: 0.3),
           width: 1.5,
         ),
         image: DecorationImage(
@@ -516,7 +509,7 @@ class _DelegateDashboardScreenState extends State<DelegateDashboardScreen> {
   }
 
   // ──────────────── Pinned Bottom CTA Button ──────────────────────
-  Widget _buildPinnedButton() {
+  Widget _buildPinnedButton(DelegateDashboardData data) {
     return Positioned(
       left: AppSpacing.lg,
       right: AppSpacing.lg,
@@ -528,7 +521,7 @@ class _DelegateDashboardScreenState extends State<DelegateDashboardScreen> {
           borderRadius: BorderRadius.circular(AppRadius.button),
           boxShadow: [
             BoxShadow(
-              color: AppColors.goldDark.withOpacity(0.35),
+              color: AppColors.goldDark.withValues(alpha: 0.35),
               blurRadius: 16,
               offset: const Offset(0, 6),
             ),
@@ -543,7 +536,7 @@ class _DelegateDashboardScreenState extends State<DelegateDashboardScreen> {
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Text(
-                  'Eksekusi 47 Suara untuk BEM 2026',
+                  'Eksekusi ${data.totalVotesHeld} Suara untuk ${data.urgentElectionTitle ?? 'BEM 2026'}',
                   style: AppTypography.bodyMedium.copyWith(
                     color: Colors.white,
                     fontWeight: FontWeight.w700,
@@ -566,11 +559,11 @@ class _DelegateDashboardScreenState extends State<DelegateDashboardScreen> {
       decoration: BoxDecoration(
         color: Colors.white,
         border: Border(
-          top: BorderSide(color: AppColors.outlineVariant.withOpacity(0.5)),
+          top: BorderSide(color: AppColors.outlineVariant.withValues(alpha: 0.5)),
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.04),
+            color: Colors.black.withValues(alpha: 0.04),
             blurRadius: 8,
             offset: const Offset(0, -2),
           ),
@@ -593,7 +586,7 @@ class _DelegateDashboardScreenState extends State<DelegateDashboardScreen> {
                 icon: Icons.gavel_outlined,
                 label: 'Mandat',
                 isSelected: true,
-                onTap: () => context.pop(),
+                onTap: () {},
               ),
               _buildNavItem(
                 context,
@@ -624,7 +617,7 @@ class _DelegateDashboardScreenState extends State<DelegateDashboardScreen> {
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
         decoration: isSelected
             ? BoxDecoration(
-                color: AppColors.goldMid.withOpacity(0.15),
+                color: AppColors.goldMid.withValues(alpha: 0.15),
                 borderRadius: BorderRadius.circular(16),
               )
             : null,
@@ -646,5 +639,4 @@ class _DelegateDashboardScreenState extends State<DelegateDashboardScreen> {
       ),
     );
   }
-
 }

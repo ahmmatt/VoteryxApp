@@ -79,7 +79,7 @@ class AdminCandidateVerificationScreen extends ConsumerWidget {
                 final faculty = c['faculty']?.toString() ?? c['major']?.toString() ?? 'Fakultas Sains & Teknologi';
                 final candNo = c['candidate_number']?.toString() ?? '${index + 1}';
                 final nim = c['nim']?.toString() ?? (c['candidate_number'] != null ? '210600$candNo • No. Urut $candNo' : 'No. Urut $candNo');
-                final imageUrl = c['photo_url']?.toString() ?? 'https://i.pravatar.cc/150?img=${index + 10}';
+                final imageUrl = getCandidateAvatarUrl(c);
                 final isVerified = c['is_verified'] == true;
                 final electionTitle = (c['elections'] is Map) ? (c['elections']['title']?.toString() ?? 'Pemilihan Umum') : 'Pemilihan Umum';
                 final candidateId = c['id']?.toString() ?? '';
@@ -112,7 +112,7 @@ class AdminCandidateVerificationScreen extends ConsumerWidget {
     required String faculty,
     required String nim,
     required String electionTitle,
-    required String imageUrl,
+    required String? imageUrl,
     required bool isVerified,
   }) {
     return Container(
@@ -148,22 +148,10 @@ class AdminCandidateVerificationScreen extends ConsumerWidget {
                     Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        ClipRRect(
-                          borderRadius: BorderRadius.circular(8),
-                          child: Image.network(
-                            imageUrl,
-                            width: 48,
-                            height: 48,
-                            fit: BoxFit.cover,
-                            errorBuilder: (context, error, stackTrace) =>
-                                Container(
-                              width: 48,
-                              height: 48,
-                              color: AppColors.navy600.withOpacity(0.1),
-                              child: const Icon(Icons.person,
-                                  color: AppColors.textSecondary),
-                            ),
-                          ),
+                        buildCandidateAvatarWidget(
+                          imageUrl: imageUrl,
+                          size: 48,
+                          radius: 10,
                         ),
                         const SizedBox(width: 12),
                         Expanded(

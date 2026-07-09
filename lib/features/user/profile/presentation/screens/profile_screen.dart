@@ -12,6 +12,7 @@ import 'history_screen.dart';
 import 'help_screen.dart';
 import 'profile_settings_screen.dart';
 import 'package:voteryxapp/features/user/notifications/presentation/widgets/notifications_modal.dart';
+import 'package:voteryxapp/features/delegates/delegation/application/delegate_application_provider.dart';
 
 class ProfileScreen extends ConsumerWidget {
   const ProfileScreen({super.key});
@@ -50,6 +51,7 @@ class ProfileScreen extends ConsumerWidget {
                 name: profile?.fullName ?? 'Pengguna Voteryx',
                 faculty: profile?.faculty ?? '',
                 kycStatus: profile?.kycStatus ?? 'pending',
+                avatarUrl: profile?.avatarUrl,
               ),
               const SizedBox(height: AppSpacing.lg),
               _buildMenuSection(context, ref),
@@ -84,7 +86,12 @@ class ProfileScreen extends ConsumerWidget {
     required String name,
     required String faculty,
     required String kycStatus,
+    String? avatarUrl,
   }) {
+    final effectiveUrl = (avatarUrl != null && avatarUrl.trim().isNotEmpty)
+        ? avatarUrl
+        : 'https://ui-avatars.com/api/?name=${Uri.encodeComponent(name)}&background=0F1F3D&color=fff&size=200';
+
     return Container(
       width: double.infinity,
       color: AppColors.primary800,
@@ -114,7 +121,7 @@ class ProfileScreen extends ConsumerWidget {
                 ),
                 child: ClipOval(
                   child: Image.network(
-                    'https://ui-avatars.com/api/?name=${Uri.encodeComponent(name)}&background=0F1F3D&color=fff&size=200',
+                    effectiveUrl,
                     width: 100,
                     height: 100,
                     fit: BoxFit.cover,
@@ -224,8 +231,24 @@ class ProfileScreen extends ConsumerWidget {
             title: 'Masuk ke Portal Delegasi',
             onTap: () {
               final profile = ref.read(userProfileProvider).valueOrNull;
-              if (profile != null && (profile.role == 'delegate' || profile.isDelegateProfilePublic)) {
-                context.pushNamed('delegate-login');
+              final applications = ref.read(delegateApplicationProvider);
+              final myApp = applications.where((a) =>
+                  (profile?.nim != null && profile!.nim!.isNotEmpty && a.nim == profile.nim) ||
+                  (profile?.fullName != null && a.name.trim().toLowerCase() == profile!.fullName.trim().toLowerCase())
+              ).firstOrNull;
+
+              final isApproved = (profile?.role == 'delegate') ||
+                  (myApp?.status == DelegateApplicationStatus.approved);
+
+              final isPending = (profile?.role != 'delegate' &&
+                      (profile?.isDelegateProfilePublic == true ||
+                          (profile?.delegateBio != null && profile!.delegateBio!.isNotEmpty))) ||
+                  (myApp?.status == DelegateApplicationStatus.pending);
+
+              if (isApproved) {
+                context.pushNamed('delegate-home');
+              } else if (isPending) {
+                context.pushNamed('delegate-review');
               } else {
                 context.pushNamed('delegate-terms');
               }

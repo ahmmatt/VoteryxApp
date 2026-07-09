@@ -116,23 +116,6 @@ class HomeTab extends ConsumerWidget {
                 onRetry: () => ref.invalidate(dashboardProvider),
               ),
             ),
-
-            const SizedBox(height: AppSpacing.xl),
-
-            // ── Ringkasan Section ──
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.pagePad),
-              child: Text(
-                'PENGUMUMAN',
-                style: AppTypography.labelLarge.copyWith(
-                  color: AppColors.textPrimary,
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: 0.5,
-                ),
-              ),
-            ),
-            const SizedBox(height: AppSpacing.sm),
-            const _AnnouncementCard(),
           ],
         ),
       ),
@@ -596,66 +579,6 @@ class _HomeInfoPill extends StatelessWidget {
               ),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-// ── Announcement Card ─────────────────────────────────────────────────────────
-
-class _AnnouncementCard extends StatelessWidget {
-  const _AnnouncementCard();
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: AppSpacing.pagePad),
-      padding: const EdgeInsets.all(AppSpacing.md),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: AppColors.outlineVariant),
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 64,
-            height: 64,
-            decoration: BoxDecoration(
-              color: const Color(0x1A0F1F3D),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: const Icon(
-              Icons.campaign_outlined,
-              color: AppColors.primary800,
-              size: 28,
-            ),
-          ),
-          const SizedBox(width: AppSpacing.md),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'PENTING',
-                  style: AppTypography.captionBold.copyWith(
-                    color: AppColors.goldDark,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  'Sosialisasi Teknis Pemilihan Raya Digital 2026...',
-                  style: AppTypography.bodyMedium.copyWith(
-                    color: AppColors.textPrimary,
-                    fontWeight: FontWeight.w600,
-                  ),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ],
             ),
           ),
         ],

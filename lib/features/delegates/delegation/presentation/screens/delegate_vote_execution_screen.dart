@@ -1,111 +1,148 @@
-// lib/features/delegation/presentation/screens/delegate_vote_execution_screen.dart
+// lib/features/delegates/delegation/presentation/screens/delegate_vote_execution_screen.dart
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../../core/constants/app_colors.dart';
 import '../../../../../core/constants/app_spacing.dart';
 import '../../../../../core/constants/app_typography.dart';
 import '../../../../../core/constants/app_radius.dart';
+import 'package:voteryxapp/features/delegates/delegation/application/delegate_dashboard_provider.dart';
+import 'package:voteryxapp/features/user/profile/presentation/providers/profile_provider.dart';
 
-/// Model kandidat untuk pemilihan.
-class _Candidate {
-  final String name;
-  final String vision;
-  final String imageUrl;
-
-  const _Candidate({
-    required this.name,
-    required this.vision,
-    required this.imageUrl,
-  });
-}
-
-/// Layar Eksekusi Suara — memilih kandidat dan mengkonfirmasi
-/// eksekusi suara dengan gestur swipe.
-class DelegateVoteExecutionScreen extends StatefulWidget {
+/// Layar Eksekusi Suara — menampilkan data real dari database:
+/// bobot suara, mandator aktif, kandidat dari pemilihan yang sedang berlangsung.
+class DelegateVoteExecutionScreen extends ConsumerStatefulWidget {
   const DelegateVoteExecutionScreen({super.key});
 
   @override
-  State<DelegateVoteExecutionScreen> createState() =>
+  ConsumerState<DelegateVoteExecutionScreen> createState() =>
       _DelegateVoteExecutionScreenState();
 }
 
 class _DelegateVoteExecutionScreenState
-    extends State<DelegateVoteExecutionScreen> {
-  int _selectedIndex = 1; // Default: Arjuna Pratama terpilih
+    extends ConsumerState<DelegateVoteExecutionScreen> {
+  int _selectedIndex = -1; // -1 berarti belum memilih
   double _sliderProgress = 0.0;
-
-  static const List<_Candidate> _candidates = [
-    _Candidate(
-      name: 'Siti Rahayu',
-      vision: 'Visi Indonesia Inklusif',
-      imageUrl: 'https://i.pravatar.cc/150?img=5',
-    ),
-    _Candidate(
-      name: 'Arjuna Pratama',
-      vision: 'Akselerasi Digital Kampus',
-      imageUrl: 'https://i.pravatar.cc/150?img=11',
-    ),
-  ];
 
   @override
   Widget build(BuildContext context) {
-    final selected = _candidates[_selectedIndex];
+    final dashboardAsync = ref.watch(delegateDashboardProvider);
+    final profile = ref.watch(userProfileProvider).valueOrNull;
 
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      appBar: _buildAppBar(),
-      body: Container(
-        decoration: const BoxDecoration(gradient: AppColors.pageGradient),
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(
-            horizontal: AppSpacing.lg,
-            vertical: AppSpacing.lg,
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              // 1. Verified delegate banner
-              _buildVerifiedBanner(),
-              const SizedBox(height: AppSpacing.xl),
-
-              // 2. Detail bobot suara card
-              _buildVoteWeightCard(),
-              const SizedBox(height: AppSpacing.xxl),
-
-              // 3. Pilih Kandidat
-              Text(
-                'Pilih Kandidat',
-                style: AppTypography.bodyMedium.copyWith(
-                  color: AppColors.textSecondary,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              const SizedBox(height: AppSpacing.md),
-              ..._candidates.asMap().entries.map((entry) {
-                return Padding(
-                  padding: const EdgeInsets.only(bottom: AppSpacing.md),
-                  child: _buildCandidateCard(
-                    candidate: entry.value,
-                    isSelected: entry.key == _selectedIndex,
-                    onTap: () => setState(() => _selectedIndex = entry.key),
-                  ),
-                );
-              }),
-              const SizedBox(height: AppSpacing.xxl),
-
-              // 4. Konfirmasi + swipe
-              _buildConfirmationSection(selected),
-              const SizedBox(height: AppSpacing.xxl),
-            ],
-          ),
-        ),
+    return dashboardAsync.when(
+      loading: () => Scaffold(
+        backgroundColor: AppColors.background,
+        appBar: _buildAppBar(context),
+        body: const Center(child: CircularProgressIndicator(color: AppColors.goldDark)),
       ),
-      bottomNavigationBar: _buildBottomNavBar(),
+      error: (e, _) => Scaffold(
+        backgroundColor: AppColors.background,
+        appBar: _buildAppBar(context),
+        body: Center(child: Text('Gagal memuat data: $e')),
+      ),
+      data: (data) {
+        final myVoteWeight = profile?.voteWeight ?? 1;
+        final activeMandates = data.mandates.where((m) => m.status == 'active').toList();
+        final delegatedWeight = activeMandates.fold<int>(0, (sum, m) => sum + m.delegatorVoteWeight);
+        final totalWeight = myVoteWeight + delegatedWeight;
+        final candidates = data.urgentElectionCandidates;
+
+        return Scaffold(
+          backgroundColor: AppColors.background,
+          appBar: _buildAppBar(context),
+          body: Container(
+            decoration: const BoxDecoration(gradient: AppColors.pageGradient),
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.symmetric(
+                horizontal: AppSpacing.lg,
+                vertical: AppSpacing.lg,
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  // 1. Verified delegate banner
+                  _buildVerifiedBanner(),
+                  const SizedBox(height: AppSpacing.xl),
+
+                  // 2. Detail bobot suara — dari database
+                  _buildVoteWeightCard(
+                    myVoteWeight: myVoteWeight,
+                    activeMandates: activeMandates,
+                    delegatedWeight: delegatedWeight,
+                    totalWeight: totalWeight,
+                  ),
+                  const SizedBox(height: AppSpacing.xxl),
+
+                  if (candidates.isEmpty) ...[
+                    // Tidak ada pemilihan aktif atau kandidat belum diisi
+                    Container(
+                      padding: const EdgeInsets.all(AppSpacing.xl),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(AppRadius.card),
+                      ),
+                      child: Column(
+                        children: [
+                          const Icon(Icons.ballot_outlined, size: 48, color: AppColors.outline),
+                          const SizedBox(height: 12),
+                          Text(
+                            data.urgentElectionTitle != null
+                                ? 'Pemilihan "${data.urgentElectionTitle}" belum memiliki kandidat.'
+                                : 'Tidak ada pemilihan aktif saat ini.',
+                            textAlign: TextAlign.center,
+                            style: AppTypography.bodyText.copyWith(color: AppColors.textSecondary, height: 1.5),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ] else ...[
+                    // 3. Pilih Kandidat
+                    Text(
+                      'Pilih Kandidat',
+                      style: AppTypography.bodyMedium.copyWith(
+                        color: AppColors.textSecondary,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: AppSpacing.md),
+                    ...candidates.asMap().entries.map((entry) {
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: AppSpacing.md),
+                        child: _buildCandidateCard(
+                          candidate: entry.value,
+                          isSelected: entry.key == _selectedIndex,
+                          onTap: () => setState(() => _selectedIndex = entry.key),
+                        ),
+                      );
+                    }),
+                    const SizedBox(height: AppSpacing.xxl),
+
+                    // 4. Konfirmasi + swipe
+                    if (_selectedIndex >= 0 && _selectedIndex < candidates.length)
+                      _buildConfirmationSection(candidates[_selectedIndex], totalWeight)
+                    else
+                      Center(
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          child: Text(
+                            'Pilih kandidat terlebih dahulu',
+                            style: AppTypography.bodyText.copyWith(color: AppColors.outline),
+                          ),
+                        ),
+                      ),
+                    const SizedBox(height: AppSpacing.xxl),
+                  ],
+                ],
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 
   // ─────────────────────────── AppBar ────────────────────────────
-  PreferredSizeWidget _buildAppBar() {
+  PreferredSizeWidget _buildAppBar(BuildContext context) {
     return AppBar(
       titleSpacing: 0,
       backgroundColor: AppColors.primary800,
@@ -116,7 +153,7 @@ class _DelegateVoteExecutionScreenState
       ),
       title: Text(
         'Eksekusi Suara',
-        style: AppTypography.headerTitle,
+        style: AppTypography.headerTitle.copyWith(color: Colors.white),
       ),
       actions: [
         IconButton(
@@ -162,14 +199,26 @@ class _DelegateVoteExecutionScreenState
   }
 
   // ─────────────────── Vote Weight Detail Card ────────────────────
-  Widget _buildVoteWeightCard() {
+  Widget _buildVoteWeightCard({
+    required int myVoteWeight,
+    required List<DelegateMandateItem> activeMandates,
+    required int delegatedWeight,
+    required int totalWeight,
+  }) {
+    // Ambil nama 3 mandator pertama untuk ditampilkan
+    final names = activeMandates.take(3).map((m) => m.delegatorName.split(' ').first).join(', ');
+    final remaining = activeMandates.length - 3;
+    final mandatorLabel = activeMandates.isEmpty
+        ? 'Belum ada mandator'
+        : names + (remaining > 0 ? ' +$remaining lainnya' : '');
+
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(AppRadius.card),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.04),
+            color: Colors.black.withValues(alpha: 0.04),
             blurRadius: 12,
             offset: const Offset(0, 4),
           ),
@@ -178,7 +227,6 @@ class _DelegateVoteExecutionScreenState
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // Detail rows
           Padding(
             padding: const EdgeInsets.all(AppSpacing.lg),
             child: Column(
@@ -193,7 +241,7 @@ class _DelegateVoteExecutionScreenState
                   ),
                 ),
                 const SizedBox(height: 16),
-                // Suara milikmu
+                // Suara milikku
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
@@ -205,7 +253,7 @@ class _DelegateVoteExecutionScreenState
                       ),
                     ),
                     Text(
-                      '+1',
+                      '+$myVoteWeight',
                       style: AppTypography.displayHeading.copyWith(
                         fontSize: 16,
                         color: AppColors.goldDark,
@@ -231,7 +279,7 @@ class _DelegateVoteExecutionScreenState
                           ),
                           const SizedBox(height: 2),
                           Text(
-                            'Siti, Budi, Rizal +9 lainnya',
+                            mandatorLabel,
                             style: AppTypography.caption.copyWith(
                               color: AppColors.outline,
                               fontSize: 11,
@@ -241,7 +289,7 @@ class _DelegateVoteExecutionScreenState
                       ),
                     ),
                     Text(
-                      '+46',
+                      activeMandates.isEmpty ? '+0' : '+$delegatedWeight',
                       style: AppTypography.displayHeading.copyWith(
                         fontSize: 16,
                         color: AppColors.goldDark,
@@ -275,7 +323,7 @@ class _DelegateVoteExecutionScreenState
                   ),
                 ),
                 Text(
-                  '47 Suara',
+                  '$totalWeight Suara',
                   style: AppTypography.displayHeading.copyWith(
                     fontSize: 16,
                     color: AppColors.goldDark,
@@ -291,10 +339,11 @@ class _DelegateVoteExecutionScreenState
 
   // ─────────────────── Candidate Card ────────────────────────────
   Widget _buildCandidateCard({
-    required _Candidate candidate,
+    required DelegateCandidateItem candidate,
     required bool isSelected,
     required VoidCallback onTap,
   }) {
+    final photoUrl = candidate.photoUrl;
     return GestureDetector(
       onTap: onTap,
       child: AnimatedContainer(
@@ -310,14 +359,14 @@ class _DelegateVoteExecutionScreenState
           boxShadow: isSelected
               ? [
                   BoxShadow(
-                    color: AppColors.goldMid.withOpacity(0.2),
+                    color: AppColors.goldMid.withValues(alpha: 0.2),
                     blurRadius: 12,
                     offset: const Offset(0, 4),
                   ),
                 ]
               : [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.02),
+                    color: Colors.black.withValues(alpha: 0.02),
                     blurRadius: 8,
                     offset: const Offset(0, 2),
                   ),
@@ -325,7 +374,7 @@ class _DelegateVoteExecutionScreenState
         ),
         child: Row(
           children: [
-            // Avatar
+            // Avatar kandidat
             Container(
               width: 52,
               height: 52,
@@ -333,15 +382,26 @@ class _DelegateVoteExecutionScreenState
                 shape: BoxShape.circle,
                 border: Border.all(
                   color: isSelected
-                      ? AppColors.goldMid.withOpacity(0.4)
+                      ? AppColors.goldMid.withValues(alpha: 0.4)
                       : AppColors.outlineVariant,
                   width: 2,
                 ),
-                image: DecorationImage(
-                  image: NetworkImage(candidate.imageUrl),
-                  fit: BoxFit.cover,
-                ),
+                color: AppColors.outlineVariant.withValues(alpha: 0.3),
+                image: photoUrl != null && photoUrl.startsWith('http')
+                    ? DecorationImage(image: NetworkImage(photoUrl), fit: BoxFit.cover)
+                    : null,
               ),
+              child: photoUrl == null || !photoUrl.startsWith('http')
+                  ? Center(
+                      child: Text(
+                        '${candidate.candidateNumber}',
+                        style: AppTypography.bodyMedium.copyWith(
+                          color: AppColors.primary900,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    )
+                  : null,
             ),
             const SizedBox(width: 14),
             // Name + vision
@@ -356,14 +416,18 @@ class _DelegateVoteExecutionScreenState
                       color: AppColors.primary900,
                     ),
                   ),
-                  const SizedBox(height: 3),
-                  Text(
-                    candidate.vision,
-                    style: AppTypography.caption.copyWith(
-                      color: isSelected ? AppColors.goldDark : AppColors.outline,
-                      fontSize: 12,
+                  if (candidate.vision != null && candidate.vision!.isNotEmpty) ...[
+                    const SizedBox(height: 3),
+                    Text(
+                      candidate.vision!,
+                      style: AppTypography.caption.copyWith(
+                        color: isSelected ? AppColors.goldDark : AppColors.outline,
+                        fontSize: 12,
+                      ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
                     ),
-                  ),
+                  ],
                 ],
               ),
             ),
@@ -392,10 +456,9 @@ class _DelegateVoteExecutionScreenState
   }
 
   // ─────────────────── Confirmation + Swipe ───────────────────────
-  Widget _buildConfirmationSection(_Candidate selected) {
+  Widget _buildConfirmationSection(DelegateCandidateItem selected, int totalWeight) {
     return Column(
       children: [
-        // Confirmation label
         Text(
           'Konfirmasi Pilihan Anda',
           style: AppTypography.caption.copyWith(
@@ -426,7 +489,7 @@ class _DelegateVoteExecutionScreenState
               const Icon(Icons.people_alt_rounded, color: Colors.white, size: 16),
               const SizedBox(width: 8),
               Text(
-                '47 Suara akan diberikan',
+                '$totalWeight Suara akan diberikan',
                 style: AppTypography.captionBold.copyWith(
                   color: Colors.white,
                   fontSize: 12,
@@ -441,9 +504,9 @@ class _DelegateVoteExecutionScreenState
           width: double.infinity,
           padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
           decoration: BoxDecoration(
-            color: Colors.red.withOpacity(0.06),
+            color: Colors.red.withValues(alpha: 0.06),
             borderRadius: BorderRadius.circular(10),
-            border: Border.all(color: Colors.red.withOpacity(0.15)),
+            border: Border.all(color: Colors.red.withValues(alpha: 0.15)),
           ),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
@@ -466,12 +529,12 @@ class _DelegateVoteExecutionScreenState
         ),
         const SizedBox(height: 24),
         // Swipe to lock
-        _buildSwipeButton(),
+        _buildSwipeButton(totalWeight),
       ],
     );
   }
 
-  Widget _buildSwipeButton() {
+  Widget _buildSwipeButton(int totalWeight) {
     const double height = 64.0;
     const double thumbSize = 56.0;
 
@@ -483,17 +546,16 @@ class _DelegateVoteExecutionScreenState
           height: height,
           width: double.infinity,
           decoration: BoxDecoration(
-            color: AppColors.outlineVariant.withOpacity(0.4),
+            color: AppColors.outlineVariant.withValues(alpha: 0.4),
             borderRadius: BorderRadius.circular(height / 2),
           ),
           child: Stack(
             alignment: Alignment.center,
             children: [
-              // Track label
               Padding(
                 padding: const EdgeInsets.only(left: thumbSize + 8),
                 child: Text(
-                  'GESER UNTUK MENGUNCI 47 SUARA',
+                  'GESER UNTUK MENGUNCI $totalWeight SUARA',
                   style: AppTypography.captionBold.copyWith(
                     color: AppColors.outline,
                     fontSize: 9,
@@ -502,7 +564,6 @@ class _DelegateVoteExecutionScreenState
                   textAlign: TextAlign.center,
                 ),
               ),
-              // Draggable thumb
               Positioned(
                 left: 4 + (_sliderProgress * maxDrag),
                 top: 4,
@@ -510,15 +571,11 @@ class _DelegateVoteExecutionScreenState
                 child: GestureDetector(
                   onHorizontalDragUpdate: (details) {
                     setState(() {
-                      _sliderProgress = ((_sliderProgress * maxDrag +
-                              details.delta.dx) /
-                          maxDrag)
-                          .clamp(0.0, 1.0);
+                      _sliderProgress = ((_sliderProgress * maxDrag + details.delta.dx) / maxDrag).clamp(0.0, 1.0);
                     });
                   },
                   onHorizontalDragEnd: (_) {
                     if (_sliderProgress > 0.75) {
-                      // Navigate to processing
                       context.pushNamed('delegate-vote-processing');
                     } else {
                       setState(() => _sliderProgress = 0.0);
@@ -531,7 +588,7 @@ class _DelegateVoteExecutionScreenState
                       shape: BoxShape.circle,
                       boxShadow: [
                         BoxShadow(
-                          color: AppColors.goldDark.withOpacity(0.35),
+                          color: AppColors.goldDark.withValues(alpha: 0.35),
                           blurRadius: 12,
                           offset: const Offset(0, 4),
                         ),
@@ -549,87 +606,6 @@ class _DelegateVoteExecutionScreenState
           ),
         );
       },
-    );
-  }
-
-  // ──────────────────── Bottom Navigation Bar ─────────────────────
-  Widget _buildBottomNavBar() {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        border: Border(
-          top: BorderSide(color: AppColors.outlineVariant.withOpacity(0.4)),
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.04),
-            blurRadius: 8,
-            offset: const Offset(0, -2),
-          ),
-        ],
-      ),
-      child: SafeArea(
-        top: false,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
-            children: [
-              _buildNavItem(Icons.home_outlined, 'Beranda', false, () {
-                context.pushNamed('delegate-home');
-              }),
-              _buildNavItem(Icons.gavel_outlined, 'Mandat', false, () {
-                context.pushNamed('delegate-dashboard');
-              }),
-              _buildNavItem(Icons.how_to_vote, 'Eksekusi', true, () {}),
-              _buildNavItem(Icons.person_outline, 'Profil', false, () {}),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildNavItem(
-    IconData icon,
-    String label,
-    bool isSelected,
-    VoidCallback onTap,
-  ) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(20),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        decoration: isSelected
-            ? BoxDecoration(
-                color: AppColors.goldMid.withOpacity(0.18),
-                borderRadius: BorderRadius.circular(20),
-              )
-            : null,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              icon,
-              size: 24,
-              color:
-                  isSelected ? AppColors.goldDark : AppColors.textSecondary,
-            ),
-            const SizedBox(height: 3),
-            Text(
-              label,
-              style: AppTypography.captionBold.copyWith(
-                color: isSelected
-                    ? AppColors.goldDark
-                    : AppColors.textSecondary,
-                fontSize: 10,
-              ),
-            ),
-          ],
-        ),
-      ),
     );
   }
 }

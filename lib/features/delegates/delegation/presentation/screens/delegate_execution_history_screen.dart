@@ -1,108 +1,75 @@
-// lib/features/delegation/presentation/screens/delegate_execution_history_screen.dart
+// lib/features/delegates/delegation/presentation/screens/delegate_execution_history_screen.dart
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../../core/constants/app_colors.dart';
 import '../../../../../core/constants/app_spacing.dart';
 import '../../../../../core/constants/app_typography.dart';
 import '../../../../../core/constants/app_radius.dart';
-
-/// Model data untuk item riwayat eksekusi.
-class _ExecutionItem {
-  final String title;
-  final String date;
-  final int votes;
-  final int? mandators;
-  final String? accuracy;
-  final String status;
-
-  const _ExecutionItem({
-    required this.title,
-    required this.date,
-    required this.votes,
-    this.mandators,
-    this.accuracy,
-    required this.status,
-  });
-}
+import 'package:voteryxapp/features/delegates/delegation/application/delegate_dashboard_provider.dart';
 
 /// Layar Riwayat Eksekusi — menampilkan ringkasan statistik
-/// dan daftar pemilihan yang pernah dieksekusi.
-class DelegateExecutionHistoryScreen extends StatefulWidget {
+/// dan daftar pemilihan yang pernah atau siap dieksekusi secara dinamis dari database.
+class DelegateExecutionHistoryScreen extends ConsumerStatefulWidget {
   const DelegateExecutionHistoryScreen({super.key});
 
   @override
-  State<DelegateExecutionHistoryScreen> createState() =>
+  ConsumerState<DelegateExecutionHistoryScreen> createState() =>
       _DelegateExecutionHistoryScreenState();
 }
 
 class _DelegateExecutionHistoryScreenState
-    extends State<DelegateExecutionHistoryScreen> {
+    extends ConsumerState<DelegateExecutionHistoryScreen> {
   int _selectedFilter = 0;
   final List<String> _filters = ['Semua', 'Menunggu', 'Selesai'];
 
-  static const List<_ExecutionItem> _items = [
-    _ExecutionItem(
-      title: 'Ketua BEM UI 2026',
-      date: '07 Jun 2026',
-      votes: 47,
-      mandators: 12,
-      accuracy: '96% tepat waktu',
-      status: 'Menunggu',
-    ),
-    _ExecutionItem(
-      title: 'HIMA Teknik 2025',
-      date: '12 Des 2025',
-      votes: 31,
-      mandators: 8,
-      status: 'Selesai',
-    ),
-    _ExecutionItem(
-      title: 'Rektor 2024',
-      date: '15 Nov 2024',
-      votes: 18,
-      status: 'Selesai',
-    ),
-  ];
-
-  List<_ExecutionItem> get _filteredItems {
-    if (_selectedFilter == 0) return _items; // Semua
+  List<DelegateExecutionItem> _getFilteredItems(List<DelegateExecutionItem> items) {
+    if (_selectedFilter == 0) return items; // Semua
     final keyword = _filters[_selectedFilter].toLowerCase();
-    return _items.where((item) => 
-      item.status.toLowerCase() == keyword
-    ).toList();
+    return items.where((item) => item.status.toLowerCase() == keyword).toList();
   }
 
   @override
   Widget build(BuildContext context) {
+    final dashboardAsync = ref.watch(delegateDashboardProvider);
+    final data = dashboardAsync.valueOrNull ?? const DelegateDashboardData();
+    final items = data.executionHistory;
+    final filteredItems = _getFilteredItems(items);
+
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: _buildAppBar(),
       body: Container(
         decoration: const BoxDecoration(gradient: AppColors.pageGradient),
-        child: SingleChildScrollView(
-          physics: const ClampingScrollPhysics(),
-          padding: const EdgeInsets.symmetric(
-            horizontal: AppSpacing.lg,
-            vertical: AppSpacing.lg,
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _buildStatsCard(),
-              const SizedBox(height: AppSpacing.xl),
-              _buildFilterChips(),
-              const SizedBox(height: AppSpacing.xl),
-              if (_filteredItems.isEmpty)
-                const Center(
-                  child: Padding(
-                    padding: EdgeInsets.all(20.0),
-                    child: Text('Tidak ada riwayat untuk filter ini'),
-                  ),
-                )
-              else
-                ..._filteredItems.map(_buildExecutionCard),
-              const SizedBox(height: AppSpacing.xl),
-            ],
+        child: RefreshIndicator(
+          onRefresh: () async {
+            ref.invalidate(delegateDashboardProvider);
+          },
+          child: SingleChildScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            padding: const EdgeInsets.symmetric(
+              horizontal: AppSpacing.lg,
+              vertical: AppSpacing.lg,
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _buildStatsCard(data),
+                const SizedBox(height: AppSpacing.xl),
+                _buildFilterChips(),
+                const SizedBox(height: AppSpacing.xl),
+                if (filteredItems.isEmpty)
+                  const Center(
+                    child: Padding(
+                      padding: EdgeInsets.all(40.0),
+                      child: Text('Tidak ada riwayat untuk filter ini'),
+                    ),
+                  )
+                else
+                  ...filteredItems.map(_buildExecutionCard),
+                const SizedBox(height: AppSpacing.xl),
+              ],
+            ),
           ),
         ),
       ),
@@ -116,24 +83,27 @@ class _DelegateExecutionHistoryScreenState
       backgroundColor: AppColors.primary800,
       elevation: 0,
       automaticallyImplyLeading: false,
-      title: Text(
-        'Riwayat Eksekusi',
-        style: AppTypography.headerTitle,
+      title: Padding(
+        padding: const EdgeInsets.only(left: 16.0),
+        child: Text(
+          'Riwayat Eksekusi',
+          style: AppTypography.headerTitle.copyWith(color: Colors.white),
+        ),
       ),
     );
   }
 
   // ──────────────────── Stats Summary Card ───────────────────────
-  Widget _buildStatsCard() {
+  Widget _buildStatsCard(DelegateDashboardData data) {
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
       decoration: BoxDecoration(
         color: const Color(0xFFFBF5E6),
         borderRadius: BorderRadius.circular(AppRadius.card),
-        border: Border.all(color: AppColors.goldMid.withOpacity(0.25)),
+        border: Border.all(color: AppColors.goldMid.withValues(alpha: 0.25)),
         boxShadow: [
           BoxShadow(
-            color: AppColors.goldMid.withOpacity(0.08),
+            color: AppColors.goldMid.withValues(alpha: 0.08),
             blurRadius: 12,
             offset: const Offset(0, 4),
           ),
@@ -142,19 +112,19 @@ class _DelegateExecutionHistoryScreenState
       child: IntrinsicHeight(
         child: Row(
           children: [
-            Expanded(child: _buildStatItem('3', 'PEMILIHAN')),
+            Expanded(child: _buildStatItem('${data.executionHistory.length}', 'PEMILIHAN')),
             VerticalDivider(
-              color: AppColors.goldDark.withOpacity(0.2),
+              color: AppColors.goldDark.withValues(alpha: 0.2),
               thickness: 1,
               width: 1,
             ),
-            Expanded(child: _buildStatItem('96', 'TOTAL SUARA')),
+            Expanded(child: _buildStatItem('${data.totalVotesHeld}', 'TOTAL SUARA')),
             VerticalDivider(
-              color: AppColors.goldDark.withOpacity(0.2),
+              color: AppColors.goldDark.withValues(alpha: 0.2),
               thickness: 1,
               width: 1,
             ),
-            Expanded(child: _buildStatItem('100%', 'TEPAT WAKTU')),
+            Expanded(child: _buildStatItem('${data.executionRate.round()}%', 'TEPAT WAKTU')),
           ],
         ),
       ),
@@ -215,8 +185,7 @@ class _DelegateExecutionHistoryScreenState
                 child: Text(
                   _filters[i],
                   style: AppTypography.bodyMedium.copyWith(
-                    color:
-                        isSelected ? Colors.white : AppColors.textSecondary,
+                    color: isSelected ? Colors.white : AppColors.textSecondary,
                     fontWeight: isSelected ? FontWeight.w700 : FontWeight.w400,
                   ),
                 ),
@@ -229,138 +198,143 @@ class _DelegateExecutionHistoryScreenState
   }
 
   // ──────────────────── Execution Card ──────────────────────────
-  Widget _buildExecutionCard(_ExecutionItem item) {
+  Widget _buildExecutionCard(DelegateExecutionItem item) {
     final bool isSelesai = item.status.toLowerCase() == 'selesai';
     final Color badgeColor = isSelesai ? const Color(0xFF10B981) : AppColors.goldDark;
-    final Color badgeBgColor = badgeColor.withOpacity(0.15);
+    final Color badgeBgColor = badgeColor.withValues(alpha: 0.15);
 
     return GestureDetector(
-      onTap: () => context.pushNamed('delegate-dashboard'),
+      onTap: () {
+        if (!isSelesai) {
+          context.pushNamed('delegate-vote-execution');
+        } else {
+          context.pushNamed('delegate-dashboard');
+        }
+      },
       child: Container(
-      margin: const EdgeInsets.only(bottom: AppSpacing.md),
-      clipBehavior: Clip.antiAlias,
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(AppRadius.card),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.03),
-            blurRadius: 12,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: IntrinsicHeight(
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            // Left accent bar
-            Container(width: 4, color: badgeColor),
-            // Card content
-            Expanded(
-              child: Padding(
-                padding: const EdgeInsets.all(AppSpacing.md),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Header row: icon + title/date + status badge
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        // Icon box
-                        Container(
-                          padding: const EdgeInsets.all(10),
-                          decoration: BoxDecoration(
-                            color: badgeBgColor,
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Icon(
-                            Icons.list_alt_rounded,
-                            color: badgeColor,
-                            size: 24,
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        // Title and date
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                item.title,
-                                style: AppTypography.displayHeading.copyWith(
-                                  fontSize: 17,
-                                  color: AppColors.primary900,
-                                  height: 1.25,
-                                ),
-                              ),
-                              const SizedBox(height: 2),
-                              Text(
-                                item.date,
-                                style: AppTypography.caption.copyWith(
-                                  color: AppColors.textSecondary,
-                                  fontSize: 12,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        // Status badge
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 10,
-                            vertical: 4,
-                          ),
-                          decoration: BoxDecoration(
-                            color: badgeBgColor,
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Text(
-                            item.status,
-                            style: AppTypography.captionBold.copyWith(
-                              color: badgeColor,
-                              fontSize: 11,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 14),
-                    // Badges row
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: [
-                        _buildBadge(
-                          Icons.how_to_vote_rounded,
-                          '${item.votes} suara',
-                          bgColor: AppColors.goldDark,
-                          textColor: Colors.white,
-                        ),
-                        if (item.mandators != null)
-                          _buildBadge(
-                            Icons.people,
-                            '${item.mandators} mandator',
-                            bgColor: AppColors.primary900,
-                            textColor: Colors.white,
-                          ),
-                        if (item.accuracy != null)
-                          _buildBadge(
-                            Icons.timer_outlined,
-                            item.accuracy!,
-                            bgColor: badgeBgColor,
-                            textColor: badgeColor,
-                          ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
+        margin: const EdgeInsets.only(bottom: AppSpacing.md),
+        clipBehavior: Clip.antiAlias,
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(AppRadius.card),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.03),
+              blurRadius: 12,
+              offset: const Offset(0, 4),
             ),
           ],
         ),
-      ),
+        child: IntrinsicHeight(
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // Left accent bar
+              Container(width: 4, color: badgeColor),
+              // Card content
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.all(AppSpacing.md),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Header row: icon + title/date + status badge
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          // Icon box
+                          Container(
+                            padding: const EdgeInsets.all(10),
+                            decoration: BoxDecoration(
+                              color: badgeBgColor,
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Icon(
+                              isSelesai ? Icons.check_circle_outline : Icons.pending_actions_rounded,
+                              color: badgeColor,
+                              size: 24,
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          // Title and date
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  item.title,
+                                  style: AppTypography.displayHeading.copyWith(
+                                    fontSize: 17,
+                                    color: AppColors.primary900,
+                                    height: 1.25,
+                                  ),
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  item.dateString,
+                                  style: AppTypography.caption.copyWith(
+                                    color: AppColors.textSecondary,
+                                    fontSize: 12,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          // Status badge
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 4,
+                            ),
+                            decoration: BoxDecoration(
+                              color: badgeBgColor,
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Text(
+                              item.status,
+                              style: AppTypography.captionBold.copyWith(
+                                color: badgeColor,
+                                fontSize: 11,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 14),
+                      // Badges row
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: [
+                          _buildBadge(
+                            Icons.how_to_vote_rounded,
+                            '${item.totalVotes} suara',
+                            bgColor: AppColors.goldDark,
+                            textColor: Colors.white,
+                          ),
+                          _buildBadge(
+                            Icons.people,
+                            '${item.totalMandators} mandator',
+                            bgColor: AppColors.primary900,
+                            textColor: Colors.white,
+                          ),
+                          if (item.accuracy != null)
+                            _buildBadge(
+                              Icons.timer_outlined,
+                              item.accuracy!,
+                              bgColor: badgeBgColor,
+                              textColor: badgeColor,
+                            ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

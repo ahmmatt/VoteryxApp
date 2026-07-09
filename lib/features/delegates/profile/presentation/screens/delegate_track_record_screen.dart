@@ -1,13 +1,14 @@
-// lib/features/profile/presentation/screens/delegate_track_record_screen.dart
+// lib/features/delegates/profile/presentation/screens/delegate_track_record_screen.dart
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../../core/constants/app_colors.dart';
 import '../../../../../core/constants/app_spacing.dart';
 import '../../../../../core/constants/app_typography.dart';
 import '../../../../../core/constants/app_radius.dart';
+import 'package:voteryxapp/features/user/profile/presentation/providers/profile_provider.dart';
 
 // ─────────────────── Model ─────────────────────────────────────────────────
 
-/// Model untuk satu rekam jejak / pencapaian delegate.
 class _TrackRecordItem {
   final String dateRange;
   final String title;
@@ -20,41 +21,123 @@ class _TrackRecordItem {
     required this.description,
     this.tags = const [],
   });
+
+  factory _TrackRecordItem.fromJson(Map<String, dynamic> json) {
+    return _TrackRecordItem(
+      dateRange: json['dateRange'] as String? ?? '',
+      title: json['title'] as String? ?? '',
+      description: json['description'] as String? ?? '',
+      tags: (json['tags'] as List<dynamic>?)?.map((e) => e.toString()).toList() ?? [],
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'dateRange': dateRange,
+      'title': title,
+      'description': description,
+      'tags': tags,
+    };
+  }
 }
 
 // ─────────────────── Screen ────────────────────────────────────────────────
 
-/// Layar Track Record — menampilkan riwayat organisasi/kepemimpinan
-/// dalam bentuk timeline interaktif dengan tombol edit/hapus.
-class DelegateTrackRecordScreen extends StatelessWidget {
+class DelegateTrackRecordScreen extends ConsumerStatefulWidget {
   const DelegateTrackRecordScreen({super.key});
 
-  static const List<_TrackRecordItem> _records = [
-    _TrackRecordItem(
-      dateRange: '2023 – SEKARANG',
-      title: 'Ketua Himpunan Mahasiswa',
-      description:
-          'Bertanggung jawab atas koordinasi 12 departemen dan 150+ anggota aktif dalam menjalankan program kerja tahunan.',
-      tags: ['Leadership', 'Strategic Planning'],
-    ),
-    _TrackRecordItem(
-      dateRange: '2022 – 2023',
-      title: 'Kepala Departemen Advokasi',
-      description:
-          'Berhasil menegosiasikan penurunan biaya parkir kampus dan penambahan fasilitas ruang belajar terbuka.',
-      tags: ['Negotiation', 'Public Policy'],
-    ),
-    _TrackRecordItem(
-      dateRange: 'FEBRUARI 2023',
-      title: 'Juara 1 Lomba Karya Tulis Nasional',
-      description:
-          'Menyusun riset tentang "Transparansi Dana Kampus Berbasis Blockchain" yang diadopsi oleh fakultas.',
-      tags: [],
-    ),
-  ];
+  @override
+  ConsumerState<DelegateTrackRecordScreen> createState() =>
+      _DelegateTrackRecordScreenState();
+}
+
+class _DelegateTrackRecordScreenState extends ConsumerState<DelegateTrackRecordScreen> {
+  bool _initialized = false;
+  final List<_TrackRecordItem> _records = [];
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (!_initialized) {
+      final profile = ref.read(userProfileProvider).valueOrNull;
+      final savedRecords = profile?.delegateTrackRecords ?? [];
+      if (savedRecords.isNotEmpty) {
+        _records.addAll(savedRecords.map((json) => _TrackRecordItem.fromJson(json)));
+      }
+      _initialized = true;
+    }
+  }
+
+  void _addRecord(_TrackRecordItem item) {
+    setState(() {
+      _records.add(item);
+    });
+  }
+
+  void _editRecord(int index, _TrackRecordItem item) {
+    setState(() {
+      _records[index] = item;
+    });
+  }
+
+  void _deleteRecord(int index) {
+    setState(() {
+      _records.removeAt(index);
+    });
+  }
+
+  Future<void> _saveToDatabase() async {
+    final recordsJson = _records.map((r) => r.toJson()).toList();
+    await ref.read(profileUpdateProvider.notifier).updateProfile(
+          delegateTrackRecords: recordsJson,
+        );
+    if (!mounted) return;
+    final state = ref.read(profileUpdateProvider);
+    if (state.error == null) {
+      ref.invalidate(userProfileProvider);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Track Record berhasil disimpan'),
+          backgroundColor: Color(0xFF10B981),
+        ),
+      );
+      Navigator.pop(context);
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Gagal menyimpan: ${state.error}'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
+  void _showRecordDialog({int? editIndex}) {
+    final isEdit = editIndex != null;
+    final initialItem = isEdit ? _records[editIndex] : null;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => _TrackRecordFormDialog(
+        initialItem: initialItem,
+        onSave: (item) {
+          if (isEdit) {
+            _editRecord(editIndex, item);
+          } else {
+            _addRecord(item);
+          }
+        },
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
+    final updateState = ref.watch(profileUpdateProvider);
+    final isLoading = updateState.isLoading;
+
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: _buildAppBar(context),
@@ -71,33 +154,42 @@ class DelegateTrackRecordScreen extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Page Header
                   _buildPageHeader(),
                   const SizedBox(height: AppSpacing.xl),
-
-                  // Timeline
-                  ...List.generate(_records.length, (i) {
-                    final isLast = i == _records.length - 1;
-                    return _TimelineItem(
-                      item: _records[i],
-                      isLast: isLast,
-                    );
-                  }),
-
+                  if (_records.isEmpty)
+                    Center(
+                      child: Padding(
+                        padding: const EdgeInsets.all(AppSpacing.xl),
+                        child: Text(
+                          'Belum ada track record.\nSilakan tambah pengalaman Anda.',
+                          textAlign: TextAlign.center,
+                          style: AppTypography.bodyText.copyWith(
+                            color: AppColors.outline,
+                          ),
+                        ),
+                      ),
+                    )
+                  else
+                    ...List.generate(_records.length, (i) {
+                      final isLast = i == _records.length - 1;
+                      return _TimelineItem(
+                        item: _records[i],
+                        isLast: isLast,
+                        onEdit: () => _showRecordDialog(editIndex: i),
+                        onDelete: () => _deleteRecord(i),
+                      );
+                    }),
                   const SizedBox(height: AppSpacing.xxl),
                 ],
               ),
             ),
           ),
-
-          // Pinned Add Button
-          _buildAddButton(context),
+          _buildActionButtons(context, isLoading),
         ],
       ),
     );
   }
 
-  // ─────────────────────────── AppBar ──────────────────────────────
   PreferredSizeWidget _buildAppBar(BuildContext context) {
     return AppBar(
       backgroundColor: AppColors.primary800,
@@ -113,7 +205,6 @@ class DelegateTrackRecordScreen extends StatelessWidget {
     );
   }
 
-  // ─────────────────── Page Header ─────────────────────────────────
   Widget _buildPageHeader() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -121,7 +212,6 @@ class DelegateTrackRecordScreen extends StatelessWidget {
         Row(
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            // Zigzag / show-chart icon sesuai Figma
             const Icon(
               Icons.show_chart_rounded,
               color: AppColors.goldDark,
@@ -153,8 +243,7 @@ class DelegateTrackRecordScreen extends StatelessWidget {
     );
   }
 
-  // ─────────────────── Add Button ──────────────────────────────────
-  Widget _buildAddButton(BuildContext context) {
+  Widget _buildActionButtons(BuildContext context, bool isLoading) {
     return SafeArea(
       top: false,
       child: Padding(
@@ -164,29 +253,63 @@ class DelegateTrackRecordScreen extends StatelessWidget {
           AppSpacing.md,
           AppSpacing.md,
         ),
-        child: SizedBox(
-          width: double.infinity,
-          height: 52,
-          child: ElevatedButton.icon(
-            onPressed: () {},
-            icon: const Icon(Icons.add_rounded, size: 20),
-            label: Text(
-              'Tambah Rekam Jejak',
-              style: AppTypography.bodyMedium.copyWith(
-                color: Colors.white,
-                fontWeight: FontWeight.w700,
-                fontSize: 14,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            SizedBox(
+              width: double.infinity,
+              height: 52,
+              child: OutlinedButton.icon(
+                onPressed: isLoading ? null : () => _showRecordDialog(),
+                icon: const Icon(Icons.add_rounded, size: 20),
+                label: Text(
+                  'Tambah Rekam Jejak',
+                  style: AppTypography.bodyMedium.copyWith(
+                    fontWeight: FontWeight.w700,
+                    fontSize: 14,
+                  ),
+                ),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: AppColors.primary900,
+                  side: const BorderSide(color: AppColors.primary900),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(AppRadius.button),
+                  ),
+                ),
               ),
             ),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.goldDark,
-              foregroundColor: Colors.white,
-              elevation: 0,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(AppRadius.button),
+            const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              height: 52,
+              child: ElevatedButton.icon(
+                onPressed: isLoading ? null : _saveToDatabase,
+                icon: isLoading
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                      )
+                    : const Icon(Icons.save_outlined, size: 18),
+                label: Text(
+                  isLoading ? 'Menyimpan...' : 'Simpan Perubahan',
+                  style: AppTypography.bodyMedium.copyWith(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w700,
+                    fontSize: 14,
+                  ),
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.goldDark,
+                  foregroundColor: Colors.white,
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(AppRadius.button),
+                  ),
+                ),
               ),
             ),
-          ),
+          ],
         ),
       ),
     );
@@ -195,15 +318,18 @@ class DelegateTrackRecordScreen extends StatelessWidget {
 
 // ─────────────────── Timeline Item Widget ─────────────────────────────────
 
-/// Satu baris timeline: dot + vertical line di kiri, card konten di kanan.
 class _TimelineItem extends StatelessWidget {
   const _TimelineItem({
     required this.item,
     required this.isLast,
+    required this.onEdit,
+    required this.onDelete,
   });
 
   final _TrackRecordItem item;
   final bool isLast;
+  final VoidCallback onEdit;
+  final VoidCallback onDelete;
 
   @override
   Widget build(BuildContext context) {
@@ -211,12 +337,10 @@ class _TimelineItem extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // ── Timeline Graphics ──────────────────────────────────────
           SizedBox(
             width: 20,
             child: Column(
               children: [
-                // Dot (dipusatkan sejajar dengan dateRange di card)
                 const SizedBox(height: 22),
                 Container(
                   width: 12,
@@ -226,7 +350,6 @@ class _TimelineItem extends StatelessWidget {
                     shape: BoxShape.circle,
                   ),
                 ),
-                // Vertical line ke item berikutnya
                 if (!isLast)
                   Expanded(
                     child: Center(
@@ -242,8 +365,6 @@ class _TimelineItem extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 14),
-
-          // ── Content Card ───────────────────────────────────────────
           Expanded(
             child: Padding(
               padding: EdgeInsets.only(
@@ -265,7 +386,6 @@ class _TimelineItem extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Date + action icons
                     Row(
                       crossAxisAlignment: CrossAxisAlignment.center,
                       children: [
@@ -279,9 +399,8 @@ class _TimelineItem extends StatelessWidget {
                             ),
                           ),
                         ),
-                        // Edit icon
                         GestureDetector(
-                          onTap: () {},
+                          onTap: onEdit,
                           behavior: HitTestBehavior.opaque,
                           child: const Padding(
                             padding: EdgeInsets.all(4),
@@ -293,9 +412,8 @@ class _TimelineItem extends StatelessWidget {
                           ),
                         ),
                         const SizedBox(width: 8),
-                        // Delete icon
                         GestureDetector(
-                          onTap: () {},
+                          onTap: onDelete,
                           behavior: HitTestBehavior.opaque,
                           child: const Padding(
                             padding: EdgeInsets.all(4),
@@ -309,8 +427,6 @@ class _TimelineItem extends StatelessWidget {
                       ],
                     ),
                     const SizedBox(height: 8),
-
-                    // Title
                     Text(
                       item.title,
                       style: AppTypography.displayHeading.copyWith(
@@ -320,8 +436,6 @@ class _TimelineItem extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(height: 8),
-
-                    // Description
                     Text(
                       item.description,
                       style: AppTypography.bodyText.copyWith(
@@ -330,8 +444,6 @@ class _TimelineItem extends StatelessWidget {
                         height: 1.5,
                       ),
                     ),
-
-                    // Tags
                     if (item.tags.isNotEmpty) ...[
                       const SizedBox(height: 12),
                       Wrap(
@@ -364,6 +476,147 @@ class _TimelineItem extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+// ─────────────────── Dialog Form ──────────────────────────────────────────────
+
+class _TrackRecordFormDialog extends StatefulWidget {
+  final _TrackRecordItem? initialItem;
+  final ValueChanged<_TrackRecordItem> onSave;
+
+  const _TrackRecordFormDialog({this.initialItem, required this.onSave});
+
+  @override
+  State<_TrackRecordFormDialog> createState() => _TrackRecordFormDialogState();
+}
+
+class _TrackRecordFormDialogState extends State<_TrackRecordFormDialog> {
+  late TextEditingController _titleController;
+  late TextEditingController _dateController;
+  late TextEditingController _descController;
+  late TextEditingController _tagsController;
+
+  @override
+  void initState() {
+    super.initState();
+    _titleController = TextEditingController(text: widget.initialItem?.title);
+    _dateController = TextEditingController(text: widget.initialItem?.dateRange);
+    _descController = TextEditingController(text: widget.initialItem?.description);
+    _tagsController = TextEditingController(
+      text: widget.initialItem?.tags.join(', '),
+    );
+  }
+
+  @override
+  void dispose() {
+    _titleController.dispose();
+    _dateController.dispose();
+    _descController.dispose();
+    _tagsController.dispose();
+    super.dispose();
+  }
+
+  void _handleSave() {
+    final title = _titleController.text.trim();
+    final date = _dateController.text.trim();
+    final desc = _descController.text.trim();
+    final tagsRaw = _tagsController.text.trim();
+
+    if (title.isEmpty || date.isEmpty || desc.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Judul, Tanggal, dan Deskripsi wajib diisi')),
+      );
+      return;
+    }
+
+    final tags = tagsRaw
+        .split(',')
+        .map((e) => e.trim())
+        .where((e) => e.isNotEmpty)
+        .toList();
+
+    widget.onSave(_TrackRecordItem(
+      dateRange: date,
+      title: title,
+      description: desc,
+      tags: tags,
+    ));
+    Navigator.pop(context);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: const BoxDecoration(
+        color: AppColors.background,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      padding: EdgeInsets.only(
+        bottom: MediaQuery.of(context).viewInsets.bottom,
+      ),
+      child: SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.all(AppSpacing.lg),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                widget.initialItem == null
+                    ? 'Tambah Track Record'
+                    : 'Edit Track Record',
+                style: AppTypography.headerTitle.copyWith(
+                  color: AppColors.primary900,
+                  fontSize: 18,
+                ),
+              ),
+              const SizedBox(height: 16),
+              _buildTextField('Judul (ex: Ketua Himpunan)', _titleController),
+              const SizedBox(height: 12),
+              _buildTextField('Waktu (ex: 2023 - Sekarang)', _dateController),
+              const SizedBox(height: 12),
+              _buildTextField('Deskripsi', _descController, maxLines: 3),
+              const SizedBox(height: 12),
+              _buildTextField('Tags (pisahkan dengan koma)', _tagsController),
+              const SizedBox(height: 24),
+              SizedBox(
+                width: double.infinity,
+                height: 50,
+                child: ElevatedButton(
+                  onPressed: _handleSave,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.goldDark,
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(AppRadius.button),
+                    ),
+                  ),
+                  child: const Text('Simpan'),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTextField(String label, TextEditingController controller,
+      {int maxLines = 1}) {
+    return TextField(
+      controller: controller,
+      maxLines: maxLines,
+      decoration: InputDecoration(
+        labelText: label,
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(AppRadius.input),
+        ),
+        filled: true,
+        fillColor: Colors.white,
       ),
     );
   }

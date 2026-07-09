@@ -1,47 +1,129 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import '../../../../../core/constants/app_colors.dart';
-import '../../../../../core/constants/app_spacing.dart';
-import '../../../../../core/constants/app_typography.dart';
-import '../../../../../core/constants/app_radius.dart';
+import 'package:voteryxapp/core/constants/app_colors.dart';
+import 'package:voteryxapp/core/constants/app_spacing.dart';
+import 'package:voteryxapp/core/constants/app_typography.dart';
+import 'package:voteryxapp/core/constants/app_radius.dart';
+import 'package:voteryxapp/features/user/election/domain/entities/election.dart';
+import 'package:voteryxapp/features/user/election/presentation/providers/election_provider.dart';
 
-class ElectionsTab extends StatelessWidget {
+class ElectionsTab extends ConsumerWidget {
   const ElectionsTab({super.key});
 
+  String _formatDate(DateTime dt) {
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agt', 'Sep', 'Okt', 'Nov', 'Des'];
+    return '${dt.day} ${months[dt.month - 1]} ${dt.year}';
+  }
+
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final electionsAsync = ref.watch(allElectionsProvider);
+
     return Column(
       children: [
         // Top Section (Navy Background AppBar)
-        _buildAppBar(context),
+        _buildAppBar(context, ref),
         
         // Body
         Expanded(
           child: Container(
             color: AppColors.background,
-            child: ListView(
-              padding: const EdgeInsets.all(AppSpacing.md),
-              physics: const ClampingScrollPhysics(),
-              children: [
-                Text(
-                  'Daftar Pemilihan',
-                  style: AppTypography.displayHeading.copyWith(fontSize: 24),
+            child: electionsAsync.when(
+              loading: () => const Center(
+                child: CircularProgressIndicator(color: AppColors.primary800),
+              ),
+              error: (err, stack) => Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(24),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Icon(Icons.error_outline, size: 48, color: AppColors.errorRed),
+                      const SizedBox(height: 12),
+                      Text('Gagal memuat daftar pemilihan', style: AppTypography.cardTitle.copyWith(color: AppColors.primary800)),
+                      const SizedBox(height: 6),
+                      Text(err.toString(), style: AppTypography.caption.copyWith(color: AppColors.textSecondary), textAlign: TextAlign.center),
+                      const SizedBox(height: 16),
+                      ElevatedButton(
+                        onPressed: () => ref.invalidate(allElectionsProvider),
+                        style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary800),
+                        child: const Text('Coba Lagi', style: TextStyle(color: Colors.white)),
+                      ),
+                    ],
+                  ),
                 ),
-                const SizedBox(height: 4),
-                Text(
-                  'Tentukan masa depan institusi Anda hari ini.',
-                  style: AppTypography.bodyText.copyWith(color: AppColors.textSecondary),
-                ),
-                const SizedBox(height: AppSpacing.xl),
-                
-                // Live Election Card
-                _buildLiveElectionCard(context),
-                const SizedBox(height: AppSpacing.lg),
-                
-                // Completed Election Card
-                _buildCompletedElectionCard(),
-                const SizedBox(height: AppSpacing.xxl),
-              ],
+              ),
+              data: (elections) {
+                // Filter hanya pemilihan aktif & lengkap (kandidat >= 2)
+                final activeElections = elections
+                    .where((e) => (e.status == 'live' || e.status == 'scheduled') && e.candidateCount >= 2 && e.title.isNotEmpty)
+                    .toList();
+                final completedElections = elections
+                    .where((e) => e.status == 'completed' || e.status == 'ended')
+                    .toList();
+
+                if (activeElections.isEmpty && completedElections.isEmpty) {
+                  return Center(
+                    child: Padding(
+                      padding: const EdgeInsets.all(32),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.how_to_vote_outlined, size: 64, color: AppColors.textSecondary.withOpacity(0.5)),
+                          const SizedBox(height: 16),
+                          Text('Belum Ada Pemilihan Terverifikasi', style: AppTypography.cardTitle.copyWith(color: AppColors.primary800)),
+                          const SizedBox(height: 8),
+                          Text(
+                            'Saat ini belum ada pemilihan yang memenuhi syarat (minimal 2 paslon terverifikasi dan berstatus aktif/terjadwal).',
+                            style: AppTypography.bodySmall.copyWith(color: AppColors.textSecondary),
+                            textAlign: TextAlign.center,
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                }
+
+                return ListView(
+                  padding: const EdgeInsets.all(AppSpacing.md),
+                  physics: const ClampingScrollPhysics(),
+                  children: [
+                    Text(
+                      'Daftar Pemilihan',
+                      style: AppTypography.displayHeading.copyWith(fontSize: 24),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Tentukan masa depan institusi Anda hari ini.',
+                      style: AppTypography.bodyText.copyWith(color: AppColors.textSecondary),
+                    ),
+                    const SizedBox(height: AppSpacing.xl),
+                    
+                    // Live & Scheduled Election Cards
+                    if (activeElections.isNotEmpty) ...[
+                      Text('Pemilihan Berlangsung & Terjadwal', style: AppTypography.itemTitle.copyWith(color: AppColors.primary800)),
+                      const SizedBox(height: AppSpacing.sm),
+                      ...activeElections.map((e) => Padding(
+                            padding: const EdgeInsets.only(bottom: AppSpacing.lg),
+                            child: _buildDynamicLiveElectionCard(context, e),
+                          )),
+                    ],
+                    
+                    // Completed Election Cards
+                    if (completedElections.isNotEmpty) ...[
+                      const SizedBox(height: AppSpacing.md),
+                      Text('Riwayat Pemilihan Selesai', style: AppTypography.itemTitle.copyWith(color: AppColors.primary800)),
+                      const SizedBox(height: AppSpacing.sm),
+                      ...completedElections.map((e) => Padding(
+                            padding: const EdgeInsets.only(bottom: AppSpacing.lg),
+                            child: _buildDynamicCompletedElectionCard(context, e),
+                          )),
+                    ],
+                    const SizedBox(height: AppSpacing.xxl),
+                  ],
+                );
+              },
             ),
           ),
         ),
@@ -49,7 +131,7 @@ class ElectionsTab extends StatelessWidget {
     );
   }
 
-  Widget _buildAppBar(BuildContext context) {
+  Widget _buildAppBar(BuildContext context, WidgetRef ref) {
     return Container(
       width: double.infinity,
       color: AppColors.primary800,
@@ -60,39 +142,46 @@ class ElectionsTab extends StatelessWidget {
         right: AppSpacing.pagePad,
       ),
       child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          GestureDetector(
-            onTap: () {
-              // Can go back to home tab if needed, or pop if it was pushed
-            },
-            child: const Icon(
-              Icons.arrow_back,
-              color: Colors.white,
-              size: 24,
-            ),
+          Row(
+            children: [
+              GestureDetector(
+                onTap: () => context.canPop() ? context.pop() : context.go('/dashboard'),
+                child: const Icon(Icons.arrow_back, color: Colors.white, size: 24),
+              ),
+              const SizedBox(width: AppSpacing.sm),
+              Text(
+                'Elections',
+                style: AppTypography.headerTitle.copyWith(fontSize: 20, color: Colors.white),
+              ),
+            ],
           ),
-          const SizedBox(width: AppSpacing.sm),
-          Text(
-            'Elections',
-            style: AppTypography.headerTitle.copyWith(
-              fontSize: 20,
-              color: Colors.white,
-            ),
+          IconButton(
+            icon: const Icon(Icons.refresh, color: Colors.white),
+            onPressed: () => ref.invalidate(allElectionsProvider),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildLiveElectionCard(BuildContext context) {
+  Widget _buildDynamicLiveElectionCard(BuildContext context, Election election) {
+    final isLive = election.isLive;
+    final statusColor = isLive ? AppColors.goldDark : const Color(0xFF1E50FF);
+    final statusBg = isLive ? const Color(0xFFFFF6E5) : const Color(0xFFE5EEFF);
+    final statusText = isLive ? 'SEDANG BERLANGSUNG' : 'TERJADWAL';
+    final dotColor = isLive ? AppColors.goldMid : const Color(0xFF1E50FF);
+
     return Container(
       padding: const EdgeInsets.all(AppSpacing.lg),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(AppRadius.card),
+        border: Border.all(color: isLive ? AppColors.glassBorderGold : AppColors.outlineVariant),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.02),
+            color: Colors.black.withOpacity(0.04),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
@@ -108,105 +197,85 @@ class ElectionsTab extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFFFEBEB), // Light red
+                  color: statusBg,
                   borderRadius: BorderRadius.circular(16),
                 ),
                 child: Row(
+                  mainAxisSize: MainAxisSize.min,
                   children: [
                     Container(
                       width: 6,
                       height: 6,
-                      decoration: const BoxDecoration(
-                        color: Color(0xFFE53935), // Red
-                        shape: BoxShape.circle,
-                      ),
+                      decoration: BoxDecoration(color: dotColor, shape: BoxShape.circle),
                     ),
                     const SizedBox(width: 6),
-                    Text(
-                      'Live',
-                      style: AppTypography.captionBold.copyWith(color: const Color(0xFFE53935)),
-                    ),
+                    Text(statusText, style: AppTypography.captionBold.copyWith(color: statusColor, fontSize: 10)),
                   ],
                 ),
               ),
-              const Icon(Icons.receipt_long_outlined, color: AppColors.navyMid, size: 24),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF3F4F6),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.access_time, size: 12, color: AppColors.textSecondary),
+                    const SizedBox(width: 4),
+                    Text(election.timeRemainingFormatted, style: AppTypography.captionBold.copyWith(color: AppColors.textSecondary, fontSize: 10)),
+                  ],
+                ),
+              ),
             ],
           ),
           const SizedBox(height: AppSpacing.md),
           
-          Text('Pemilihan Ketua BEM 2026', style: AppTypography.screenTitle.copyWith(fontSize: 20)),
-          const SizedBox(height: 8),
-          Row(
-            children: [
-              const Icon(Icons.access_time, color: AppColors.navyMid, size: 16),
-              const SizedBox(width: 6),
-              Text('02 HARI : 14 JAM : 30 MENIT', style: AppTypography.captionBold.copyWith(color: AppColors.navyMid)),
-            ],
-          ),
-          const SizedBox(height: AppSpacing.xl),
-          
-          // Progress Section
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text('Partisipasi Pemilih', style: AppTypography.bodyMedium.copyWith(fontWeight: FontWeight.w600)),
-              Text('62%', style: AppTypography.bodyMedium.copyWith(fontWeight: FontWeight.bold, color: AppColors.goldDark)),
-            ],
-          ),
-          const SizedBox(height: 8),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(4),
-            child: const LinearProgressIndicator(
-              value: 0.62,
-              backgroundColor: Color(0xFFE4E9F7),
-              valueColor: AlwaysStoppedAnimation<Color>(AppColors.goldDark),
-              minHeight: 6,
-            ),
-          ),
+          Text(election.title, style: AppTypography.screenTitle.copyWith(fontSize: 20)),
           const SizedBox(height: 6),
           Text(
-            '12,402 dari 20,000 mahasiswa sudah memilih',
-            style: AppTypography.caption.copyWith(color: AppColors.textSecondary, fontStyle: FontStyle.italic),
+            election.description ?? 'Pemilihan resmi oleh ${election.organization ?? "Panitia Pemilihan"}.',
+            style: AppTypography.bodyText.copyWith(color: AppColors.textSecondary),
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
           ),
           const SizedBox(height: AppSpacing.lg),
           
-          // Info Boxes Row
-          Row(
-            children: [
-              Expanded(
-                child: _buildInfoBox(
-                  icon: Icons.person_outline,
-                  title: 'Kandidat',
-                  value: '2 Kandidat',
-                  bgColor: const Color(0xFFF8F9FA),
-                  iconColor: AppColors.navyMid,
-                ),
-              ),
-              const SizedBox(width: AppSpacing.md),
-              Expanded(
-                child: _buildInfoBox(
-                  icon: Icons.people_outline,
-                  title: 'Delegasi',
-                  value: '3 Aktif',
-                  bgColor: const Color(0xFFE8F5E9), // Light green
-                  iconColor: const Color(0xFF2E7D32), // Dark green
-                ),
-              ),
-            ],
+          // Middle Info Box
+          _buildInfoBox(
+            icon: Icons.people_outline,
+            title: 'PARTISIPASI SAAT INI',
+            value: '${election.voteCount} dari ${election.estimatedVoters > 0 ? election.estimatedVoters : 100} Pemilih (${election.participationRate.toStringAsFixed(1)}%)',
+            bgColor: const Color(0xFFF3F4F6),
+            iconColor: AppColors.primary800,
           ),
-          const SizedBox(height: AppSpacing.xl),
+          const SizedBox(height: AppSpacing.sm),
+          _buildInfoBox(
+            icon: Icons.event_note_outlined,
+            title: 'TIMELINE PEMILIHAN',
+            value: '${_formatDate(election.startDate)} – ${_formatDate(election.endDate)}',
+            bgColor: const Color(0xFFFFF6E5),
+            iconColor: AppColors.goldDark,
+          ),
+          const SizedBox(height: AppSpacing.lg),
           
           // Bottom Actions
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Padding(
-                padding: const EdgeInsets.only(left: 8.0),
-                child: Text('Lihat Detail', style: AppTypography.bodyMedium.copyWith(fontWeight: FontWeight.w600)),
+              InkWell(
+                onTap: () {
+                  context.pushNamed('election-info', pathParameters: {'id': election.id});
+                },
+                child: Padding(
+                  padding: const EdgeInsets.only(left: 4.0),
+                  child: Text('Lihat Detail', style: AppTypography.bodyMedium.copyWith(color: AppColors.primary800, fontWeight: FontWeight.w700)),
+                ),
               ),
               InkWell(
                 onTap: () {
-                  context.pushNamed('election', pathParameters: {'id': '1'});
+                  context.pushNamed('election', pathParameters: {'id': election.id});
                 },
                 child: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
@@ -229,7 +298,7 @@ class ElectionsTab extends StatelessWidget {
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      const Icon(Icons.arrow_forward, color: Colors.white, size: 18),
+                      const Icon(Icons.how_to_vote, color: Colors.white, size: 18),
                       const SizedBox(width: 8),
                       Text('Pilih Sekarang', style: AppTypography.bodyMedium.copyWith(color: Colors.white, fontWeight: FontWeight.w600)),
                     ],
@@ -243,7 +312,7 @@ class ElectionsTab extends StatelessWidget {
     );
   }
 
-  Widget _buildCompletedElectionCard() {
+  Widget _buildDynamicCompletedElectionCard(BuildContext context, Election election) {
     return Container(
       padding: const EdgeInsets.all(AppSpacing.lg),
       decoration: BoxDecoration(
@@ -267,36 +336,35 @@ class ElectionsTab extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFF3F4F6), // Light grey
+                  color: const Color(0xFFF3F4F6),
                   borderRadius: BorderRadius.circular(16),
                 ),
-                child: Text(
-                  'Selesai',
-                  style: AppTypography.captionBold.copyWith(color: AppColors.textSecondary),
-                ),
+                child: Text('Selesai', style: AppTypography.captionBold.copyWith(color: AppColors.textSecondary)),
               ),
-              const Icon(Icons.check_circle_outline, color: AppColors.textSecondary, size: 24),
+              const Icon(Icons.check_circle_outline, color: AppColors.successTeal, size: 24),
             ],
           ),
           const SizedBox(height: AppSpacing.md),
           
-          Text('Pemilihan Senat Mahasiswa', style: AppTypography.screenTitle.copyWith(fontSize: 20)),
+          Text(election.title, style: AppTypography.screenTitle.copyWith(fontSize: 20)),
           const SizedBox(height: 6),
-          Text('Berakhir pada 12 Okt 2025', style: AppTypography.bodyText.copyWith(color: AppColors.textSecondary)),
+          Text('Berakhir pada ${_formatDate(election.endDate)}', style: AppTypography.bodyText.copyWith(color: AppColors.textSecondary)),
           const SizedBox(height: AppSpacing.xl),
           
           // Bottom Action
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.symmetric(vertical: 14),
-            decoration: BoxDecoration(
-              color: const Color(0xFF384666), // Dark Navy button
-              borderRadius: BorderRadius.circular(24),
-            ),
-            alignment: Alignment.center,
-            child: Text(
-              'Lihat Hasil Akhir',
-              style: AppTypography.bodyMedium.copyWith(color: Colors.white, fontWeight: FontWeight.w600),
+          InkWell(
+            onTap: () {
+              context.pushNamed('election-info', pathParameters: {'id': election.id});
+            },
+            child: Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(vertical: 14),
+              decoration: BoxDecoration(
+                color: const Color(0xFF384666),
+                borderRadius: BorderRadius.circular(24),
+              ),
+              alignment: Alignment.center,
+              child: Text('Lihat Hasil Akhir', style: AppTypography.bodyMedium.copyWith(color: Colors.white, fontWeight: FontWeight.w600)),
             ),
           ),
         ],

@@ -7,18 +7,21 @@ import 'package:voteryxapp/features/user/delegation/domain/entities/delegate.dar
 class DelegationRepository {
   SupabaseClient get _client => SupabaseConfig.client;
 
-  /// Ambil semua user yang profil delegate-nya publik,
-  /// diurutkan berdasarkan trust_score tertinggi.
+  /// Ambil semua user yang sudah di-acc sebagai delegate oleh admin (role == 'delegate')
+  /// dan profil delegate-nya diaktifkan/publik, diurutkan berdasarkan trust_score tertinggi.
   Future<List<Delegate>> getPublicDelegates() async {
     final response = await _client
         .from('users')
         .select(
             'id, full_name, faculty, major, delegate_bio, delegate_vision, '
             'trust_score, avatar_url, role, is_delegate_profile_public')
-        .or('is_delegate_profile_public.eq.true,role.eq.delegate')
+        .eq('role', 'delegate')
+        .eq('is_delegate_profile_public', true)
         .order('trust_score', ascending: false);
 
-    return (response as List).map((json) {
+    return (response as List)
+        .where((json) => json['role'] == 'delegate' && json['is_delegate_profile_public'] == true)
+        .map((json) {
       return Delegate(
         id: json['id'] as String? ?? '',
         fullName: json['full_name'] as String? ?? 'Delegate',

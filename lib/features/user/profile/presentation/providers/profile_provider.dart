@@ -1,4 +1,5 @@
 // lib/features/user/profile/presentation/providers/profile_provider.dart
+import 'dart:typed_data';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -53,13 +54,25 @@ class ProfileUpdateNotifier extends StateNotifier<ProfileUpdateState> {
     String? faculty,
     String? nim,
     String? major,
+    String? avatarUrl,
+    Uint8List? avatarBytes,
     String? delegateBio,
     String? delegateVision,
+    List<String>? delegateSkills,
+    List<Map<String, dynamic>>? delegateTrackRecords,
     bool? isDelegateProfilePublic,
   }) async {
     state = state.copyWith(isLoading: true, error: null);
 
     try {
+      String? targetAvatarUrl = avatarUrl;
+      if (avatarBytes != null) {
+        targetAvatarUrl = await _ref.read(userProfileProvider.notifier).uploadAvatar(avatarBytes, 'jpg');
+        if (targetAvatarUrl == null) {
+          throw Exception('Gagal mengunggah foto profil ke bucket "avatars". Pastikan bucket sudah dibuat di Supabase Storage.');
+        }
+      }
+
       await _ref.read(userProfileProvider.notifier).updateProfile(
             fullName: fullName,
             phone: phone,
@@ -67,8 +80,11 @@ class ProfileUpdateNotifier extends StateNotifier<ProfileUpdateState> {
             faculty: faculty,
             nim: nim,
             major: major,
+            avatarUrl: targetAvatarUrl,
             delegateBio: delegateBio,
             delegateVision: delegateVision,
+            delegateSkills: delegateSkills,
+            delegateTrackRecords: delegateTrackRecords,
             isDelegateProfilePublic: isDelegateProfilePublic,
           );
       state = state.copyWith(isLoading: false, isSuccess: true);

@@ -1,4 +1,5 @@
 // lib/features/auth/data/datasources/auth_remote_datasource.dart
+import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../../core/network/supabase_client.dart';
 import '../models/user_profile_model.dart';
@@ -93,6 +94,23 @@ class AuthRemoteDatasource {
     }
   }
 
+  /// Unggah file foto profil ke bucket Supabase Storage (`avatars`).
+  Future<String?> uploadAvatar(String userId, Uint8List bytes, String fileExtension) async {
+    try {
+      final fileName = '$userId-${DateTime.now().millisecondsSinceEpoch}.$fileExtension';
+      await _client.storage.from('avatars').uploadBinary(
+            fileName,
+            bytes,
+            fileOptions: const FileOptions(cacheControl: '3600', upsert: true),
+          );
+      final publicUrl = _client.storage.from('avatars').getPublicUrl(fileName);
+      return publicUrl;
+    } catch (e) {
+      debugPrint('Error uploading avatar: $e');
+      return null;
+    }
+  }
+
   /// Update field profil user di tabel `users`.
   Future<void> updateUserProfile({
     required String userId,
@@ -102,8 +120,11 @@ class AuthRemoteDatasource {
     String? faculty,
     String? nim,
     String? specialization,
+    String? avatarUrl,
     String? delegateBio,
     String? delegateVision,
+    List<String>? delegateSkills,
+    List<Map<String, dynamic>>? delegateTrackRecords,
     bool? isDelegateProfilePublic,
   }) async {
     final data = <String, dynamic>{
@@ -115,8 +136,11 @@ class AuthRemoteDatasource {
     if (faculty != null) data['faculty'] = faculty;
     if (nim != null) data['nim'] = nim;
     if (specialization != null) data['major'] = specialization;
+    if (avatarUrl != null) data['avatar_url'] = avatarUrl;
     if (delegateBio != null) data['delegate_bio'] = delegateBio;
     if (delegateVision != null) data['delegate_vision'] = delegateVision;
+    if (delegateSkills != null) data['delegate_skills'] = delegateSkills;
+    if (delegateTrackRecords != null) data['delegate_track_records'] = delegateTrackRecords;
     if (isDelegateProfilePublic != null) {
       data['is_delegate_profile_public'] = isDelegateProfilePublic;
     }
@@ -125,17 +149,18 @@ class AuthRemoteDatasource {
       await _client.from('users').update(data).eq('id', userId);
     } on PostgrestException catch (e) {
       if (e.code == 'PGRST204' || e.code == '42703' || e.message.toLowerCase().contains('column') || e.message.toLowerCase().contains('schema cache')) {
-        // Step 1: Coba hapus kolom 'nim' saja terlebih dahulu (karena 'nim' adalah kolom baru yang mungkin belum ada di cloud SQL),
-        // sehingga kolom 'major' (Spesialisasi) & 'faculty' tetap bisa tersimpan sempurna di database!
+        // Step 1: Coba hapus kolom 'nim' saja terlebih dahulu
         final step1Data = Map<String, dynamic>.from(data)..remove('nim');
         try {
           await _client.from('users').update(step1Data).eq('id', userId);
         } on PostgrestException catch (e2) {
           if (e2.code == 'PGRST204' || e2.code == '42703' || e2.message.toLowerCase().contains('column') || e2.message.toLowerCase().contains('schema cache')) {
-            // Step 2: Coba hapus kolom delegator opsional jika masih gagal
+            // Step 2: Coba hapus kolom delegate opsional baru jika masih gagal
             final step2Data = Map<String, dynamic>.from(step1Data)
               ..remove('delegate_bio')
               ..remove('delegate_vision')
+              ..remove('delegate_skills')
+              ..remove('delegate_track_records')
               ..remove('is_delegate_profile_public');
             try {
               await _client.from('users').update(step2Data).eq('id', userId);

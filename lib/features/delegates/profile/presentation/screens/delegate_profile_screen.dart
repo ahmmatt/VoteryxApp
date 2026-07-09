@@ -1,49 +1,28 @@
-// lib/features/profile/presentation/screens/delegate_profile_screen.dart
+// lib/features/delegates/profile/presentation/screens/delegate_profile_screen.dart
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../../core/constants/app_colors.dart';
 import '../../../../../core/constants/app_spacing.dart';
 import '../../../../../core/constants/app_typography.dart';
 import '../../../../../core/constants/app_radius.dart';
-import '../../../../../core/router/app_router.dart';
+import 'package:voteryxapp/core/router/app_router.dart';
 import 'delegate_edit_bio_screen.dart';
 import 'delegate_update_skills_screen.dart';
 import 'delegate_track_record_screen.dart';
-import 'delegate_help_screen.dart';
-import 'delegate_notifications_screen.dart';
 import 'delegate_security_screen.dart';
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Constants
-// ─────────────────────────────────────────────────────────────────────────────
+import 'package:voteryxapp/features/auth/presentation/providers/auth_provider.dart';
+import 'package:voteryxapp/features/delegates/delegation/application/delegate_dashboard_provider.dart';
 
 const Color _teal = Color(0xFF10B981);
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Screen
-// ─────────────────────────────────────────────────────────────────────────────
-
-/// Layar Profil Saya (Role: Delegate)
-///
-/// Layout:
-///  ┌─ Navy Header ───────────────────────────────┐
-///  │  AppBar row (back arrow + title + "Edit")   │
-///  │  Avatar (circular photo + gold edit badge)  │
-///  │  Name & subtitle                            │
-///  │  Stats card (1.2k | 15 | 4.9)              │
-///  └─────────────────────────────────────────────┘
-///  ┌─ Scrollable Body ───────────────────────────┐
-///  │  Performa Delegate card                     │
-///  │  Pengaturan Profil section                  │
-///  │  Akun & Keamanan section                    │
-///  │  Version footer                             │
-///  └─────────────────────────────────────────────┘
-///  Bottom Navigation Bar
-class DelegateProfileScreen extends StatelessWidget {
+/// Layar Profil Delegate — menampilkan informasi profil, performa, dan
+/// pengaturan akun secara dinamis dari database (Supabase).
+class DelegateProfileScreen extends ConsumerWidget {
   const DelegateProfileScreen({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     return Scaffold(
       backgroundColor: AppColors.background,
       body: Column(
@@ -53,99 +32,75 @@ class DelegateProfileScreen extends StatelessWidget {
 
           // ── Scrollable Content ─────────────────────────────────────
           Expanded(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.fromLTRB(
-                AppSpacing.md,
-                AppSpacing.md,
-                AppSpacing.md,
-                AppSpacing.xxl,
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Performa Delegate card
-                  _PerformaCard(),
-                  const SizedBox(height: AppSpacing.lg),
+            child: RefreshIndicator(
+              onRefresh: () async {
+                ref.invalidate(userProfileProvider);
+                ref.invalidate(delegateDashboardProvider);
+              },
+              child: SingleChildScrollView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                padding: const EdgeInsets.fromLTRB(
+                  AppSpacing.md,
+                  AppSpacing.md,
+                  AppSpacing.md,
+                  AppSpacing.xxl,
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Banner kelengkapan profil (jika belum lengkap)
+                    const _ProfileCompletenessCard(),
+                    // Performa Delegate card
+                    const _PerformaCard(),
+                    const SizedBox(height: AppSpacing.lg),
 
-                  // Pengaturan Profil
-                  _MenuSection(
-                    title: 'Pengaturan Profil',
-                    items: [
-                      _MenuItem(
-                        icon: Icons.edit_outlined,
-                        label: 'Edit Bio & Visi',
-                        onTap: () => Navigator.of(context, rootNavigator: true).push(
-                          MaterialPageRoute(
-                              builder: (_) => const DelegateEditBioScreen()),
+                    // Pengaturan Profil
+                    _MenuSection(
+                      title: 'Pengaturan Profil',
+                      items: [
+                        _MenuItem(
+                          icon: Icons.edit_outlined,
+                          label: 'Edit Bio & Visi',
+                          onTap: () => Navigator.of(context, rootNavigator: true).push(
+                            MaterialPageRoute(
+                                builder: (_) => const DelegateEditBioScreen()),
+                          ),
                         ),
-                      ),
-                      _MenuItem(
-                        icon: Icons.psychology_outlined,
-                        label: 'Update Keahlian',
-                        onTap: () => Navigator.of(context, rootNavigator: true).push(
-                          MaterialPageRoute(
-                              builder: (_) =>
-                                  const DelegateUpdateSkillsScreen()),
+                        _MenuItem(
+                          icon: Icons.psychology_outlined,
+                          label: 'Update Keahlian',
+                          onTap: () => Navigator.of(context, rootNavigator: true).push(
+                            MaterialPageRoute(
+                                builder: (_) =>
+                                    const DelegateUpdateSkillsScreen()),
+                          ),
                         ),
-                      ),
-                      _MenuItem(
-                        icon: Icons.history_edu_outlined,
-                        label: 'Kelola Track Record',
-                        onTap: () => Navigator.of(context, rootNavigator: true).push(
-                          MaterialPageRoute(
-                              builder: (_) =>
-                                  const DelegateTrackRecordScreen()),
+                        _MenuItem(
+                          icon: Icons.history_edu_outlined,
+                          label: 'Kelola Track Record',
+                          onTap: () => Navigator.of(context, rootNavigator: true).push(
+                            MaterialPageRoute(
+                                builder: (_) =>
+                                    const DelegateTrackRecordScreen()),
+                          ),
                         ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: AppSpacing.lg),
+                      ],
+                      logoutItem: true,
+                    ),
+                    const SizedBox(height: AppSpacing.xl),
 
-                  // Akun & Keamanan
-                  _MenuSection(
-                    title: 'Akun & Keamanan',
-                    items: [
-                      _MenuItem(
-                        icon: Icons.shield_outlined,
-                        label: 'Security',
-                        onTap: () => Navigator.of(context, rootNavigator: true).push(
-                          MaterialPageRoute(
-                              builder: (_) => const DelegateSecurityScreen()),
+                    // Version footer
+                    Center(
+                      child: Text(
+                        'Delegate Portal v2.4.0 (Live Build)',
+                        style: AppTypography.caption.copyWith(
+                          color: AppColors.outline,
+                          fontSize: 11,
                         ),
-                      ),
-                      _MenuItem(
-                        icon: Icons.notifications_outlined,
-                        label: 'Notifications',
-                        onTap: () => Navigator.of(context, rootNavigator: true).push(
-                          MaterialPageRoute(
-                              builder: (_) =>
-                                  const DelegateNotificationsScreen()),
-                        ),
-                      ),
-                      _MenuItem(
-                        icon: Icons.help_outline_rounded,
-                        label: 'Help',
-                        onTap: () => Navigator.of(context, rootNavigator: true).push(
-                          MaterialPageRoute(
-                              builder: (_) => const DelegateHelpScreen()),
-                        ),
-                      ),
-                    ],
-                    logoutItem: true,
-                  ),
-                  const SizedBox(height: AppSpacing.xl),
-
-                  // Version footer
-                  Center(
-                    child: Text(
-                      'Delegate Portal v2.4.0 (Alpha Build)',
-                      style: AppTypography.caption.copyWith(
-                        color: AppColors.outline,
-                        fontSize: 11,
                       ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
           ),
@@ -155,17 +110,95 @@ class DelegateProfileScreen extends StatelessWidget {
   }
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Profile Completeness Banner
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _ProfileCompletenessCard extends ConsumerWidget {
+  const _ProfileCompletenessCard();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final profile = ref.watch(userProfileProvider).valueOrNull;
+    if (profile == null) return const SizedBox.shrink();
+
+    final isComplete = profile.isDelegateProfileComplete;
+    if (isComplete) return const SizedBox.shrink();
+
+    // Hitung apa yang masih kurang
+    final missing = <String>[];
+    if (profile.delegateBio == null || profile.delegateBio!.trim().isEmpty) {
+      missing.add('Bio');
+    }
+    if (profile.delegateVision == null || profile.delegateVision!.trim().isEmpty) {
+      missing.add('Visi');
+    }
+    if (profile.delegateSkills == null || profile.delegateSkills!.isEmpty) {
+      missing.add('Keahlian');
+    }
+    if (profile.delegateTrackRecords == null || profile.delegateTrackRecords!.isEmpty) {
+      missing.add('Track Record');
+    }
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: AppSpacing.md),
+      padding: const EdgeInsets.all(AppSpacing.md),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFFF5E6),
+        borderRadius: BorderRadius.circular(AppRadius.card),
+        border: Border.all(color: const Color(0xFFFFB74D).withValues(alpha: 0.5)),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.warning_amber_rounded, color: Color(0xFFE65100), size: 20),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Profil Belum Lengkap',
+                  style: AppTypography.bodyMedium.copyWith(
+                    color: const Color(0xFFE65100),
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  'Mandator tidak bisa mendelegasikan suara sebelum kamu mengisi: ${missing.join(', ')}.',
+                  style: AppTypography.caption.copyWith(
+                    color: const Color(0xFFBF360C),
+                    height: 1.4,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Navy Header
+// Navy Header — tanpa tombol Edit di pojok kanan atas
 // ─────────────────────────────────────────────────────────────────────────────
 
-class _DelegateProfileHeader extends StatelessWidget {
+class _DelegateProfileHeader extends ConsumerWidget {
   const _DelegateProfileHeader({required this.context});
   final BuildContext context;
 
   @override
-  Widget build(BuildContext ctx) {
+  Widget build(BuildContext ctx, WidgetRef ref) {
+    final profileAsync = ref.watch(userProfileProvider);
+    final profile = profileAsync.valueOrNull;
+
+    final name = profile?.fullName ?? 'Delegator';
+    final subtitle = profile != null && (profile.faculty != null || profile.major != null)
+        ? '${profile.faculty ?? "Fakultas"} • ${profile.major ?? "Program Studi"}'
+        : 'Delegator Terverifikasi';
+    final avatarUrl = profile?.avatarUrl;
+
     return Container(
       color: AppColors.primary800,
       child: SafeArea(
@@ -180,7 +213,7 @@ class _DelegateProfileHeader extends StatelessWidget {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              // ── AppBar Row ───────────────────────────────────────────
+              // ── AppBar Row — NO Edit button ────────────────────────
               Row(
                 children: [
                   IconButton(
@@ -201,22 +234,7 @@ class _DelegateProfileHeader extends StatelessWidget {
                       ),
                     ),
                   ),
-                  TextButton(
-                    onPressed: () {},
-                    style: TextButton.styleFrom(
-                      padding: EdgeInsets.zero,
-                      minimumSize: Size.zero,
-                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                    ),
-                    child: Text(
-                      'Edit',
-                      style: AppTypography.bodyMedium.copyWith(
-                        color: Colors.white,
-                        fontWeight: FontWeight.w600,
-                        fontSize: 13,
-                      ),
-                    ),
-                  ),
+                  // Tombol Edit DIHAPUS
                 ],
               ),
               const SizedBox(height: 10),
@@ -231,25 +249,35 @@ class _DelegateProfileHeader extends StatelessWidget {
                     height: 70,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      border:
-                          Border.all(color: AppColors.goldMid, width: 2),
-                      image: const DecorationImage(
-                        image: NetworkImage(
-                            'https://i.pravatar.cc/150?img=15'),
-                        fit: BoxFit.cover,
-                      ),
+                      border: Border.all(color: AppColors.goldMid, width: 2),
+                      color: AppColors.primary900,
+                      image: avatarUrl != null && avatarUrl.isNotEmpty && avatarUrl.startsWith('http')
+                          ? DecorationImage(
+                              image: NetworkImage(avatarUrl),
+                              fit: BoxFit.cover,
+                            )
+                          : null,
                     ),
+                    child: avatarUrl == null || !avatarUrl.startsWith('http')
+                        ? const Icon(Icons.person, color: AppColors.goldMid, size: 36)
+                        : null,
                   ),
-                  Container(
-                    width: 22,
-                    height: 22,
-                    decoration: BoxDecoration(
-                      gradient: AppColors.goldGradient,
-                      shape: BoxShape.circle,
-                      border: Border.all(color: Colors.white, width: 1.5),
+                  // Badge edit kecil tetap ada untuk tap ke edit bio
+                  GestureDetector(
+                    onTap: () => Navigator.of(context, rootNavigator: true).push(
+                      MaterialPageRoute(builder: (_) => const DelegateEditBioScreen()),
                     ),
-                    child: const Icon(Icons.edit_rounded,
-                        color: Colors.white, size: 10),
+                    child: Container(
+                      width: 22,
+                      height: 22,
+                      decoration: BoxDecoration(
+                        gradient: AppColors.goldGradient,
+                        shape: BoxShape.circle,
+                        border: Border.all(color: Colors.white, width: 1.5),
+                      ),
+                      child: const Icon(Icons.edit_rounded,
+                          color: Colors.white, size: 10),
+                    ),
                   ),
                 ],
               ),
@@ -257,7 +285,7 @@ class _DelegateProfileHeader extends StatelessWidget {
 
               // ── Name ─────────────────────────────────────────────────
               Text(
-                'Aditya Dharmawan',
+                name,
                 style: AppTypography.displayHeading.copyWith(
                   fontSize: 18,
                   color: Colors.white,
@@ -266,7 +294,7 @@ class _DelegateProfileHeader extends StatelessWidget {
               ),
               const SizedBox(height: 2),
               Text(
-                'Fakultas Teknik • Angkatan 2021',
+                subtitle,
                 style: AppTypography.caption.copyWith(
                   color: Colors.white70,
                   fontSize: 11,
@@ -274,8 +302,8 @@ class _DelegateProfileHeader extends StatelessWidget {
               ),
               const SizedBox(height: 12),
 
-              // ── Stats Card (inside header, dark navy pill) ───────────
-              _StatsCard(),
+              // ── Stats Card ───────────────────────────────────────────
+              const _StatsCard(),
             ],
           ),
         ),
@@ -285,14 +313,27 @@ class _DelegateProfileHeader extends StatelessWidget {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Stats Card
+// Stats Card — Rating dihitung dari execution rate (bukan hardcoded 4.9)
 // ─────────────────────────────────────────────────────────────────────────────
 
-class _StatsCard extends StatelessWidget {
+class _StatsCard extends ConsumerWidget {
   const _StatsCard();
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final dashboardAsync = ref.watch(delegateDashboardProvider);
+    final data = dashboardAsync.valueOrNull ?? const DelegateDashboardData();
+
+    // Rating: skala 0–5 dari execution rate (0–100%)
+    // Semakin banyak eksekusi tepat waktu → rating naik
+    // Jika belum pernah eksekusi → 0
+    final double ratingRaw = data.executionRate > 0
+        ? (data.executionRate / 100 * 5.0).clamp(0.0, 5.0)
+        : 0.0;
+    final String ratingStr = data.executionRate > 0
+        ? ratingRaw.toStringAsFixed(1)
+        : '0';
+
     return Container(
       decoration: BoxDecoration(
         color: Colors.white.withValues(alpha: 0.05),
@@ -304,7 +345,7 @@ class _StatsCard extends StatelessWidget {
           children: [
             Expanded(
               child: _StatItem(
-                value: '1.2k',
+                value: '${data.mandates.where((m) => m.status == "active").length}',
                 label: 'Mandat',
                 valueColor: AppColors.goldMid,
               ),
@@ -316,7 +357,7 @@ class _StatsCard extends StatelessWidget {
             ),
             Expanded(
               child: _StatItem(
-                value: '15',
+                value: '${data.executionHistory.where((h) => h.status == "Selesai").length}',
                 label: 'Eksekusi',
                 valueColor: AppColors.goldMid,
               ),
@@ -328,7 +369,7 @@ class _StatsCard extends StatelessWidget {
             ),
             Expanded(
               child: _StatItem(
-                value: '4.9',
+                value: ratingStr,
                 label: 'Rating',
                 valueColor: AppColors.goldMid,
               ),
@@ -380,14 +421,20 @@ class _StatItem extends StatelessWidget {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Performa Delegate Card
+// Performa Delegate Card — hanya Execution Rate, TANPA Trust Score
 // ─────────────────────────────────────────────────────────────────────────────
 
-class _PerformaCard extends StatelessWidget {
+class _PerformaCard extends ConsumerWidget {
   const _PerformaCard();
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final dashboardAsync = ref.watch(delegateDashboardProvider);
+    final data = dashboardAsync.valueOrNull ?? const DelegateDashboardData();
+
+    // Execution Rate = jumlah pemilihan yg sudah dieksekusi / total pemilihan
+    final executionRatePercent = data.executionRate.round();
+
     return Container(
       padding: const EdgeInsets.all(AppSpacing.md),
       decoration: BoxDecoration(
@@ -425,22 +472,54 @@ class _PerformaCard extends StatelessWidget {
           ),
           const SizedBox(height: 16),
 
-          // Trust Score
-          _PerformaRow(
-            label: 'Trust Score',
-            value: 0.78,
-            valueText: '78%',
-            color: AppColors.goldMid,
-          ),
-          const SizedBox(height: 14),
-
-          // Execution Rate
+          // Execution Rate ONLY — Trust Score dihapus
           _PerformaRow(
             label: 'Execution Rate',
-            value: 0.96,
-            valueText: '96%',
-            color: _teal,
+            sublabel: executionRatePercent == 0
+                ? 'Belum ada eksekusi suara'
+                : '$executionRatePercent% pemilihan berhasil dieksekusi',
+            value: (executionRatePercent / 100).clamp(0.0, 1.0),
+            valueText: '$executionRatePercent%',
+            color: executionRatePercent >= 80 ? _teal : AppColors.goldDark,
           ),
+          const SizedBox(height: 10),
+
+          // Info card kelengkapan profil
+          Consumer(builder: (context, ref, _) {
+            final profile = ref.watch(userProfileProvider).valueOrNull;
+            final isComplete = profile?.isDelegateProfileComplete ?? false;
+            return Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                color: isComplete
+                    ? _teal.withValues(alpha: 0.08)
+                    : AppColors.goldMid.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    isComplete ? Icons.check_circle : Icons.info_outline,
+                    size: 16,
+                    color: isComplete ? _teal : AppColors.goldDark,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      isComplete
+                          ? 'Profil lengkap — mandator dapat mendelegasikan suara kepadamu'
+                          : 'Lengkapi profil agar mandator bisa mendelegasikan suara',
+                      style: AppTypography.caption.copyWith(
+                        color: isComplete ? _teal : AppColors.goldDark,
+                        fontSize: 11,
+                        height: 1.3,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          }),
         ],
       ),
     );
@@ -453,11 +532,13 @@ class _PerformaRow extends StatelessWidget {
     required this.value,
     required this.valueText,
     required this.color,
+    this.sublabel,
   });
   final String label;
   final double value;
   final String valueText;
   final Color color;
+  final String? sublabel;
 
   @override
   Widget build(BuildContext context) {
@@ -467,12 +548,25 @@ class _PerformaRow extends StatelessWidget {
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text(
-              label,
-              style: AppTypography.bodyText.copyWith(
-                color: AppColors.textSecondary,
-                fontSize: 13,
-              ),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label,
+                  style: AppTypography.bodyText.copyWith(
+                    color: AppColors.textSecondary,
+                    fontSize: 13,
+                  ),
+                ),
+                if (sublabel != null)
+                  Text(
+                    sublabel!,
+                    style: AppTypography.caption.copyWith(
+                      color: AppColors.outline,
+                      fontSize: 10,
+                    ),
+                  ),
+              ],
             ),
             Text(
               valueText,
@@ -490,8 +584,7 @@ class _PerformaRow extends StatelessWidget {
           child: LinearProgressIndicator(
             value: value,
             minHeight: 7,
-            backgroundColor:
-                AppColors.outlineVariant.withValues(alpha: 0.35),
+            backgroundColor: AppColors.outlineVariant.withValues(alpha: 0.35),
             valueColor: AlwaysStoppedAnimation<Color>(color),
           ),
         ),
@@ -575,12 +668,13 @@ class _MenuSection extends StatelessWidget {
 
               // Logout item
               if (logoutItem) ...[
-                const Divider(
-                  height: 1,
-                  indent: 52,
-                  color: Color(0xFFF0F1F5),
-                ),
-                _LogoutTile(),
+                if (items.isNotEmpty)
+                  const Divider(
+                    height: 1,
+                    indent: 52,
+                    color: Color(0xFFF0F1F5),
+                  ),
+                const _LogoutTile(),
               ],
             ],
           ),
@@ -646,9 +740,6 @@ class _LogoutTile extends StatelessWidget {
       color: Colors.transparent,
       child: InkWell(
         onTap: () {
-          // Logout delegate harus kembali ke halaman login role user,
-          // bukan ke halaman login delegate. `go` mengganti lokasi aktif
-          // sehingga user tidak kembali ke profil delegate via tombol back.
           context.go(AppRoutes.login);
         },
         borderRadius: BorderRadius.circular(AppRadius.card),
@@ -675,121 +766,6 @@ class _LogoutTile extends StatelessWidget {
               ),
             ],
           ),
-        ),
-      ),
-    );
-  }
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Bottom Navigation Bar
-// ─────────────────────────────────────────────────────────────────────────────
-
-class _DelegateBottomNavBar extends StatelessWidget {
-  const _DelegateBottomNavBar({required this.context});
-  final BuildContext context;
-
-  @override
-  Widget build(BuildContext ctx) {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        border: Border(
-          top: BorderSide(
-            color: AppColors.outlineVariant.withValues(alpha: 0.5),
-          ),
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.04),
-            blurRadius: 8,
-            offset: const Offset(0, -2),
-          ),
-        ],
-      ),
-      child: SafeArea(
-        top: false,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
-            children: [
-              _NavItem(
-                icon: Icons.home_outlined,
-                label: 'Beranda',
-                isSelected: false,
-                onTap: () => context.pushNamed('delegate-home'),
-              ),
-              _NavItem(
-                icon: Icons.gavel_outlined,
-                label: 'Mandat',
-                isSelected: false,
-                onTap: () => context.pushNamed('delegate-dashboard'),
-              ),
-              _NavItem(
-                icon: Icons.how_to_vote_outlined,
-                label: 'Eksekusi',
-                isSelected: false,
-                onTap: () => context.pushNamed('delegate-history'),
-              ),
-              _NavItem(
-                icon: Icons.person_outline_rounded,
-                label: 'Profil',
-                isSelected: true,
-                onTap: () {},
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _NavItem extends StatelessWidget {
-  const _NavItem({
-    required this.icon,
-    required this.label,
-    required this.isSelected,
-    required this.onTap,
-  });
-  final IconData icon;
-  final String label;
-  final bool isSelected;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
-        decoration: isSelected
-            ? BoxDecoration(
-                color: AppColors.goldMid.withValues(alpha: 0.15),
-                borderRadius: BorderRadius.circular(24),
-              )
-            : null,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              icon,
-              size: 24,
-              color: isSelected ? AppColors.goldDark : AppColors.textSecondary,
-            ),
-            const SizedBox(height: 3),
-            Text(
-              label,
-              style: AppTypography.captionBold.copyWith(
-                color: isSelected ? AppColors.goldDark : AppColors.textSecondary,
-                fontSize: 10,
-                fontWeight:
-                    isSelected ? FontWeight.w700 : FontWeight.w400,
-              ),
-            ),
-          ],
         ),
       ),
     );

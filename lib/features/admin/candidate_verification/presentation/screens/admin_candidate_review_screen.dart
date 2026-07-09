@@ -46,7 +46,7 @@ class AdminCandidateReviewScreen extends ConsumerWidget {
           final faculty = c['faculty']?.toString() ?? c['major']?.toString() ?? 'Fakultas Teknik';
           final isVerified = c['is_verified'] == true;
           final electionTitle = (c['elections'] is Map) ? (c['elections']['title']?.toString() ?? 'Pemilihan BEM') : 'Pemilihan BEM';
-          final imageUrl = c['photo_url']?.toString() ?? 'https://i.pravatar.cc/150?img=12';
+          final imageUrl = getCandidateAvatarUrl(c);
           final visi = c['visi']?.toString() ?? 'Mewujudkan lingkungan kampus kolaboratif.';
           final hasPrograms = c['programs'] != null && (c['programs'] is List) && (c['programs'] as List).isNotEmpty;
 
@@ -69,7 +69,7 @@ class AdminCandidateReviewScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildProfileCard(String name, String faculty, String candNo, String electionTitle, bool isVerified, String imageUrl) {
+  Widget _buildProfileCard(String name, String faculty, String candNo, String electionTitle, bool isVerified, String? imageUrl) {
     return Container(
       padding: const EdgeInsets.all(AppSpacing.lg),
       decoration: BoxDecoration(
@@ -85,22 +85,10 @@ class AdminCandidateReviewScreen extends ConsumerWidget {
       ),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Row(children: [
-          ClipRRect(
-            borderRadius: BorderRadius.circular(16),
-            child: Image.network(
-              imageUrl,
-              width: 62,
-              height: 62,
-              fit: BoxFit.cover,
-              errorBuilder: (context, error, stackTrace) => Container(
-                width: 62,
-                height: 62,
-                decoration: BoxDecoration(
-                    color: AppColors.navy600.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(16)),
-                child: const Icon(Icons.person, color: AppColors.textSecondary, size: 32),
-              ),
-            ),
+          buildCandidateAvatarWidget(
+            imageUrl: imageUrl,
+            size: 62,
+            radius: 16,
           ),
           const SizedBox(width: AppSpacing.md),
           Expanded(

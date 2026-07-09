@@ -76,6 +76,14 @@ CREATE TABLE IF NOT EXISTS public.candidates (
     faculty TEXT,
     major TEXT,
     photo_url TEXT,
+    form_url TEXT,
+    form_text TEXT,
+    ktm_url TEXT,
+    ktm_text TEXT,
+    vision_mission_url TEXT,
+    recommendation_url TEXT,
+    recommendation_text TEXT,
+    documents JSONB DEFAULT '[]'::jsonb,
     visi TEXT,
     misi TEXT,
     track_records JSONB DEFAULT '[]'::jsonb,
@@ -186,14 +194,32 @@ VALUES
 ON CONFLICT DO NOTHING;
 
 -- Insert Dummy Candidates untuk BEM Universitas
-INSERT INTO public.candidates (election_id, full_name, candidate_number, faculty, major, visi, misi, programs, track_records, vote_count)
+INSERT INTO public.candidates (
+    election_id, full_name, candidate_number, faculty, major, photo_url,
+    form_url, form_text, ktm_url, ktm_text, vision_mission_url, recommendation_url, recommendation_text, documents,
+    visi, misi, programs, track_records, vote_count
+)
 VALUES 
 (
   'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11', 
   'Rizky Pratama & Dinda Kirana', 
   1, 
   'Fakultas Teknik', 
-  'Teknik Informatika', 
+  'Teknik Informatika',
+  'https://images.unsplash.com/photo-1534528741775-53994a69daeb?q=80&w=400&auto=format&fit=crop',
+  'https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf',
+  'Formulir Pendaftaran Resmi Paslon Nomor Urut 1 (Rizky Pratama & Dinda Kirana).\n\nStatus: Terverifikasi oleh Komisi Pemilihan Umum Mahasiswa (KPUM).\nTanggal Daftar: 12 Oktober 2024.\nCatatan: Berkas lengkap dan memenuhi seluruh persyaratan administrasi.',
+  'https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf',
+  'Kartu Tanda Mahasiswa (KTM) dan Kartu Hasil Studi (KHS) atas nama Rizky Pratama (NIM: 2106001001) dan Dinda Kirana (NIM: 2106001002).\n\nStatus Mahasiswa: Aktif Semester Ganjil 2024/2025.\nIPK Kumulatif: 3.85 / 3.90.',
+  'https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf',
+  'https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf',
+  'Surat Rekomendasi Resmi Dekanat Fakultas Teknik dan Badan Perwakilan Mahasiswa (BPM) untuk pencalonan Rizky Pratama & Dinda Kirana dalam Pemilihan Ketua BEM Universitas 2024.',
+  '[
+    {"title": "Formulir Pendaftaran Resmi Paslon", "meta": "PDF • Berkas Terverifikasi Sistem", "content": "Form Pendaftaran Resmi Paslon Nomor Urut 1 (Rizky Pratama & Dinda Kirana).\\n\\nStatus: Terverifikasi oleh Komisi Pemilihan Umum Mahasiswa (KPUM).\\nTanggal Daftar: 12 Oktober 2024.", "file_url": "https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf"},
+    {"title": "Kartu Tanda Mahasiswa (KTM) & KHS", "meta": "JPG / PDF • Status Mahasiswa Aktif", "content": "Kartu Tanda Mahasiswa (KTM) dan Kartu Hasil Studi (KHS) atas nama Rizky Pratama (NIM: 2106001001) dan Dinda Kirana (NIM: 2106001002).\\n\\nStatus Mahasiswa: Aktif Semester Ganjil 2024/2025.\\nIPK Kumulatif: 3.85 / 3.90.", "file_url": "https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf"},
+    {"title": "Naskah Visi, Misi & Rencana Kerja (2 Program)", "meta": "PDF • 840 KB", "content": "Visi: Mewujudkan BEM Universitas yang Inklusif, Transparan, dan Berdaya Saing Global berbasis Teknologi Digital.\\n\\nMisi: Meningkatkan transparansi anggaran kemahasiswaan serta membangun ekosistem riset kolaboratif.", "file_url": "https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf"},
+    {"title": "Surat Rekomendasi Organisasi & Fakultas", "meta": "PDF • 1.1 MB", "content": "Surat Rekomendasi Resmi Dekanat Fakultas Teknik dan Badan Perwakilan Mahasiswa (BPM) untuk pencalonan Rizky Pratama & Dinda Kirana dalam Pemilihan Ketua BEM Universitas 2024.", "file_url": "https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf"}
+  ]'::jsonb,
   'Mewujudkan BEM Universitas yang Inklusif, Transparan, dan Berdaya Saing Global berbasis Teknologi Digital.', 
   'Meningkatkan transparansi anggaran kemahasiswaan serta membangun ekosistem riset kolaboratif.', 
   '[{"title": "Voteryx Fest & Tech Summit", "desc": "Festival teknologi dan inovasi mahasiswa bulanan."}, {"title": "Beasiswa Darurat", "desc": "Bantuan dana darurat untuk mahasiswa berprestasi."}]'::jsonb,
@@ -205,7 +231,21 @@ VALUES
   'Ahmad Fauzi & Siti Aisyah', 
   2, 
   'Fakultas Hukum', 
-  'Ilmu Hukum', 
+  'Ilmu Hukum',
+  NULL,
+  'https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf',
+  'Formulir Pendaftaran Resmi Paslon Nomor Urut 2 (Ahmad Fauzi & Siti Aisyah).\n\nStatus: Terverifikasi oleh Komisi Pemilihan Umum Mahasiswa (KPUM).\nTanggal Daftar: 13 Oktober 2024.\nCatatan: Berkas lengkap dan valid.',
+  'https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf',
+  'Kartu Tanda Mahasiswa (KTM) dan KHS atas nama Ahmad Fauzi (NIM: 2104002001) dan Siti Aisyah (NIM: 2104002002).\n\nStatus Mahasiswa: Aktif Semester Ganjil 2024/2025.\nIPK Kumulatif: 3.78 / 3.82.',
+  'https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf',
+  'https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf',
+  'Surat Rekomendasi Dekanat Fakultas Hukum dan Dewan Perwakilan Mahasiswa (DPM) untuk Paslon Ahmad Fauzi & Siti Aisyah.',
+  '[
+    {"title": "Formulir Pendaftaran Resmi Paslon", "meta": "PDF • Berkas Terverifikasi Sistem", "content": "Formulir Pendaftaran Resmi Paslon Nomor Urut 2 (Ahmad Fauzi & Siti Aisyah).\\n\\nStatus: Terverifikasi oleh Komisi Pemilihan Umum Mahasiswa (KPUM).\\nTanggal Daftar: 13 Oktober 2024.", "file_url": "https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf"},
+    {"title": "Kartu Tanda Mahasiswa (KTM) & KHS", "meta": "JPG / PDF • Status Mahasiswa Aktif", "content": "Kartu Tanda Mahasiswa (KTM) dan KHS atas nama Ahmad Fauzi (NIM: 2104002001) dan Siti Aisyah (NIM: 2104002002).\\n\\nStatus Mahasiswa: Aktif Semester Ganjil 2024/2025.\\nIPK Kumulatif: 3.78 / 3.82.", "file_url": "https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf"},
+    {"title": "Naskah Visi, Misi & Rencana Kerja (2 Program)", "meta": "PDF • 840 KB", "content": "Visi: BEM Universitas sebagai Rumah Bersama yang Kolaboratif, Aspiratif, dan Mengedepankan Integritas Akademik.\\n\\nMisi: Menguatkan solidaritas antar himpunan dan pengembangan karir berskala nasional.", "file_url": "https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf"},
+    {"title": "Surat Rekomendasi Organisasi & Fakultas", "meta": "PDF • 1.1 MB", "content": "Surat Rekomendasi Dekanat Fakultas Hukum dan Dewan Perwakilan Mahasiswa (DPM) untuk Paslon Ahmad Fauzi & Siti Aisyah.", "file_url": "https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf"}
+  ]'::jsonb,
   'BEM Universitas sebagai Rumah Bersama yang Kolaboratif, Aspiratif, dan Mengedepankan Integritas Akademik.', 
   'Menguatkan solidaritas antar himpunan dan pengembangan karir berskala nasional.', 
   '[{"title": "Career Expo & Mentoring Network", "desc": "Jaringan bimbingan karir langsung dari praktisi industri."}, {"title": "Pusat Layanan Mental Health", "desc": "Konseling gratis dan rahasia bagi seluruh mahasiswa."}]'::jsonb,

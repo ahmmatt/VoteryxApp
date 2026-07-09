@@ -11,6 +11,7 @@ import '../../../../../core/constants/app_radius.dart';
 import 'package:voteryxapp/core/network/supabase_client.dart';
 import 'package:voteryxapp/features/admin/dashboard/presentation/providers/admin_dashboard_provider.dart';
 import 'package:voteryxapp/features/user/election/presentation/widgets/election_summary_white_card.dart';
+import 'package:voteryxapp/features/admin/candidate_verification/presentation/providers/admin_candidate_verification_provider.dart';
 
 class AdminElectionLiveDetailScreen extends ConsumerStatefulWidget {
   const AdminElectionLiveDetailScreen({
@@ -251,7 +252,7 @@ class _AdminElectionLiveDetailScreenState
               }
 
               final String pctString = cand['percentage']?.toString() ?? '${(progress * 100).toStringAsFixed(1)}%';
-              final photoUrl = cand['photo_url']?.toString() ?? 'https://i.pravatar.cc/150?img=${rank + 10}';
+              final photoUrl = getCandidateAvatarUrl(cand);
               final isWin = cand['is_winning'] == true || (idx == 0 && progress >= 0.4);
 
               return Padding(
@@ -597,7 +598,7 @@ class _AdminElectionLiveDetailScreenState
     required String percentage,
     required String votes,
     required double progressValue,
-    required String imageUrl,
+    required String? imageUrl,
     required bool isWinning,
   }) {
     return Container(
@@ -631,24 +632,10 @@ class _AdminElectionLiveDetailScreenState
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(24),
-                      child: Image.network(imageUrl,
-                          width: 48, height: 48, fit: BoxFit.cover,
-                          errorBuilder: (_, __, ___) => Container(
-                                width: 48,
-                                height: 48,
-                                decoration: const BoxDecoration(
-                                    color: AppColors.primary800,
-                                    shape: BoxShape.circle),
-                                child: Center(
-                                  child: Text(
-                                    name.isNotEmpty ? name[0].toUpperCase() : 'K',
-                                    style: AppTypography.cardTitle
-                                        .copyWith(color: Colors.white),
-                                  ),
-                                ),
-                              )),
+                    buildCandidateAvatarWidget(
+                      imageUrl: imageUrl,
+                      size: 48,
+                      radius: 24,
                     ),
                     const SizedBox(width: 16),
                     Expanded(
