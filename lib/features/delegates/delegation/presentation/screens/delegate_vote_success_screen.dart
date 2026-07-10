@@ -23,7 +23,8 @@ class _MandatorItem {
 /// Layar Delegate Portal — menampilkan bukti eksekusi suara yang
 /// berhasil dikunci beserta detail receipt dan QR code validasi.
 class DelegateVoteSuccessScreen extends ConsumerWidget {
-  const DelegateVoteSuccessScreen({super.key});
+  final String? electionId;
+  const DelegateVoteSuccessScreen({super.key, this.electionId});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -31,13 +32,32 @@ class DelegateVoteSuccessScreen extends ConsumerWidget {
     final dashboardData = ref.watch(delegateDashboardProvider).valueOrNull;
     final profile = ref.watch(userProfileProvider).valueOrNull;
     
-    final int weight = state.totalWeight > 0 ? state.totalWeight : 0;
-    final String batchId = state.transactionHash ?? '#VOTE-DELEG-9921-X';
-    final String electionTitle = dashboardData?.urgentElectionTitle ?? 'Pemilihan Aktif';
+    DelegateExecutionItem? historyItem;
+    if (electionId != null && dashboardData != null) {
+      historyItem = dashboardData.executionHistory
+          .where((e) => e.electionId == electionId)
+          .firstOrNull;
+    }
+
+    final int weight = historyItem != null 
+        ? historyItem.totalVotes 
+        : (state.totalWeight > 0 ? state.totalWeight : 0);
+        
+    final String batchId = historyItem != null 
+        ? '#VOTE-DELEG-${electionId?.substring(0, 4).toUpperCase() ?? '9921'}-X'
+        : (state.transactionHash ?? '#VOTE-DELEG-9921-X');
+        
+    final String electionTitle = historyItem != null 
+        ? historyItem.title 
+        : (dashboardData?.urgentElectionTitle ?? 'Pemilihan Aktif');
+        
     final String executorName = profile?.fullName ?? 'Delegate';
     
+    final int totalMandators = historyItem != null 
+        ? historyItem.totalMandators 
+        : (dashboardData?.mandates.where((m) => m.status == 'active').length ?? 0);
+        
     final activeMandates = dashboardData?.mandates.where((m) => m.status == 'active').toList() ?? [];
-    final totalMandators = activeMandates.length;
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: _buildAppBar(context),
@@ -53,7 +73,7 @@ class DelegateVoteSuccessScreen extends ConsumerWidget {
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               // ── Success badge ──────────────────────────────────
-              _buildSuccessBadge(),
+              _buildSuccessBadge(weight),
               const SizedBox(height: 28),
 
               // ── Headline ───────────────────────────────────────
@@ -85,8 +105,6 @@ class DelegateVoteSuccessScreen extends ConsumerWidget {
               const SizedBox(height: 28),
 
               // ── Action buttons ─────────────────────────────────
-              _buildSaveButton(),
-              const SizedBox(height: 12),
               _buildDashboardButton(context),
               const SizedBox(height: AppSpacing.xxl),
             ],
@@ -144,7 +162,7 @@ class DelegateVoteSuccessScreen extends ConsumerWidget {
   }
 
   // ─────────────────── Success Badge ─────────────────────────────
-  Widget _buildSuccessBadge() {
+  Widget _buildSuccessBadge(int weight) {
     return Stack(
       alignment: Alignment.topRight,
       clipBehavior: Clip.none,
@@ -275,12 +293,16 @@ class DelegateVoteSuccessScreen extends ConsumerWidget {
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Text(
-              'BATCH ID: $batchId',
-              style: AppTypography.captionBold.copyWith(
-                color: AppColors.primary900,
-                fontSize: 11,
+            Flexible(
+              child: Text(
+                'BATCH ID: $batchId',
+                style: AppTypography.captionBold.copyWith(
+                  color: AppColors.primary900,
+                  fontSize: 11,
+                ),
+                overflow: TextOverflow.ellipsis,
               ),
             ),
             const SizedBox(width: 8),
@@ -512,45 +534,12 @@ class DelegateVoteSuccessScreen extends ConsumerWidget {
     );
   }
 
-  // ─────────────────── Action Buttons ────────────────────────────
-  Widget _buildSaveButton() {
-    return SizedBox(
-      width: double.infinity,
-      height: 52,
-      child: ElevatedButton(
-        onPressed: () {},
-        style: ElevatedButton.styleFrom(
-          backgroundColor: AppColors.goldMid,
-          foregroundColor: Colors.white,
-          elevation: 0,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(AppRadius.button),
-          ),
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Icon(Icons.download_rounded, size: 18),
-            const SizedBox(width: 8),
-            Text(
-              'Simpan Bukti Eksekusi ke Galeri',
-              style: AppTypography.bodyMedium.copyWith(
-                color: Colors.white,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
   Widget _buildDashboardButton(BuildContext context) {
     return SizedBox(
       width: double.infinity,
       height: 52,
       child: OutlinedButton(
-        onPressed: () => context.pushNamed('delegate-history'),
+        onPressed: () => context.goNamed('delegate-dashboard'),
         style: OutlinedButton.styleFrom(
           foregroundColor: AppColors.primary900,
           side: const BorderSide(color: AppColors.primary900, width: 1.5),

@@ -72,7 +72,8 @@ class _DelegateDashboardScreenState extends ConsumerState<DelegateDashboardScree
             ),
           ),
           // Pinned bottom CTA button
-          _buildPinnedButton(data),
+          if (data.activeElectionsCount > 0 && data.urgentElectionId != null)
+            _buildPinnedButton(data),
         ],
       ),
     );

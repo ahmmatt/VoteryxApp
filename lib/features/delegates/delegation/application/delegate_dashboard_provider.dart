@@ -224,7 +224,20 @@ final delegateDashboardProvider = FutureProvider.autoDispose<DelegateDashboardDa
         : '';
 
     final hasVoted = votedElectionIds.contains(eId);
-    final activeMandators = mandates.where((m) => m.electionId == eId && m.status == 'active').length;
+    
+    int actualVoteWeight = calculatedVotesHeld;
+    if (hasVoted) {
+      final voteRecord = rawVotes.firstWhere((v) => v['election_id'] == eId, orElse: () => <String, dynamic>{});
+      actualVoteWeight = (voteRecord['vote_weight'] as num?)?.toInt() ?? calculatedVotesHeld;
+    }
+    
+    // For active elections, use the current active mandates.
+    // For past elections, we infer the number of mandators from the vote weight 
+    // by subtracting the delegate's own vote weight.
+    int activeMandators = mandates.where((m) => m.electionId == eId && m.status == 'active').length;
+    if (hasVoted) {
+      activeMandators = (actualVoteWeight - myOwnVoteWeight).clamp(0, 9999);
+    }
 
     if (eStatus == 'live' && !hasVoted) {
       activeCount++;
@@ -239,7 +252,7 @@ final delegateDashboardProvider = FutureProvider.autoDispose<DelegateDashboardDa
         electionId: eId,
         title: eTitle,
         dateString: dateFormatted,
-        totalVotes: calculatedVotesHeld,
+        totalVotes: actualVoteWeight,
         totalMandators: activeMandators,
         status: 'Menunggu',
         createdAt: date,
@@ -250,7 +263,7 @@ final delegateDashboardProvider = FutureProvider.autoDispose<DelegateDashboardDa
         electionId: eId,
         title: eTitle,
         dateString: dateFormatted,
-        totalVotes: calculatedVotesHeld,
+        totalVotes: actualVoteWeight,
         totalMandators: activeMandators,
         status: 'Selesai',
         createdAt: date,

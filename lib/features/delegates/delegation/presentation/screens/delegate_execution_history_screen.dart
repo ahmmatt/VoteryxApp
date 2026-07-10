@@ -208,7 +208,7 @@ class _DelegateExecutionHistoryScreenState
         if (!isSelesai) {
           context.pushNamed('delegate-vote-execution');
         } else {
-          context.pushNamed('delegate-dashboard');
+          context.pushNamed('delegate-vote-success', extra: item.electionId);
         }
       },
       child: Container(

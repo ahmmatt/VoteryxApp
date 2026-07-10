@@ -645,7 +645,10 @@ final GoRouter appRouter = GoRouter(
       path: '/delegation/vote-success',
       name: 'delegate-vote-success',
       parentNavigatorKey: _rootNavigatorKey,
-      builder: (_, __) => const DelegateVoteSuccessScreen(),
+      builder: (_, state) {
+        final electionId = state.extra as String?;
+        return DelegateVoteSuccessScreen(electionId: electionId);
+      },
     ),
 
     // Wildcard delegation route — harus di akhir agar tidak menimpa route spesifik
