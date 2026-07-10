@@ -221,11 +221,20 @@ class AdminProposalMonitorScreen extends ConsumerWidget {
             height: 44,
             child: ElevatedButton(
               onPressed: () {
-                context.pushNamed(
-                  'admin-election-live',
-                  pathParameters: {'id': id},
-                  extra: item,
-                );
+                if (isActive) {
+                  context.pushNamed(
+                    'admin-election-live',
+                    pathParameters: {'id': id},
+                    extra: item,
+                  );
+                } else {
+                  // Admin review proposal
+                  context.pushNamed(
+                    'admin-proposal-track',
+                    pathParameters: {'id': id},
+                    extra: item,
+                  );
+                }
               },
               style: ElevatedButton.styleFrom(
                 backgroundColor: isActive ? AppColors.primary900 : AppColors.goldMid,
@@ -237,7 +246,7 @@ class AdminProposalMonitorScreen extends ConsumerWidget {
                 children: [
                   Flexible(
                     child: Text(
-                      'Lihat & Kelola Detail Pemilihan',
+                      isActive ? 'Lihat & Kelola Detail Pemilihan' : 'Lihat Detail Usulan',
                       style: AppTypography.bodyMedium.copyWith(
                           color: Colors.white, fontWeight: FontWeight.bold),
                       overflow: TextOverflow.ellipsis,

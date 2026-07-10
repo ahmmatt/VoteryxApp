@@ -159,7 +159,14 @@ class _KycCameraScreenState extends ConsumerState<KycCameraScreen> {
                     children: [
                       // Camera Preview or Fallback Loading/Simulation
                       if (_isCameraInitialized && _cameraController != null)
-                        CameraPreview(_cameraController!)
+                        FittedBox(
+                          fit: BoxFit.cover,
+                          child: SizedBox(
+                            width: 100,
+                            height: 100 / _cameraController!.value.aspectRatio,
+                            child: CameraPreview(_cameraController!),
+                          ),
+                        )
                       else
                         Container(
                           color: Colors.white.withValues(alpha: 0.05),
@@ -261,11 +268,13 @@ class _KycCameraScreenState extends ConsumerState<KycCameraScreen> {
                 children: [
                   Icon(Icons.lock_outline, color: Colors.white.withValues(alpha: 0.5), size: 14),
                   const SizedBox(width: 8),
-                  Text(
-                    'Foto hanya diproses secara lokal di perangkat, tidak diunggah sembarangan',
-                    style: AppTypography.captionBold.copyWith(
-                      color: Colors.white.withValues(alpha: 0.5),
-                      fontSize: 10,
+                  Expanded(
+                    child: Text(
+                      'Foto hanya diproses secara lokal di perangkat, tidak diunggah sembarangan',
+                      style: AppTypography.captionBold.copyWith(
+                        color: Colors.white.withValues(alpha: 0.5),
+                        fontSize: 10,
+                      ),
                     ),
                   ),
                 ],

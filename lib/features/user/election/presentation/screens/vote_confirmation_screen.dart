@@ -7,7 +7,8 @@ import 'package:voteryxapp/core/constants/app_colors.dart';
 import 'package:voteryxapp/core/constants/app_spacing.dart';
 import 'package:voteryxapp/core/constants/app_typography.dart';
 import 'package:voteryxapp/core/utils/app_snackbar.dart';
-import 'package:voteryxapp/core/widgets/slide_to_confirm.dart';
+import '../providers/election_provider.dart';
+import '../../../../../core/widgets/slide_to_confirm.dart';
 import 'package:voteryxapp/features/user/vote_execution/presentation/providers/vote_execution_provider.dart';
 
 class VoteConfirmationScreen extends ConsumerWidget {
@@ -218,10 +219,22 @@ class VoteConfirmationScreen extends ConsumerWidget {
                   ),
                   child: SlideToConfirm(
                     onConfirm: () async {
-                      context.goNamed(
-                        'election-processing',
-                        pathParameters: {'id': electionId},
-                      );
+                      // Cek apakah user adalah delegate untuk pemilihan ini
+                      final dData = ref.read(dashboardProvider).valueOrNull;
+                      final isDelegate = dData?.mandateElectionIds.contains(electionId) ?? false;
+                      
+                      if (isDelegate) {
+                        context.goNamed(
+                          'delegate-execution-loading',
+                          pathParameters: {'id': electionId},
+                        );
+                      } else {
+                        context.goNamed(
+                          'election-processing',
+                          pathParameters: {'id': electionId},
+                        );
+                      }
+                      
                       await ref
                           .read(voteExecutionProvider.notifier)
                           .executeVote();

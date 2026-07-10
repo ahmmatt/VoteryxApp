@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'dart:convert';
 
 import '../../../../../core/constants/app_colors.dart';
 import '../../../../../core/constants/app_spacing.dart';
@@ -9,16 +10,21 @@ import '../../../../../core/widgets/gold_button.dart';
 import '../../domain/entities/election.dart';
 import 'package:voteryxapp/features/user/vote_execution/presentation/providers/vote_execution_provider.dart';
 import '../providers/election_provider.dart';
+import 'package:voteryxapp/features/admin/candidate_verification/presentation/providers/admin_candidate_verification_provider.dart';
 
 class CandidateDetailScreen extends ConsumerStatefulWidget {
   const CandidateDetailScreen({
     super.key,
     required this.electionId,
     required this.candidateId,
+    this.isAdmin = false,
+    this.isProposal = false,
   });
 
   final String electionId;
   final String candidateId;
+  final bool isAdmin;
+  final bool isProposal;
 
   @override
   ConsumerState<CandidateDetailScreen> createState() => _CandidateDetailScreenState();
@@ -42,7 +48,9 @@ class _CandidateDetailScreenState extends ConsumerState<CandidateDetailScreen>
 
   @override
   Widget build(BuildContext context) {
-    final candidateAsync = ref.watch(candidateDetailProvider(widget.candidateId));
+    final candidateAsync = widget.isProposal
+        ? ref.watch(proposalCandidateDetailProvider(widget.candidateId))
+        : ref.watch(candidateDetailProvider(widget.candidateId));
 
     return candidateAsync.when(
       loading: () => Scaffold(
@@ -206,9 +214,7 @@ class _CandidateDetailScreenState extends ConsumerState<CandidateDetailScreen>
                       color: Colors.white.withValues(alpha: 0.2), width: 4),
                 ),
                 child: ClipOval(
-                  child: candidate.photoUrl != null && candidate.photoUrl!.isNotEmpty
-                      ? Image.network(candidate.photoUrl!, fit: BoxFit.cover)
-                      : const Icon(Icons.person, size: 64, color: AppColors.textSecondary),
+                  child: _buildAvatarImage(candidate.photoUrl),
                 ),
               ),
               Positioned(
@@ -230,18 +236,27 @@ class _CandidateDetailScreenState extends ConsumerState<CandidateDetailScreen>
             ],
           ),
           const SizedBox(height: 16),
-          // Name and verified badge
+          // Name
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Text(
+              candidate.fullName,
+              style: AppTypography.displayHeading
+                  .copyWith(color: Colors.white, fontSize: 22),
+              maxLines: 2,
+              textAlign: TextAlign.center,
+              overflow: TextOverflow.visible,
+            ),
+          ),
+          const SizedBox(height: 8),
+          // Subtitle and verified badge
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Flexible(
-                child: Text(
-                  candidate.fullName,
-                  style: AppTypography.displayHeading
-                      .copyWith(color: Colors.white, fontSize: 24),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
+              Text(
+                '${candidate.faculty ?? "Fakultas Mahasiswa"}${candidate.nim != null ? " • NIM ${candidate.nim}" : ""}',
+                style: AppTypography.bodyText
+                    .copyWith(color: Colors.white.withValues(alpha: 0.7)),
               ),
               if (candidate.isVerified) ...[
                 const SizedBox(width: 8),
@@ -267,13 +282,6 @@ class _CandidateDetailScreenState extends ConsumerState<CandidateDetailScreen>
               ],
             ],
           ),
-          const SizedBox(height: 4),
-          // Subtitle
-          Text(
-            '${candidate.faculty ?? "Fakultas Mahasiswa"}${candidate.nim != null ? " • NIM ${candidate.nim}" : ""}',
-            style: AppTypography.bodyText
-                .copyWith(color: Colors.white.withValues(alpha: 0.7)),
-          ),
         ],
       ),
     );
@@ -287,7 +295,9 @@ class _CandidateDetailScreenState extends ConsumerState<CandidateDetailScreen>
         Text('Visi', style: AppTypography.screenTitle.copyWith(fontSize: 20)),
         const SizedBox(height: 12),
         Text(
-          '"${candidate.visi ?? "Mewujudkan organisasi yang inklusif, transparan, dan berorientasi pada kemajuan bersama melalui inovasi berkelanjutan."}"',
+          candidate.visi != null && candidate.visi!.trim().isNotEmpty
+              ? '"${candidate.visi!.trim()}"'
+              : '"Belum ada visi yang ditambahkan."',
           style: AppTypography.bodyText.copyWith(
               fontStyle: FontStyle.italic,
               color: AppColors.textSecondary,
@@ -296,16 +306,13 @@ class _CandidateDetailScreenState extends ConsumerState<CandidateDetailScreen>
         const SizedBox(height: 24),
         Text('Misi', style: AppTypography.screenTitle.copyWith(fontSize: 20)),
         const SizedBox(height: 12),
-        if (candidate.misi != null && candidate.misi!.isNotEmpty)
+        if (candidate.misi != null && candidate.misi!.trim().isNotEmpty)
           ...candidate.misi!
               .split('\n')
               .where((s) => s.trim().isNotEmpty)
               .map((item) => _buildBulletPoint(item.trim()))
-        else ...[
-          _buildBulletPoint('Digitalisasi seluruh layanan administrasi kemahasiswaan untuk efisiensi waktu.'),
-          _buildBulletPoint('Membangun transparansi anggaran organisasi kemahasiswaan yang dapat diakses publik.'),
-          _buildBulletPoint('Meningkatkan partisipasi aktif mahasiswa dalam perumusan kebijakan kampus.'),
-        ],
+        else
+          _buildBulletPoint('Belum ada misi yang ditambahkan.'),
       ],
     );
   }
@@ -514,6 +521,11 @@ class _CandidateDetailScreenState extends ConsumerState<CandidateDetailScreen>
   }
 
   Widget _buildStatistikTab(Candidate candidate) {
+    // If it's a proposal, there are no stats yet
+    final int dukungan = candidate.voteCount;
+    // For now, if Dukungan is 0, percentage is 0. If we had total voters, we could calculate it properly.
+    final double percentage = dukungan > 0 ? 0.0 : 0.0; 
+
     return ListView(
       padding: const EdgeInsets.fromLTRB(24, 24, 24, 120),
       physics: const ClampingScrollPhysics(),
@@ -533,11 +545,11 @@ class _CandidateDetailScreenState extends ConsumerState<CandidateDetailScreen>
                 child: Stack(
                   fit: StackFit.expand,
                   children: [
-                    const CircularProgressIndicator(
-                      value: 0.82,
-                      backgroundColor: Color(0xFFFEEFC3), // Light gold
+                    CircularProgressIndicator(
+                      value: percentage,
+                      backgroundColor: const Color(0xFFFEEFC3), // Light gold
                       valueColor:
-                          AlwaysStoppedAnimation<Color>(AppColors.goldMid),
+                          const AlwaysStoppedAnimation<Color>(AppColors.goldMid),
                       strokeWidth: 8,
                     ),
                     Center(
@@ -545,7 +557,7 @@ class _CandidateDetailScreenState extends ConsumerState<CandidateDetailScreen>
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           Text(
-                            '82%',
+                            '${(percentage * 100).toStringAsFixed(0)}%',
                             style: AppTypography.displayHeading
                                 .copyWith(fontSize: 40),
                           ),
@@ -570,7 +582,7 @@ class _CandidateDetailScreenState extends ConsumerState<CandidateDetailScreen>
                           style: AppTypography.captionBold
                               .copyWith(color: AppColors.textSecondary)),
                       const SizedBox(height: 4),
-                      Text('4,203',
+                      Text(dukungan.toString(),
                           style: AppTypography.screenTitle
                               .copyWith(color: AppColors.goldDark)),
                     ],
@@ -581,7 +593,7 @@ class _CandidateDetailScreenState extends ConsumerState<CandidateDetailScreen>
                           style: AppTypography.captionBold
                               .copyWith(color: AppColors.textSecondary)),
                       const SizedBox(height: 4),
-                      Text('12k', style: AppTypography.screenTitle),
+                      Text('-', style: AppTypography.screenTitle),
                     ],
                   ),
                 ],
@@ -613,18 +625,101 @@ class _CandidateDetailScreenState extends ConsumerState<CandidateDetailScreen>
           stops: const [0.0, 0.4, 1.0],
         ),
       ),
-      child: GoldButton(
-        label: 'Pilih ${candidate.fullName}',
-        icon: Icons.how_to_vote,
-        onPressed: () {
-          ref.read(voteExecutionProvider.notifier).setSelectedCandidate(
-                candidateId: candidate.id,
-                candidateName: candidate.fullName,
-                electionId: widget.electionId,
-              );
-          context.pushNamed('election-vote', pathParameters: {'id': widget.electionId});
-        },
-      ),
+      child: widget.isAdmin
+          ? Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: () async {
+                      final success = await ref
+                          .read(adminCandidateVerificationProvider.notifier)
+                          .updateVerificationStatus(candidate.id, false, isProposal: widget.isProposal);
+                      if (context.mounted && success) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text('⚠️ Verifikasi ${candidate.fullName} dibatalkan.'),
+                            backgroundColor: AppColors.errorRed,
+                          ),
+                        );
+                        context.pop();
+                      }
+                    },
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: AppColors.errorRed,
+                      side: const BorderSide(color: AppColors.errorRed),
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                    ),
+                    child: const Text('Batalkan / Tolak'),
+                  ),
+                ),
+                const SizedBox(width: AppSpacing.md),
+                Expanded(
+                  child: ElevatedButton(
+                    onPressed: () async {
+                      final success = await ref
+                          .read(adminCandidateVerificationProvider.notifier)
+                          .updateVerificationStatus(candidate.id, true, isProposal: widget.isProposal);
+                      if (context.mounted && success) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text('✅ ${candidate.fullName} berhasil diverifikasi!'),
+                            backgroundColor: Colors.green,
+                          ),
+                        );
+                        context.pop();
+                      }
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.successTeal,
+                      foregroundColor: Colors.white,
+                      elevation: 0,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                    ),
+                    child: const Text('Setujui'),
+                  ),
+                ),
+              ],
+            )
+          : GoldButton(
+              label: 'Pilih ${candidate.fullName}',
+              icon: Icons.how_to_vote,
+              onPressed: () {
+                ref.read(voteExecutionProvider.notifier).setSelectedCandidate(
+                      candidateId: candidate.id,
+                      candidateName: candidate.fullName,
+                      electionId: widget.electionId,
+                    );
+                context.pushNamed('election-vote',
+                    pathParameters: {'id': widget.electionId});
+              },
+            ),
     );
+  }
+
+  Widget _buildAvatarImage(String? photoUrl) {
+    if (photoUrl == null || photoUrl.trim().isEmpty) {
+      return const Icon(Icons.person, size: 64, color: AppColors.textSecondary);
+    }
+    
+    final cleanUrl = photoUrl.trim();
+    if (cleanUrl.startsWith('data:image')) {
+      try {
+        final base64Str = cleanUrl.split(',').last;
+        return Image.memory(
+          base64Decode(base64Str),
+          fit: BoxFit.cover,
+          errorBuilder: (context, error, stackTrace) => const Icon(Icons.person, size: 64, color: AppColors.textSecondary),
+        );
+      } catch (e) {
+        return const Icon(Icons.person, size: 64, color: AppColors.textSecondary);
+      }
+    } else if (cleanUrl.startsWith('http')) {
+      return Image.network(
+        cleanUrl,
+        fit: BoxFit.cover,
+        errorBuilder: (context, error, stackTrace) => const Icon(Icons.person, size: 64, color: AppColors.textSecondary),
+      );
+    }
+    return const Icon(Icons.person, size: 64, color: AppColors.textSecondary);
   }
 }

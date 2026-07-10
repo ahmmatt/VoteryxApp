@@ -148,13 +148,13 @@ class _KycPhotoReviewScreenState extends ConsumerState<KycPhotoReviewScreen> {
                           ),
                   ),
                   const SizedBox(height: AppSpacing.md),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
+                  Wrap(
+                    alignment: WrapAlignment.center,
+                    spacing: 8,
+                    runSpacing: 8,
                     children: [
                       _buildPill('Terbaca Jelas'),
-                      const SizedBox(width: 8),
                       _buildPill('NFC / OCR Valid'),
-                      const SizedBox(width: 8),
                       _buildPill('Pencahayaan OK'),
                     ],
                   ),

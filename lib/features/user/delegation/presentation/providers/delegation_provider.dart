@@ -20,6 +20,13 @@ final publicDelegatesProvider = FutureProvider.autoDispose<List<Delegate>>((ref)
   return await repo.getPublicDelegates();
 });
 
+/// Provider untuk mengambil detail satu delegate berdasarkan ID-nya langsung dari DB.
+final delegateDetailProvider =
+    FutureProvider.autoDispose.family<Delegate?, String>((ref, delegateId) async {
+  final repo = ref.read(delegationRepositoryProvider);
+  return await repo.getDelegateById(delegateId);
+});
+
 // ─── Delegation Action State ──────────────────────────────────────────────────
 
 class DelegationActionState {
@@ -109,6 +116,27 @@ class DelegationActionNotifier extends StateNotifier<DelegationActionState> {
             ? 'Kamu sudah mendelegasikan suara di pemilihan ini.'
             : e.userFriendlyMessage,
       );
+    } catch (e) {
+      state = state.copyWith(
+        isLoading: false,
+        error: extractUserFriendlyError(e),
+      );
+    }
+  }
+
+  Future<void> cancelDelegation({required String electionId}) async {
+    final userId = _ref.read(currentUserIdProvider);
+    if (userId == null) return;
+
+    state = state.copyWith(isLoading: true, error: null);
+    try {
+      final repo = _ref.read(delegationRepositoryProvider);
+      // Wait, let's look at the repository for cancelling. It is `revokeDelegation` actually!
+      await repo.revokeDelegation(
+        electionId: electionId,
+        delegatorId: userId,
+      );
+      state = state.copyWith(isLoading: false, isSuccess: true);
     } catch (e) {
       state = state.copyWith(
         isLoading: false,

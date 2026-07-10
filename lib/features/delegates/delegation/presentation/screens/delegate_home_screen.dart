@@ -1,4 +1,5 @@
 // lib/features/delegates/delegation/presentation/screens/delegate_home_screen.dart
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -33,16 +34,27 @@ class DelegateHomeScreen extends ConsumerWidget {
         automaticallyImplyLeading: false,
         title: Row(
           children: [
-            CircleAvatar(
-              radius: 18,
-              backgroundColor: AppColors.goldMid,
-              backgroundImage: avatarUrl != null && avatarUrl.isNotEmpty && avatarUrl.startsWith('http')
-                  ? NetworkImage(avatarUrl) as ImageProvider
-                  : null,
-              child: avatarUrl == null || !avatarUrl.startsWith('http')
-                  ? const Icon(Icons.person, color: AppColors.primary900, size: 18)
-                  : null,
-            ),
+            Builder(builder: (context) {
+              ImageProvider? avatarProvider;
+              if (avatarUrl != null && avatarUrl.isNotEmpty) {
+                if (avatarUrl.startsWith('data:image')) {
+                  try {
+                    final base64Str = avatarUrl.split(',').last;
+                    avatarProvider = MemoryImage(base64Decode(base64Str));
+                  } catch (_) {}
+                } else if (avatarUrl.startsWith('http')) {
+                  avatarProvider = NetworkImage(avatarUrl);
+                }
+              }
+              return CircleAvatar(
+                radius: 18,
+                backgroundColor: AppColors.goldMid,
+                backgroundImage: avatarProvider,
+                child: avatarProvider == null
+                    ? const Icon(Icons.person, color: AppColors.primary900, size: 18)
+                    : null,
+              );
+            }),
             const SizedBox(width: 12),
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -492,6 +504,7 @@ class DelegateHomeScreen extends ConsumerWidget {
         iconColor: iconColor,
         title: titleText,
         time: timeText,
+        avatarUrl: m.delegatorAvatarUrl,
       ));
 
       if (i < shown.length - 1) {
@@ -533,17 +546,21 @@ class DelegateHomeScreen extends ConsumerWidget {
     required Color iconColor,
     required String title,
     required String time,
+    String? avatarUrl,
   }) {
     return Padding(
       padding: const EdgeInsets.all(AppSpacing.lg),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(color: iconBgColor, shape: BoxShape.circle),
-            child: Icon(icon, color: iconColor, size: 20),
-          ),
+          if (avatarUrl != null && avatarUrl.isNotEmpty)
+            _buildAvatar(avatarUrl, radius: 18)
+          else
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(color: iconBgColor, shape: BoxShape.circle),
+              child: Icon(icon, color: iconColor, size: 20),
+            ),
           const SizedBox(width: 16),
           Expanded(
             child: Column(
@@ -560,5 +577,37 @@ class DelegateHomeScreen extends ConsumerWidget {
         ],
       ),
     );
+  }
+
+  Widget _buildAvatar(String? avatarUrl, {double radius = 18}) {
+    if (avatarUrl == null || avatarUrl.isEmpty) {
+      return CircleAvatar(
+        radius: radius,
+        backgroundColor: AppColors.outlineVariant,
+        child: Icon(Icons.person, color: AppColors.textSecondary, size: radius * 1.2),
+      );
+    }
+    
+    try {
+      if (avatarUrl.startsWith('data:image')) {
+        final base64Str = avatarUrl.split(',').last;
+        final normalized = base64.normalize(base64Str.replaceAll(RegExp(r'\s+'), ''));
+        return CircleAvatar(
+          radius: radius,
+          backgroundImage: MemoryImage(base64Decode(normalized)),
+        );
+      } else {
+        return CircleAvatar(
+          radius: radius,
+          backgroundImage: NetworkImage(avatarUrl),
+        );
+      }
+    } catch (_) {
+      return CircleAvatar(
+        radius: radius,
+        backgroundColor: AppColors.outlineVariant,
+        child: Icon(Icons.person, color: AppColors.textSecondary, size: radius * 1.2),
+      );
+    }
   }
 }

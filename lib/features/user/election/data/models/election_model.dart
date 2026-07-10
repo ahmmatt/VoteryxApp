@@ -1,5 +1,6 @@
 // lib/features/user/election/data/models/election_model.dart
 import '../../domain/entities/election.dart';
+import '../../../../../core/network/supabase_client.dart';
 
 class ElectionModel extends Election {
   const ElectionModel({
@@ -22,9 +23,16 @@ class ElectionModel extends Election {
     int candidateCount = 0;
     if (json['candidates'] != null) {
       if (json['candidates'] is List) {
-        candidateCount = (json['candidates'] as List).length;
+        final list = json['candidates'] as List;
+        if (list.isNotEmpty && list.first is Map && (list.first as Map).containsKey('count')) {
+          candidateCount = ((list.first as Map)['count'] as num?)?.toInt() ?? 0;
+        } else {
+          candidateCount = list.length;
+        }
       } else if (json['candidates'] is Map) {
         candidateCount = (json['candidates']['count'] as num?)?.toInt() ?? 0;
+      } else if (json['candidates'] is num) {
+        candidateCount = (json['candidates'] as num).toInt();
       }
     }
 
@@ -32,9 +40,16 @@ class ElectionModel extends Election {
     int voteCount = 0;
     if (json['votes'] != null) {
       if (json['votes'] is List) {
-        voteCount = (json['votes'] as List).length;
+        final list = json['votes'] as List;
+        if (list.isNotEmpty && list.first is Map && (list.first as Map).containsKey('count')) {
+          voteCount = ((list.first as Map)['count'] as num?)?.toInt() ?? 0;
+        } else {
+          voteCount = list.length;
+        }
       } else if (json['votes'] is Map) {
         voteCount = (json['votes']['count'] as num?)?.toInt() ?? 0;
+      } else if (json['votes'] is num) {
+        voteCount = (json['votes'] as num).toInt();
       }
     }
 
@@ -106,13 +121,26 @@ class CandidateModel extends Candidate {
       } catch (_) {}
     }
 
+    // photo_url: gunakan photo_url jika ada, fallback ke users.avatar_url (dari join)
+    String? parsedPhotoUrl = json['photo_url']?.toString();
+    if (parsedPhotoUrl == null || parsedPhotoUrl.isEmpty) {
+      final usersMap = json['users'] as Map<String, dynamic>?;
+      parsedPhotoUrl = usersMap?['avatar_url']?.toString();
+    }
+    if (parsedPhotoUrl != null && 
+        parsedPhotoUrl.isNotEmpty && 
+        !parsedPhotoUrl.startsWith('http') && 
+        !parsedPhotoUrl.startsWith('data:image')) {
+      parsedPhotoUrl = SupabaseConfig.client.storage.from('avatars').getPublicUrl(parsedPhotoUrl);
+    }
+
     return CandidateModel(
       id: json['id'] as String? ?? '',
       electionId: json['election_id'] as String? ?? '',
       fullName: json['full_name'] as String? ?? 'Kandidat',
       nim: json['nim'] as String?,
       faculty: json['faculty'] as String?,
-      photoUrl: json['photo_url'] as String?,
+      photoUrl: parsedPhotoUrl,
       visi: json['visi'] as String?,
       misi: json['misi'] as String?,
       trackRecords: trackRecords,

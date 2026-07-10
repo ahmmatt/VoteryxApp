@@ -1,5 +1,8 @@
 // lib/features/auth/presentation/providers/auth_provider.dart
+import 'dart:convert';
+import 'dart:io';
 import 'dart:typed_data';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -53,12 +56,16 @@ class UserProfileNotifier extends AsyncNotifier<UserProfile?> {
     return await ds.getUserProfile(user.id);
   }
 
-  /// Unggah foto profil dan ambil URL publiknya.
+  /// Unggah foto profil dan ambil URL publiknya (atau fallback Base64 jika bucket storage belum ada).
   Future<String?> uploadAvatar(Uint8List bytes, String fileExtension) async {
     final ds = ref.read(authRemoteDatasourceProvider);
     final user = ds.currentUser;
     if (user == null) throw Exception('Tidak ada sesi aktif.');
-    return await ds.uploadAvatar(user.id, bytes, fileExtension);
+    final url = await ds.uploadAvatar(user.id, bytes, fileExtension);
+    if (url == null || url.trim().isEmpty) {
+      return 'data:image/$fileExtension;base64,${base64Encode(bytes)}';
+    }
+    return url;
   }
 
   /// Update profil user.
@@ -413,7 +420,35 @@ class RegistrationNotifier extends StateNotifier<RegistrationState> {
       final userId = authResponse.user!.id;
       final nikHash = HashUtils.sha256Hash(nik);
 
-      // 2. Insert ke public.users (termasuk data lengkap e-KTP)
+      // 1.5. Unggah foto wajah liveness (jika ada file lokal) atau tentukan avatarUrl
+      String? avatarUrl;
+      if (state.faceImagePath != null && state.faceImagePath!.isNotEmpty) {
+        try {
+          final faceFile = File(state.faceImagePath!);
+          if (await faceFile.exists()) {
+            final bytes = await faceFile.readAsBytes();
+            avatarUrl = await ds.uploadAvatar(userId, bytes, 'jpg');
+            // Jika upload storage gagal (karena bucket avatars belum ada di Supabase / RLS),
+            // LANGSUNG simpan data Base64 foto asli yang baru saja difoto saat mendaftar!
+            if (avatarUrl == null || avatarUrl.trim().isEmpty) {
+              avatarUrl = 'data:image/jpg;base64,${base64Encode(bytes)}';
+            }
+          }
+        } catch (e) {
+          debugPrint('Gagal upload/proses foto wajah: $e');
+        }
+      }
+      // Hanya jika foto tidak ada sama sekali (misal simulasi tanpa kamera aktif), kita sediakan avatar default
+      if (avatarUrl == null || avatarUrl.trim().isEmpty) {
+        final genderStr = (ktpData?.gender ?? '').toLowerCase();
+        if (genderStr.contains('perempuan') || genderStr.contains('wanita')) {
+          avatarUrl = 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?q=80&w=400&auto=format&fit=crop';
+        } else {
+          avatarUrl = 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?q=80&w=400&auto=format&fit=crop';
+        }
+      }
+
+      // 2. Insert ke public.users (termasuk data lengkap e-KTP dan avatarUrl)
       try {
         await ds.insertUserProfile(
           userId: userId,
@@ -424,6 +459,7 @@ class RegistrationNotifier extends StateNotifier<RegistrationState> {
           birthDate: ktpData?.birthDate,
           gender: ktpData?.gender,
           address: ktpData?.address,
+          avatarUrl: avatarUrl,
         );
       } on PostgrestException catch (e) {
         // Jika terjadi error RLS 42501 (karena pengaturan "Confirm Email" di Supabase aktif sehingga sesi belum login saat insert)

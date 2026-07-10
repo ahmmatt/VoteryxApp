@@ -1,731 +1,547 @@
 // lib/features/admin/election_management/presentation/screens/admin_inbox_usulan_screen.dart
-
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:intl/intl.dart';
+
 import '../../../../../core/constants/app_colors.dart';
 import '../../../../../core/constants/app_spacing.dart';
 import '../../../../../core/constants/app_typography.dart';
 import '../../../../../core/constants/app_radius.dart';
+import '../providers/admin_proposal_provider.dart';
+import 'package:voteryxapp/features/user/election_proposal/domain/entities/election_proposal.dart';
 
-// ── Data Model (local/mock) ───────────────────────────────────────────────────
-enum _ProposalStatus { baru, disetujui, ditolak }
-
-class _Proposal {
-  const _Proposal({
-    required this.id,
-    required this.org,
-    required this.orgInitial,
-    required this.status,
-    required this.statusLabel,
-    required this.timeAgo,
-    required this.title,
-    required this.tujuan,
-    required this.periode,
-    required this.candidateCount,
-    required this.filter,
-    this.showFullCard = false,
-  });
-
-  final String id;
-  final String org;
-  final String orgInitial;
-  final _ProposalStatus status;
-  final String statusLabel;
-  final String timeAgo;
-  final String title;
-  final String tujuan;
-  final String periode;
-  final int candidateCount;
-  final String filter;
-  final bool showFullCard;
-}
-
-// ── Screen ────────────────────────────────────────────────────────────────────
-class AdminInboxUsulanScreen extends StatefulWidget {
+class AdminInboxUsulanScreen extends ConsumerWidget {
   const AdminInboxUsulanScreen({super.key});
 
   @override
-  State<AdminInboxUsulanScreen> createState() => _AdminInboxUsulanScreenState();
-}
+  Widget build(BuildContext context, WidgetRef ref) {
+    final filter = ref.watch(adminProposalFilterProvider);
+    final proposalsAsync = ref.watch(adminAllProposalsProvider);
 
-class _AdminInboxUsulanScreenState extends State<AdminInboxUsulanScreen> {
-  int _selectedTab = 0; // 0: Baru, 1: Disetujui, 2: Ditolak
-
-  static const _tabs = [
-    ('Baru', 4),
-    ('Disetujui', 12),
-    ('Ditolak', 2),
-  ];
-
-  static const List<_Proposal> _allProposals = [
-    _Proposal(
-      id: '1',
-      org: 'HIMA Teknik Informatika',
-      orgInitial: 'H',
-      status: _ProposalStatus.baru,
-      statusLabel: 'MENUNGGU REVIEW',
-      timeAgo: '2 jam yang lalu',
-      title: 'Usulan: Pemilihan Ketua HIMA TI 2026',
-      tujuan: 'Regenerasi kepemimpinan tahunan organisasi mahasiswa.',
-      periode: '15 – 17 Juni 2026',
-      candidateCount: 5,
-      filter: 'baru',
-      showFullCard: true,
-    ),
-    _Proposal(
-      id: '2',
-      org: 'BEM Fakultas Ekonomi',
-      orgInitial: 'B',
-      status: _ProposalStatus.baru,
-      statusLabel: 'BARU MASUK',
-      timeAgo: '5 jam yang lalu',
-      title: 'Usulan: Pemilihan Ketua BEM FE 2026',
-      tujuan: '-',
-      periode: '-',
-      candidateCount: 3,
-      filter: 'baru',
-      showFullCard: false,
-    ),
-    _Proposal(
-      id: '3',
-      org: 'BEM Universitas',
-      orgInitial: 'U',
-      status: _ProposalStatus.disetujui,
-      statusLabel: 'DISETUJUI',
-      timeAgo: '1 hari yang lalu',
-      title: 'Usulan: Pemilihan Ketua BEM 2026',
-      tujuan: 'Regenerasi kepemimpinan.',
-      periode: '20 – 22 Juni 2026',
-      candidateCount: 4,
-      filter: 'disetujui',
-      showFullCard: true,
-    ),
-    _Proposal(
-      id: '4',
-      org: 'DPM Fakultas Hukum',
-      orgInitial: 'D',
-      status: _ProposalStatus.ditolak,
-      statusLabel: 'DITOLAK',
-      timeAgo: '3 hari yang lalu',
-      title: 'Usulan: Pemilihan Anggota DPM 2026',
-      tujuan: 'Regenerasi anggota dewan perwakilan.',
-      periode: '1 – 3 Juli 2026',
-      candidateCount: 6,
-      filter: 'ditolak',
-      showFullCard: true,
-    ),
-  ];
-
-  List<_Proposal> get _filteredProposals {
-    const filterMap = ['baru', 'disetujui', 'ditolak'];
-    return _allProposals
-        .where((p) => p.filter == filterMap[_selectedTab])
-        .toList();
-  }
-
-  @override
-  Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.background,
-      appBar: _buildAppBar(context),
-      body: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _buildTabRow(),
-          Expanded(
-            child: _filteredProposals.isEmpty
-                ? _buildEmptyState()
-                : ListView.separated(
-                    padding: const EdgeInsets.fromLTRB(
-                      AppSpacing.md,
-                      AppSpacing.md,
-                      AppSpacing.md,
-                      AppSpacing.xxl,
-                    ),
-                    itemCount: _filteredProposals.length + 1, // +1 for bottom note
-                    separatorBuilder: (_, __) =>
-                        const SizedBox(height: AppSpacing.md),
-                    itemBuilder: (ctx, i) {
-                      if (i == _filteredProposals.length) {
-                        return _buildBottomNote();
-                      }
-                      final p = _filteredProposals[i];
-                      return p.showFullCard
-                          ? _buildFullProposalCard(ctx, p)
-                          : _buildCompactProposalCard(ctx, p);
-                    },
-                  ),
+      appBar: AppBar(
+        titleSpacing: 0,
+        backgroundColor: AppColors.primary800,
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: Colors.white),
+          onPressed: () => context.pop(),
+        ),
+        title: Text('Inbox Usulan Pemilihan',
+            style: AppTypography.headerTitle.copyWith(color: Colors.white)),
+        actions: [
+          IconButton(
+            onPressed: () => ref.invalidate(adminAllProposalsProvider),
+            icon: const Icon(Icons.refresh, color: Colors.white),
+            tooltip: 'Segarkan',
           ),
         ],
       ),
-    );
-  }
+      body: Container(
+        decoration: const BoxDecoration(gradient: AppColors.pageGradient),
+        child: Column(
+          children: [
+            // Filter Tabs
+            _buildFilterTabs(ref, filter),
 
-  // ── AppBar ────────────────────────────────────────────────────────────────
-  PreferredSizeWidget _buildAppBar(BuildContext context) {
-    return AppBar(
-      backgroundColor: AppColors.primary900,
-      elevation: 0,
-      leading: IconButton(
-        icon: const Icon(Icons.arrow_back, color: Colors.white),
-        onPressed: () => context.pop(),
-      ),
-      title: Text('Inbox Usulan', style: AppTypography.headerTitle),
-    );
-  }
-
-  // ── Tab Row ───────────────────────────────────────────────────────────────
-  Widget _buildTabRow() {
-    return Container(
-      color: AppColors.background,
-      padding: const EdgeInsets.symmetric(
-        horizontal: AppSpacing.md,
-        vertical: AppSpacing.sm,
-      ),
-      child: Row(
-        children: List.generate(_tabs.length, (i) {
-          final (label, count) = _tabs[i];
-          final isSelected = i == _selectedTab;
-          return Padding(
-            padding: EdgeInsets.only(right: i < _tabs.length - 1 ? 8 : 0),
-            child: GestureDetector(
-              onTap: () => setState(() => _selectedTab = i),
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 200),
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                decoration: BoxDecoration(
-                  color: isSelected ? AppColors.primary900 : Colors.transparent,
-                  borderRadius: BorderRadius.circular(AppRadius.button),
-                  border: isSelected
-                      ? null
-                      : Border.all(color: AppColors.outlineVariant),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      label,
-                      style: AppTypography.bodyMedium.copyWith(
-                        color: isSelected
-                            ? Colors.white
-                            : AppColors.textSecondary,
-                        fontWeight: FontWeight.w600,
+            // Proposals List
+            Expanded(
+              child: RefreshIndicator(
+                onRefresh: () async => ref.invalidate(adminAllProposalsProvider),
+                color: AppColors.goldMid,
+                child: proposalsAsync.when(
+                  data: (proposals) {
+                    if (proposals.isEmpty) return _buildEmpty(filter);
+                    return ListView.separated(
+                      padding: const EdgeInsets.all(AppSpacing.lg),
+                      itemCount: proposals.length,
+                      separatorBuilder: (_, __) =>
+                          const SizedBox(height: AppSpacing.md),
+                      itemBuilder: (ctx, i) =>
+                          _ProposalCard(item: proposals[i]),
+                    );
+                  },
+                  loading: () => const Center(
+                    child: CircularProgressIndicator(color: AppColors.goldMid),
+                  ),
+                  error: (e, _) => Center(
+                    child: Padding(
+                      padding: const EdgeInsets.all(24),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const Icon(Icons.error_outline,
+                              size: 48, color: AppColors.errorRed),
+                          const SizedBox(height: 12),
+                          Text('Gagal memuat usulan',
+                              style: AppTypography.cardTitle),
+                          const SizedBox(height: 8),
+                          Text(e.toString(),
+                              style: AppTypography.caption
+                                  .copyWith(color: AppColors.textSecondary),
+                              textAlign: TextAlign.center),
+                          const SizedBox(height: 16),
+                          ElevatedButton(
+                            onPressed: () =>
+                                ref.invalidate(adminAllProposalsProvider),
+                            style: ElevatedButton.styleFrom(
+                                backgroundColor: AppColors.primary800),
+                            child: const Text('Coba Lagi',
+                                style: TextStyle(color: Colors.white)),
+                          ),
+                        ],
                       ),
                     ),
-                    const SizedBox(width: 6),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 6, vertical: 1),
-                      decoration: BoxDecoration(
-                        color: isSelected
-                            ? Colors.white.withOpacity(0.2)
-                            : AppColors.outlineVariant.withOpacity(0.3),
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: Text(
-                        '$count',
-                        style: AppTypography.captionBold.copyWith(
-                          color: isSelected
-                              ? Colors.white
-                              : AppColors.textSecondary,
-                          fontSize: 11,
-                        ),
-                      ),
-                    ),
-                  ],
+                  ),
                 ),
               ),
             ),
-          );
-        }),
+          ],
+        ),
       ),
     );
   }
 
-  // ── Full Proposal Card (with tujuan, periode, candidate avatars) ──────────
-  Widget _buildFullProposalCard(BuildContext context, _Proposal p) {
-    final statusColor = _statusColor(p.status);
+  Widget _buildFilterTabs(WidgetRef ref, String currentFilter) {
+    final tabs = [
+      ('Semua', 'all'),
+      ('Menunggu', 'pending'),
+      ('Disetujui', 'approved'),
+      ('Ditolak', 'rejected'),
+    ];
+
     return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(AppRadius.card),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.04),
-            blurRadius: 12,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Left gold accent bar + content
-          IntrinsicHeight(
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                // Gold left bar
-                Container(
-                  width: 4,
+      color: AppColors.primary800,
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+        child: Row(
+          children: tabs.map((t) {
+            final isSelected = currentFilter == t.$2;
+            return Padding(
+              padding: const EdgeInsets.only(right: 8),
+              child: GestureDetector(
+                onTap: () => ref
+                    .read(adminProposalFilterProvider.notifier)
+                    .state = t.$2,
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 200),
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 16, vertical: 8),
                   decoration: BoxDecoration(
-                    color: AppColors.goldMid,
-                    borderRadius: const BorderRadius.only(
-                      topLeft: Radius.circular(AppRadius.card),
-                      bottomLeft: Radius.circular(AppRadius.card),
+                    color: isSelected
+                        ? AppColors.goldMid
+                        : Colors.white.withOpacity(0.12),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Text(
+                    t.$1,
+                    style: AppTypography.captionBold.copyWith(
+                      color: isSelected
+                          ? AppColors.primary900
+                          : Colors.white.withOpacity(0.8),
+                      fontSize: 13,
                     ),
                   ),
                 ),
-                Expanded(
-                  child: Padding(
-                    padding: const EdgeInsets.all(AppSpacing.md),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        // Header row
-                        Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            _buildOrgAvatar(p.orgInitial),
-                            const SizedBox(width: AppSpacing.sm),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    p.org,
-                                    style: AppTypography.bodyMedium.copyWith(
-                                      color: AppColors.primary900,
-                                      fontWeight: FontWeight.w700,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 2),
-                                  Row(
-                                    children: [
-                                      Container(
-                                        width: 7,
-                                        height: 7,
-                                        decoration: BoxDecoration(
-                                          color: statusColor,
-                                          shape: BoxShape.circle,
-                                        ),
-                                      ),
-                                      const SizedBox(width: 4),
-                                      Text(
-                                        p.statusLabel,
-                                        style: AppTypography.captionBold
-                                            .copyWith(
-                                          color: statusColor,
-                                          fontSize: 9,
-                                          letterSpacing: 0.5,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ],
-                              ),
-                            ),
-                            Text(
-                              p.timeAgo,
-                              style: AppTypography.caption.copyWith(
-                                color: AppColors.outline,
-                                fontSize: 11,
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: AppSpacing.sm),
-                        // Title
-                        Text(
-                          p.title,
-                          style: AppTypography.cardTitle.copyWith(
-                            color: AppColors.primary900,
-                            fontSize: 15,
-                          ),
-                        ),
-                        const SizedBox(height: AppSpacing.sm),
-                        // Tujuan
-                        _buildInfoRow(
-                          icon: Icons.info_outline,
-                          label: 'TUJUAN',
-                          value: p.tujuan,
-                        ),
-                        const SizedBox(height: AppSpacing.sm),
-                        // Periode
-                        _buildInfoRow(
-                          icon: Icons.calendar_today_outlined,
-                          label: 'PERIODE',
-                          value: p.periode,
-                        ),
-                        const SizedBox(height: AppSpacing.md),
-                        // Candidate avatars row
-                        _buildCandidateAvatarRow(p.candidateCount),
-                      ],
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          // Divider
-          Divider(
-            height: 1,
-            thickness: 1,
-            color: AppColors.outlineVariant.withOpacity(0.3),
-          ),
-          // Action buttons
-          Padding(
-            padding: const EdgeInsets.all(AppSpacing.md),
-            child: Column(
-              children: [
-                // Tolak button
-                SizedBox(
-                  width: double.infinity,
-                  height: 44,
-                  child: OutlinedButton.icon(
-                    onPressed: () {},
-                    style: OutlinedButton.styleFrom(
-                      side: const BorderSide(color: AppColors.errorRed),
-                      shape: RoundedRectangleBorder(
-                        borderRadius:
-                            BorderRadius.circular(AppRadius.cardInner),
-                      ),
-                    ),
-                    icon: const Icon(Icons.close, color: AppColors.errorRed,
-                        size: 18),
-                    label: Text(
-                      'Tolak Usulan',
-                      style: AppTypography.labelLarge.copyWith(
-                        color: AppColors.errorRed,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: AppSpacing.sm),
-                // Review & Setujui button
-                SizedBox(
-                  width: double.infinity,
-                  height: 44,
-                  child: ElevatedButton.icon(
-                    onPressed: () => context.pushNamed('admin-review-detail'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.goldMid,
-                      elevation: 0,
-                      shape: RoundedRectangleBorder(
-                        borderRadius:
-                            BorderRadius.circular(AppRadius.cardInner),
-                      ),
-                    ),
-                    icon: const Icon(Icons.verified_outlined,
-                        color: Colors.white, size: 18),
-                    label: Text(
-                      'Review & Setujui',
-                      style: AppTypography.labelLarge.copyWith(
-                        color: Colors.white,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
+              ),
+            );
+          }).toList(),
+        ),
       ),
     );
   }
 
-  // ── Compact Proposal Card (without detail, with Proses button) ────────────
-  Widget _buildCompactProposalCard(BuildContext context, _Proposal p) {
-    return Container(
-      padding: const EdgeInsets.all(AppSpacing.md),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(AppRadius.card),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.04),
-            blurRadius: 12,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Header row
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _buildOrgAvatar(p.orgInitial),
-              const SizedBox(width: AppSpacing.sm),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      p.org,
-                      style: AppTypography.bodyMedium.copyWith(
-                        color: AppColors.primary900,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Row(
-                      children: [
-                        Container(
-                          width: 7,
-                          height: 7,
-                          decoration: BoxDecoration(
-                            color: _statusColor(p.status),
-                            shape: BoxShape.circle,
-                          ),
-                        ),
-                        const SizedBox(width: 4),
-                        Text(
-                          p.statusLabel,
-                          style: AppTypography.captionBold.copyWith(
-                            color: _statusColor(p.status),
-                            fontSize: 9,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-              Text(
-                p.timeAgo,
-                style: AppTypography.caption
-                    .copyWith(color: AppColors.outline, fontSize: 11),
-              ),
-            ],
-          ),
-          const SizedBox(height: AppSpacing.sm),
-          Text(
-            p.title,
-            style: AppTypography.cardTitle
-                .copyWith(color: AppColors.primary900, fontSize: 15),
-          ),
-          const SizedBox(height: AppSpacing.sm),
-          // Avatars + count
-          Row(
-            children: [
-              _buildCandidateAvatarRow(p.candidateCount),
-            ],
-          ),
-          const SizedBox(height: AppSpacing.md),
-          // Action row
-          Row(
-            mainAxisAlignment: MainAxisAlignment.end,
-            children: [
-              TextButton(
-                onPressed: () => context.pushNamed('admin-review-detail'),
-                style: TextButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(horizontal: 12),
-                ),
-                child: Text(
-                  'Lihat Detail',
-                  style: AppTypography.labelLarge.copyWith(
-                    color: AppColors.textSecondary,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 8),
-              ElevatedButton(
-                onPressed: () => context.pushNamed('admin-review-detail'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.primary800,
-                  elevation: 0,
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(AppRadius.cardInner),
-                  ),
-                ),
-                child: Text(
-                  'Proses',
-                  style: AppTypography.labelLarge.copyWith(
-                    color: Colors.white,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  // ── Empty State ───────────────────────────────────────────────────────────
-  Widget _buildEmptyState() {
+  Widget _buildEmpty(String filter) {
+    final label = filter == 'all'
+        ? 'Belum ada usulan pemilihan masuk.'
+        : 'Tidak ada usulan dengan status ini.';
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Icon(Icons.inbox_outlined,
-              size: 56, color: AppColors.outlineVariant),
-          const SizedBox(height: AppSpacing.md),
-          Text(
-            'Tidak ada usulan',
-            style: AppTypography.bodyMedium
-                .copyWith(color: AppColors.textSecondary),
-          ),
+              size: 56, color: AppColors.textSecondary.withOpacity(0.4)),
+          const SizedBox(height: 16),
+          Text(label,
+              style: AppTypography.bodyText
+                  .copyWith(color: AppColors.textSecondary)),
         ],
       ),
     );
   }
+}
 
-  // ── Bottom Note ───────────────────────────────────────────────────────────
-  Widget _buildBottomNote() {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: AppSpacing.lg),
-      child: Column(
-        children: [
-          Icon(Icons.history_outlined,
-              size: 32, color: AppColors.outlineVariant),
-          const SizedBox(height: AppSpacing.sm),
-          Text(
-            'Menampilkan usulan terbaru minggu ini',
-            style: AppTypography.caption.copyWith(color: AppColors.outline),
-            textAlign: TextAlign.center,
-          ),
-        ],
-      ),
-    );
-  }
+// ── Proposal Card ─────────────────────────────────────────────────────────────
 
-  // ── Helpers ───────────────────────────────────────────────────────────────
-  Widget _buildOrgAvatar(String initial) {
+class _ProposalCard extends ConsumerWidget {
+  const _ProposalCard({required this.item});
+
+  final AdminProposalItem item;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final p = item.proposal;
+    final statusConfig = _statusConfig(p.status);
+
     return Container(
-      width: 38,
-      height: 38,
       decoration: BoxDecoration(
-        color: AppColors.goldMid,
-        borderRadius: BorderRadius.circular(8),
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(AppRadius.card),
+        border: Border.all(color: AppColors.outlineVariant),
+        boxShadow: [
+          BoxShadow(
+              color: Colors.black.withOpacity(0.03),
+              blurRadius: 8,
+              offset: const Offset(0, 2))
+        ],
       ),
-      alignment: Alignment.center,
-      child: Text(
-        initial,
-        style: AppTypography.cardTitle.copyWith(color: Colors.white),
-      ),
-    );
-  }
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header
+          Padding(
+            padding: const EdgeInsets.all(AppSpacing.lg),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    // Org avatar
+                    Container(
+                      width: 40,
+                      height: 40,
+                      decoration: BoxDecoration(
+                        color: AppColors.primary800.withOpacity(0.1),
+                        shape: BoxShape.circle,
+                      ),
+                      child: Center(
+                        child: Text(
+                          p.organization?.isNotEmpty == true
+                              ? p.organization![0].toUpperCase()
+                              : 'P',
+                          style: AppTypography.captionBold.copyWith(
+                              color: AppColors.primary800, fontSize: 16),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(p.organization ?? 'Organisasi tidak diketahui',
+                              style: AppTypography.captionBold
+                                  .copyWith(color: AppColors.textPrimary)),
+                          Text('Diajukan oleh: ${item.proposerName}',
+                              style: AppTypography.caption
+                                  .copyWith(color: AppColors.textSecondary)),
+                        ],
+                      ),
+                    ),
+                    // Status badge
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 10, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: statusConfig['bg'] as Color,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(
+                            color: statusConfig['border'] as Color),
+                      ),
+                      child: Text(
+                        statusConfig['label'] as String,
+                        style: AppTypography.captionBold.copyWith(
+                          color: statusConfig['text'] as Color,
+                          fontSize: 10,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: AppSpacing.md),
+                Text(p.title,
+                    style: AppTypography.cardTitle
+                        .copyWith(color: AppColors.primary900, fontSize: 16)),
+                if (p.purpose?.isNotEmpty == true) ...[
+                  const SizedBox(height: 4),
+                  Text(
+                    p.purpose!,
+                    style: AppTypography.caption.copyWith(
+                        color: AppColors.textSecondary, height: 1.4),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+                const SizedBox(height: AppSpacing.sm),
+                Row(
+                  children: [
+                    Icon(Icons.calendar_today_outlined,
+                        size: 13, color: AppColors.textSecondary),
+                    const SizedBox(width: 4),
+                    Text(
+                      _formatPeriode(p.proposedStartDate, p.proposedEndDate),
+                      style: AppTypography.caption
+                          .copyWith(color: AppColors.textSecondary),
+                    ),
+                    const SizedBox(width: 16),
+                    Icon(Icons.access_time,
+                        size: 13, color: AppColors.textSecondary),
+                    const SizedBox(width: 4),
+                    Text(
+                      p.createdAt != null
+                          ? _formatAgo(p.createdAt!)
+                          : '-',
+                      style: AppTypography.caption
+                          .copyWith(color: AppColors.textSecondary),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
 
-  Widget _buildInfoRow({
-    required IconData icon,
-    required String label,
-    required String value,
-  }) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Icon(icon, size: 14, color: AppColors.textSecondary),
-        const SizedBox(width: 6),
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              label,
-              style: AppTypography.captionBold.copyWith(
-                color: AppColors.textSecondary,
-                fontSize: 9,
-                letterSpacing: 0.5,
+          // Kandidat List
+          if (item.candidates.isNotEmpty) ...[
+            Divider(height: 1, color: AppColors.outlineVariant),
+            Padding(
+              padding: const EdgeInsets.all(AppSpacing.md),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      const Icon(Icons.people_outline,
+                          size: 14, color: AppColors.textSecondary),
+                      const SizedBox(width: 4),
+                      Text(
+                          '${item.candidates.length} Kandidat Diajukan',
+                          style: AppTypography.captionBold
+                              .copyWith(color: AppColors.textSecondary)),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  ...item.candidates.map((c) => Padding(
+                        padding: const EdgeInsets.only(bottom: 4),
+                        child: Row(
+                          children: [
+                            CircleAvatar(
+                              radius: 14,
+                              backgroundColor:
+                                  AppColors.primary800.withOpacity(0.1),
+                              child: Text(
+                                c.fullName.isNotEmpty
+                                    ? c.fullName[0].toUpperCase()
+                                    : '?',
+                                style: AppTypography.captionBold.copyWith(
+                                    color: AppColors.primary800,
+                                    fontSize: 11),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                c.fullName,
+                                style: AppTypography.caption
+                                    .copyWith(color: AppColors.textPrimary),
+                              ),
+                            ),
+                            if (c.nikOrNim != null)
+                              Text(
+                                'NIM: ${c.nikOrNim}',
+                                style: AppTypography.caption.copyWith(
+                                    color: AppColors.textSecondary,
+                                    fontSize: 10),
+                              ),
+                          ],
+                        ),
+                      )),
+                ],
               ),
             ),
-            const SizedBox(height: 2),
+          ],
+
+          // Action Buttons (hanya untuk pending)
+          if (p.isPending || p.isUnderReview) ...[
+            Divider(height: 1, color: AppColors.outlineVariant),
+            Padding(
+              padding: const EdgeInsets.all(AppSpacing.md),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: () =>
+                          _showActionDialog(context, ref, p.id, p.title, false),
+                      icon: const Icon(Icons.close,
+                          size: 16, color: AppColors.errorRed),
+                      label: const Text('Tolak'),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: AppColors.errorRed,
+                        side: const BorderSide(color: AppColors.errorRed),
+                        padding: const EdgeInsets.symmetric(vertical: 10),
+                        shape: RoundedRectangleBorder(
+                            borderRadius:
+                                BorderRadius.circular(AppRadius.button)),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    flex: 2,
+                    child: ElevatedButton.icon(
+                      onPressed: () =>
+                          _showActionDialog(context, ref, p.id, p.title, true),
+                      icon: const Icon(Icons.check, size: 16),
+                      label: const Text('Setujui'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.successTeal,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 10),
+                        shape: RoundedRectangleBorder(
+                            borderRadius:
+                                BorderRadius.circular(AppRadius.button)),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  void _showActionDialog(BuildContext context, WidgetRef ref,
+      String proposalId, String title, bool isApprove) {
+    final noteController = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(AppRadius.card)),
+        title: Row(
+          children: [
+            Icon(
+              isApprove ? Icons.check_circle : Icons.cancel,
+              color: isApprove ? AppColors.successTeal : AppColors.errorRed,
+              size: 22,
+            ),
+            const SizedBox(width: 8),
             Text(
-              value,
-              style: AppTypography.bodyText.copyWith(
-                color: AppColors.primary900,
-                fontSize: 13,
-                height: 1.3,
+              isApprove ? 'Setujui Usulan' : 'Tolak Usulan',
+              style: AppTypography.cardTitle,
+            ),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('"$title"',
+                style: AppTypography.bodyText
+                    .copyWith(fontStyle: FontStyle.italic)),
+            const SizedBox(height: 16),
+            Text('Catatan untuk pengusul (opsional):',
+                style: AppTypography.caption
+                    .copyWith(color: AppColors.textSecondary)),
+            const SizedBox(height: 8),
+            TextField(
+              controller: noteController,
+              maxLines: 3,
+              decoration: InputDecoration(
+                hintText: isApprove
+                    ? 'Mis: Silakan lanjutkan ke tahap persiapan...'
+                    : 'Mis: Kekurangan dokumen persyaratan...',
+                border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide:
+                        const BorderSide(color: AppColors.outlineVariant)),
+                focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide:
+                        const BorderSide(color: AppColors.primary800)),
               ),
             ),
           ],
         ),
-      ],
+        actions: [
+          TextButton(
+            onPressed: () => ctx.pop(),
+            child: const Text('Batal',
+                style: TextStyle(color: AppColors.textSecondary)),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              ctx.pop();
+              await ref.read(adminProposalActionProvider.notifier).updateStatus(
+                proposalId,
+                isApprove ? 'approved' : 'rejected',
+                adminNote: noteController.text.trim().isEmpty
+                    ? null
+                    : noteController.text.trim(),
+              );
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor:
+                  isApprove ? AppColors.successTeal : AppColors.errorRed,
+            ),
+            child: Text(isApprove ? 'Setujui' : 'Tolak',
+                style: const TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
     );
   }
 
-  Widget _buildCandidateAvatarRow(int count) {
-    const avatarColors = [
-      Color(0xFF7986CB),
-      Color(0xFF64B5F6),
-      Color(0xFF81C784),
-    ];
-    final displayCount = count > 3 ? 3 : count;
-    final extra = count > 3 ? count - 3 : 0;
-
-    return Row(
-      children: [
-        SizedBox(
-          width: displayCount * 22.0 + (extra > 0 ? 30 : 0),
-          height: 28,
-          child: Stack(
-            children: [
-              ...List.generate(displayCount, (i) {
-                return Positioned(
-                  left: i * 22.0,
-                  child: Container(
-                    width: 28,
-                    height: 28,
-                    decoration: BoxDecoration(
-                      color: avatarColors[i % avatarColors.length],
-                      shape: BoxShape.circle,
-                      border: Border.all(color: Colors.white, width: 2),
-                    ),
-                  ),
-                );
-              }),
-              if (extra > 0)
-                Positioned(
-                  left: displayCount * 22.0,
-                  child: Container(
-                    width: 28,
-                    height: 28,
-                    decoration: BoxDecoration(
-                      color: AppColors.outlineVariant,
-                      shape: BoxShape.circle,
-                      border: Border.all(color: Colors.white, width: 2),
-                    ),
-                    alignment: Alignment.center,
-                    child: Text(
-                      '+$extra',
-                      style: AppTypography.captionBold.copyWith(
-                        color: Colors.white,
-                        fontSize: 9,
-                      ),
-                    ),
-                  ),
-                ),
-            ],
-          ),
-        ),
-        const SizedBox(width: AppSpacing.sm),
-        Text(
-          '$count kandidat diusulkan',
-          style: AppTypography.caption.copyWith(
-            color: AppColors.textSecondary,
-            fontSize: 12,
-          ),
-        ),
-        const Spacer(),
-        const Icon(Icons.chevron_right, color: AppColors.outline, size: 18),
-      ],
-    );
-  }
-
-  Color _statusColor(_ProposalStatus status) {
+  Map<String, dynamic> _statusConfig(String status) {
     switch (status) {
-      case _ProposalStatus.baru:
-        return AppColors.goldMid;
-      case _ProposalStatus.disetujui:
-        return AppColors.successTeal;
-      case _ProposalStatus.ditolak:
-        return AppColors.errorRed;
+      case 'approved':
+        return {
+          'label': 'DISETUJUI',
+          'bg': const Color(0xFFE8F6F2),
+          'border': const Color(0xFFB5E3D8),
+          'text': AppColors.successTeal,
+        };
+      case 'rejected':
+        return {
+          'label': 'DITOLAK',
+          'bg': const Color(0xFFFFF0F0),
+          'border': const Color(0xFFFFCCCC),
+          'text': AppColors.errorRed,
+        };
+      case 'under_review':
+        return {
+          'label': 'DALAM REVIEW',
+          'bg': const Color(0xFFF0F4FF),
+          'border': const Color(0xFFB8CAFF),
+          'text': AppColors.primary800,
+        };
+      default: // pending
+        return {
+          'label': 'MENUNGGU',
+          'bg': const Color(0xFFFFFDF5),
+          'border': const Color(0xFFF0D695),
+          'text': AppColors.warningAmber,
+        };
     }
+  }
+
+  String _formatPeriode(DateTime? start, DateTime? end) {
+    if (start == null && end == null) return 'Periode belum ditentukan';
+    final fmt = DateFormat('d MMM yyyy', 'id');
+    if (start != null && end != null) {
+      return '${fmt.format(start)} – ${fmt.format(end)}';
+    }
+    return start != null ? fmt.format(start) : fmt.format(end!);
+  }
+
+  String _formatAgo(DateTime time) {
+    final diff = DateTime.now().difference(time);
+    if (diff.inMinutes < 60) return '${diff.inMinutes}m lalu';
+    if (diff.inHours < 24) return '${diff.inHours}j lalu';
+    return '${diff.inDays}h lalu';
   }
 }

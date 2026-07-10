@@ -61,6 +61,7 @@ class AuthRemoteDatasource {
     String? birthDate,
     String? gender,
     String? address,
+    String? avatarUrl,
   }) async {
     final baseData = {
       'id': userId,
@@ -71,6 +72,7 @@ class AuthRemoteDatasource {
       'role': 'voter',
       'vote_weight': 1,
       'is_delegate_profile_public': false,
+      if (avatarUrl != null && avatarUrl.trim().isNotEmpty) 'avatar_url': avatarUrl,
     };
 
     final fullData = {

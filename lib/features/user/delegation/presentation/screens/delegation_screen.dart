@@ -1,5 +1,6 @@
 // lib/features/user/delegation/presentation/screens/delegation_screen.dart
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:voteryxapp/core/constants/app_colors.dart';
 import 'package:voteryxapp/core/constants/app_typography.dart';
@@ -9,6 +10,7 @@ import 'package:voteryxapp/core/widgets/gold_button.dart';
 
 import 'package:voteryxapp/features/user/delegation/domain/entities/delegate.dart';
 import 'package:voteryxapp/features/user/delegation/presentation/providers/delegation_provider.dart';
+import 'package:voteryxapp/features/user/election/presentation/providers/election_provider.dart';
 
 class DelegationScreen extends ConsumerStatefulWidget {
   const DelegationScreen({super.key});
@@ -35,6 +37,7 @@ class _DelegationScreenState extends ConsumerState<DelegationScreen> {
           context,
           'Suaramu berhasil didelegasikan ke ${next.selectedDelegateName}!',
         );
+        ref.invalidate(dashboardProvider);
         ref.read(delegationActionProvider.notifier).reset();
       }
     });
@@ -140,6 +143,12 @@ class _DelegationScreenState extends ConsumerState<DelegationScreen> {
                                   delegate: d,
                                   onDelegate: () =>
                                       _showDelegateConfirmation(context, d),
+                                  onDetailTap: () {
+                                    context.pushNamed(
+                                      'user-delegate-detail',
+                                      pathParameters: {'delegateId': d.id},
+                                    );
+                                  },
                                 ))
                             .toList(),
                       );
@@ -239,13 +248,20 @@ class _DelegationScreenState extends ConsumerState<DelegationScreen> {
 }
 
 class _DelegateCard extends StatelessWidget {
-  const _DelegateCard({required this.delegate, required this.onDelegate});
+  const _DelegateCard({
+    required this.delegate,
+    required this.onDelegate,
+    required this.onDetailTap,
+  });
 
   final Delegate delegate;
   final VoidCallback onDelegate;
+  final VoidCallback onDetailTap;
 
   @override
   Widget build(BuildContext context) {
+    final hasPhoto = delegate.photoUrl != null && delegate.photoUrl!.isNotEmpty;
+
     return Container(
       margin: const EdgeInsets.only(bottom: AppSpacing.sm),
       padding: const EdgeInsets.all(AppSpacing.md),
@@ -257,27 +273,27 @@ class _DelegateCard extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Avatar
-          Container(
-            width: 50,
-            height: 50,
-            decoration: BoxDecoration(
-              gradient: AppColors.delegateGradient,
-              shape: BoxShape.circle,
-            ),
-            child: Center(
-              child: Text(
-                delegate.initials,
-                style: AppTypography.headerTitle.copyWith(
-                  color: Colors.white,
-                  fontSize: 18,
-                ),
-              ),
-            ),
+          // ── Avatar ──────────────────────────────────
+          CircleAvatar(
+            radius: 26,
+            backgroundColor: AppColors.navyMid,
+            backgroundImage: hasPhoto ? NetworkImage(delegate.photoUrl!) : null,
+            onBackgroundImageError: hasPhoto
+                ? (_, __) {}
+                : null,
+            child: !hasPhoto
+                ? Text(
+                    delegate.initials,
+                    style: AppTypography.headerTitle.copyWith(
+                      color: Colors.white,
+                      fontSize: 16,
+                    ),
+                  )
+                : null,
           ),
           const SizedBox(width: AppSpacing.md),
 
-          // Info
+          // ── Info ────────────────────────────────────
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -302,39 +318,61 @@ class _DelegateCard extends StatelessWidget {
                     style: AppTypography.bodyText.copyWith(fontSize: 11, height: 1.4),
                   ),
                 ],
-                const SizedBox(height: 10),
+                const SizedBox(height: 8),
+                // Trust score row
                 Row(
                   children: [
-                    // Trust score
-                    Row(
-                      children: [
-                        const Icon(Icons.star_rounded, color: AppColors.goldMid, size: 14),
-                        const SizedBox(width: 3),
-                        Text(
-                          delegate.trustScore.toStringAsFixed(1),
-                          style: AppTypography.captionBold.copyWith(
-                            color: AppColors.goldDark,
+                    const Icon(Icons.star_rounded, color: AppColors.goldMid, size: 14),
+                    const SizedBox(width: 3),
+                    Text(
+                      delegate.trustScore.toStringAsFixed(1),
+                      style: AppTypography.captionBold.copyWith(color: AppColors.goldDark),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                // Action row: Lihat Detail | Delegasikan
+                Row(
+                  children: [
+                    GestureDetector(
+                      onTap: onDetailTap,
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            'Lihat Detail',
+                            style: AppTypography.captionBold.copyWith(
+                              color: AppColors.primary800,
+                              decoration: TextDecoration.underline,
+                            ),
                           ),
-                        ),
-                      ],
+                          const SizedBox(width: 2),
+                          const Icon(Icons.arrow_forward, size: 13, color: AppColors.primary800),
+                        ],
+                      ),
                     ),
                     const Spacer(),
                     GestureDetector(
                       onTap: onDelegate,
                       child: Container(
                         padding: const EdgeInsets.symmetric(
-                          horizontal: 16,
+                          horizontal: 14,
                           vertical: 7,
                         ),
                         decoration: BoxDecoration(
                           gradient: AppColors.delegateGradient,
                           borderRadius: BorderRadius.circular(20),
                         ),
-                        child: Text(
-                          'Delegasikan',
-                          style: AppTypography.captionBold.copyWith(
-                            color: Colors.white,
-                          ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              'Delegasikan',
+                              style: AppTypography.captionBold.copyWith(color: Colors.white),
+                            ),
+                            const SizedBox(width: 4),
+                            const Icon(Icons.arrow_forward, size: 12, color: Colors.white),
+                          ],
                         ),
                       ),
                     ),

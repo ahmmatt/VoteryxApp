@@ -41,12 +41,14 @@ class ElectionDetailData {
     required this.candidates,
     this.hasVoted = false,
     this.hasDelegated = false,
+    this.delegationInfo,
   });
 
   final Election election;
   final List<Candidate> candidates;
   final bool hasVoted;
   final bool hasDelegated;
+  final Map<String, dynamic>? delegationInfo;
 
   bool get hasParticipated => hasVoted || hasDelegated;
 }
@@ -61,17 +63,20 @@ final electionDetailProvider = FutureProvider.autoDispose
     repo.getElectionWithCandidates(electionId),
     if (userId != null) repo.hasUserVotedInElection(electionId, userId),
     if (userId != null) repo.hasUserDelegatedInElection(electionId, userId),
+    if (userId != null) repo.getDelegationInfo(electionId, userId),
   ]);
 
   final electionData = futures[0] as Map<String, dynamic>;
   final hasVoted = userId != null ? (futures[1] as bool) : false;
   final hasDelegated = userId != null ? (futures[2] as bool) : false;
+  final delegationInfo = userId != null ? (futures[3] as Map<String, dynamic>?) : null;
 
   return ElectionDetailData(
     election: electionData['election'] as Election,
     candidates: electionData['candidates'] as List<Candidate>,
     hasVoted: hasVoted,
     hasDelegated: hasDelegated,
+    delegationInfo: delegationInfo,
   );
 });
 
@@ -90,12 +95,16 @@ class DashboardData {
   const DashboardData({
     required this.activeElections,
     required this.votedElectionIds,
+    required this.delegatedElectionIds,
     required this.hasActiveMandate,
+    required this.mandateElectionIds,
   });
 
   final List<Election> activeElections;
   final Set<String> votedElectionIds;
+  final Set<String> delegatedElectionIds;
   final bool hasActiveMandate;
+  final List<String> mandateElectionIds;
 }
 
 final dashboardProvider = FutureProvider.autoDispose<DashboardData>((ref) async {
@@ -105,21 +114,23 @@ final dashboardProvider = FutureProvider.autoDispose<DashboardData>((ref) async 
   // Parallel fetch
   final results = await Future.wait([
     repo.getActiveElections(),
-    if (userId != null) repo.getUserParticipatedElectionIds(userId),
+    if (userId != null) repo.getUserVotedElectionIds(userId),
+    if (userId != null) repo.getUserDelegatedElectionIds(userId),
     if (userId != null) repo.hasActiveMandate(userId),
+    if (userId != null) repo.getMandateElectionIds(userId),
   ]);
 
   final elections = results[0] as List<Election>;
-  final votedIds = userId != null
-      ? (results[1] as Set<String>)
-      : <String>{};
-  final hasMandate = userId != null
-      ? (results[2] as bool)
-      : false;
+  final votedIds = userId != null ? (results[1] as Set<String>) : <String>{};
+  final delegatedIds = userId != null ? (results[2] as Set<String>) : <String>{};
+  final hasMandate = userId != null ? (results[3] as bool) : false;
+  final mandateElectionIds = userId != null ? (results[4] as List<String>) : <String>[];
 
   return DashboardData(
     activeElections: elections,
     votedElectionIds: votedIds,
+    delegatedElectionIds: delegatedIds,
     hasActiveMandate: hasMandate,
+    mandateElectionIds: mandateElectionIds,
   );
 });

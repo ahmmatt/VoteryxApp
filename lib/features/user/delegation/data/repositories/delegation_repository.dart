@@ -7,33 +7,106 @@ import 'package:voteryxapp/features/user/delegation/domain/entities/delegate.dar
 class DelegationRepository {
   SupabaseClient get _client => SupabaseConfig.client;
 
-  /// Ambil semua user yang sudah di-acc sebagai delegate oleh admin (role == 'delegate')
-  /// dan profil delegate-nya diaktifkan/publik, diurutkan berdasarkan trust_score tertinggi.
+  /// Helper: parse satu row users + delegate_applications menjadi Delegate entity.
+  Delegate _parseDelegate(Map<String, dynamic> json,
+      {Map<String, dynamic>? appRow}) {
+    String? rawPhoto = json['avatar_url'] as String?;
+    if (rawPhoto != null && rawPhoto.isNotEmpty && !rawPhoto.startsWith('http')) {
+      rawPhoto = SupabaseConfig.client.storage.from('avatars').getPublicUrl(rawPhoto);
+    }
+
+    // Parse track records JSONB (kolom lama, mungkin tidak ada)
+    List<Map<String, dynamic>> trackRecords = [];
+    final rawTr = json['delegate_track_records'];
+    if (rawTr is List) {
+      trackRecords = rawTr.whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList();
+    }
+
+    // Parse skills array (kolom lama, mungkin tidak ada)
+    List<String> skills = [];
+    final rawSkills = json['delegate_skills'];
+    if (rawSkills is List) {
+      skills = rawSkills.map((e) => e.toString()).toList();
+    }
+
+    return Delegate(
+      id: json['id'] as String? ?? '',
+      fullName: json['full_name'] as String? ?? 'Delegate',
+      faculty: json['faculty'] as String?,
+      specialization: json['major'] as String?,
+      delegateBio: json['delegate_bio'] as String?,
+      delegateVision: json['delegate_vision'] as String?,
+      photoUrl: rawPhoto,
+      trustScore: (json['trust_score'] as num?)?.toDouble() ?? 0.0,
+      delegationCount: 0,
+      trackRecords: trackRecords,
+      skills: skills,
+      // Dari tabel delegate_applications
+      expertise: appRow?['expertise'] as String?,
+      bio: appRow?['bio'] as String?,
+      trackRecord: appRow?['track_record'] as String?,
+      portfolioUrl: appRow?['portfolio_url'] as String?,
+      nim: appRow?['nim'] as String?,
+    );
+  }
+
+  /// Ambil semua delegate publik (join dengan delegate_applications).
   Future<List<Delegate>> getPublicDelegates() async {
     final response = await _client
         .from('users')
         .select(
             'id, full_name, faculty, major, delegate_bio, delegate_vision, '
-            'trust_score, avatar_url, role, is_delegate_profile_public')
+            'trust_score, avatar_url, role, is_delegate_profile_public, '
+            'delegate_skills, delegate_track_records')
         .eq('role', 'delegate')
         .eq('is_delegate_profile_public', true)
         .order('trust_score', ascending: false);
 
-    return (response as List)
-        .where((json) => json['role'] == 'delegate' && json['is_delegate_profile_public'] == true)
-        .map((json) {
-      return Delegate(
-        id: json['id'] as String? ?? '',
-        fullName: json['full_name'] as String? ?? 'Delegate',
-        faculty: json['faculty'] as String?,
-        specialization: json['major'] as String? ?? json['specialization'] as String?,
-        delegateBio: json['delegate_bio'] as String?,
-        delegateVision: json['delegate_vision'] as String?,
-        photoUrl: json['avatar_url'] as String? ?? json['photo_url'] as String?,
-        trustScore: (json['trust_score'] as num?)?.toDouble() ?? 0.0,
-        delegationCount: 0,
-      );
-    }).toList();
+    final List<Delegate> delegates = [];
+    for (final json in (response as List)) {
+      if (json['role'] != 'delegate' || json['is_delegate_profile_public'] != true) continue;
+
+      // Coba ambil data dari delegate_applications berdasarkan user_id
+      Map<String, dynamic>? appRow;
+      try {
+        appRow = await _client
+            .from('delegate_applications')
+            .select('expertise, bio, track_record, portfolio_url, nim, status')
+            .eq('user_id', json['id'] as String)
+            .eq('status', 'approved')
+            .maybeSingle();
+      } catch (_) {}
+
+      delegates.add(_parseDelegate(Map<String, dynamic>.from(json), appRow: appRow));
+    }
+    return delegates;
+  }
+
+  /// Ambil satu delegate berdasarkan user ID (fresh dari DB).
+  Future<Delegate?> getDelegateById(String userId) async {
+    final json = await _client
+        .from('users')
+        .select(
+            'id, full_name, faculty, major, delegate_bio, delegate_vision, '
+            'trust_score, avatar_url, role, is_delegate_profile_public, '
+            'delegate_skills, delegate_track_records')
+        .eq('id', userId)
+        .maybeSingle();
+
+    if (json == null) return null;
+
+    // Ambil data dari delegate_applications
+    Map<String, dynamic>? appRow;
+    try {
+      appRow = await _client
+          .from('delegate_applications')
+          .select('expertise, bio, track_record, portfolio_url, nim, status')
+          .eq('user_id', userId)
+          .eq('status', 'approved')
+          .maybeSingle();
+    } catch (_) {}
+
+    return _parseDelegate(Map<String, dynamic>.from(json), appRow: appRow);
   }
 
   /// Buat delegasi baru.

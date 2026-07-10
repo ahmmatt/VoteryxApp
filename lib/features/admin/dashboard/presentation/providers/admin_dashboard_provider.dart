@@ -84,14 +84,23 @@ class AdminDashboardController extends StateNotifier<AdminDashboardStats> {
       // 2. Ambil total suara murni dari tabel votes di Supabase
       int computedVotes = 0;
       List<DateTime> voteTimes = [];
+      Map<String, int> votesPerElection = {};
+      Map<String, List<DateTime>> voteTimesPerElection = {};
       try {
-        final votesResp = await SupabaseConfig.client.from('votes').select('id, created_at').order('created_at', ascending: true);
+        final votesResp = await SupabaseConfig.client.from('votes').select('id, created_at, election_id').order('created_at', ascending: true);
         final vList = votesResp as List;
         computedVotes = vList.length;
         for (var v in vList) {
-          if (v['created_at'] != null) {
-            final dt = DateTime.tryParse(v['created_at'].toString());
-            if (dt != null) voteTimes.add(dt);
+          final eId = v['election_id']?.toString() ?? '';
+          if (eId.isNotEmpty) {
+            votesPerElection[eId] = (votesPerElection[eId] ?? 0) + 1;
+            if (v['created_at'] != null) {
+              final dt = DateTime.tryParse(v['created_at'].toString());
+              if (dt != null) {
+                voteTimes.add(dt);
+                voteTimesPerElection.putIfAbsent(eId, () => []).add(dt);
+              }
+            }
           }
         }
       } catch (_) {}
@@ -104,30 +113,7 @@ class AdminDashboardController extends StateNotifier<AdminDashboardStats> {
         computedRate = 100.0;
       }
 
-      // 3. Ambil total delegasi aktif murni dari database (tanpa hardcoded offset +412)
-      int computedDelegates = 0;
-      try {
-        final applications = _ref.read(delegateApplicationProvider);
-        final approvedApps = applications.where((a) => a.status == DelegateApplicationStatus.approved).length;
-        computedDelegates = approvedApps > 0 ? approvedApps : applications.length;
-      } catch (_) {}
-      try {
-        final delUsersResp = await SupabaseConfig.client.from('users').select('id').eq('role', 'delegate');
-        final int dbRoleDel = (delUsersResp as List).length;
-        if (dbRoleDel > computedDelegates) computedDelegates = dbRoleDel;
-      } catch (_) {}
-
-      // 4. Ambil kandidat yang menunggu verifikasi dari tabel candidates
-      int pendingCandidates = 0;
-      try {
-        final candResp = await SupabaseConfig.client
-            .from('candidates')
-            .select('id')
-            .eq('status', 'pending');
-        pendingCandidates = (candResp as List).length;
-      } catch (_) {}
-
-      // 5. Hitung tren per jam (hourlyRates) untuk chart berdasarkan distribusi vote asli di database
+      // 5. Hitung tren per jam (hourlyRates) untuk chart keseluruhan
       List<double> computedHourly = [0.0, 0.0, 0.0, 0.0, computedRate];
       if (computedVotes > 0 && computedDpt > 0) {
         if (voteTimes.isEmpty) {
@@ -159,6 +145,37 @@ class AdminDashboardController extends StateNotifier<AdminDashboardStats> {
         }
       }
 
+      // 3. Ambil total delegasi aktif murni dari database
+      int computedDelegates = 0;
+      try {
+        final applications = _ref.read(delegateApplicationProvider);
+        final approvedApps = applications.where((a) => a.status == DelegateApplicationStatus.approved).length;
+        computedDelegates = approvedApps > 0 ? approvedApps : applications.length;
+      } catch (_) {}
+      try {
+        final delUsersResp = await SupabaseConfig.client.from('users').select('id').eq('role', 'delegate');
+        final int dbRoleDel = (delUsersResp as List).length;
+        if (dbRoleDel > computedDelegates) computedDelegates = dbRoleDel;
+      } catch (_) {}
+
+      // 4. Ambil kandidat yang menunggu verifikasi dari tabel candidates dan aggregat suara per pemilihan
+      int pendingCandidates = 0;
+      Map<String, int> candidateVotesPerElection = {};
+      try {
+        final candResp = await SupabaseConfig.client
+            .from('candidates')
+            .select('id, status, election_id, vote_count');
+        final cList = candResp as List;
+        pendingCandidates = cList.where((c) => c['status'] == 'pending').length;
+        for (var c in cList) {
+          final eId = c['election_id']?.toString() ?? '';
+          final vCount = (c['vote_count'] as num?)?.toInt() ?? 0;
+          if (eId.isNotEmpty) {
+            candidateVotesPerElection[eId] = (candidateVotesPerElection[eId] ?? 0) + vCount;
+          }
+        }
+      } catch (_) {}
+
       // 6. Ambil data pemilihan aktif & terjadwal dari tabel elections & election_proposals
       List<Map<String, dynamic>> activeList = [];
       List<Map<String, dynamic>> upcomingList = [];
@@ -174,13 +191,62 @@ class AdminDashboardController extends StateNotifier<AdminDashboardStats> {
           final endDateStr = e['end_date']?.toString();
           final startDateStr = e['start_date']?.toString();
 
+          // Hitung rate spesifik per pemilihan
+          final estimatedVoters = (e['estimated_voters'] as num?)?.toInt() ?? 0;
+          int electionVotes = votesPerElection[id] ?? 0;
+          final candVotes = candidateVotesPerElection[id] ?? 0;
+          if (candVotes > electionVotes) {
+            electionVotes = candVotes;
+          }
+          final electionVoteTimes = voteTimesPerElection[id] ?? [];
+          
+          double elRate = 0.0;
+          if (estimatedVoters > 0) {
+            elRate = double.parse(((electionVotes / estimatedVoters) * 100).toStringAsFixed(1));
+          } else if (electionVotes > 0) {
+            elRate = 100.0;
+          }
+
+          List<double> elHourly = [0.0, 0.0, 0.0, 0.0, elRate];
+          if (electionVotes > 0 && estimatedVoters > 0) {
+            if (electionVoteTimes.isEmpty) {
+              elHourly = [
+                double.parse((elRate * 0.15).toStringAsFixed(1)),
+                double.parse((elRate * 0.35).toStringAsFixed(1)),
+                double.parse((elRate * 0.60).toStringAsFixed(1)),
+                double.parse((elRate * 0.85).toStringAsFixed(1)),
+                elRate,
+              ];
+            } else {
+              int c08 = 0, c10 = 0, c12 = 0, c14 = 0, c16 = 0;
+              for (var t in electionVoteTimes) {
+                final hour = t.toLocal().hour;
+                if (hour <= 8) c08++;
+                if (hour <= 10) c10++;
+                if (hour <= 12) c12++;
+                if (hour <= 14) c14++;
+                c16++;
+              }
+              final double baseDpt = estimatedVoters > 0 ? estimatedVoters.toDouble() : 1.0;
+              elHourly = [
+                double.parse(((c08 / baseDpt) * 100).toStringAsFixed(1)),
+                double.parse(((c10 / baseDpt) * 100).toStringAsFixed(1)),
+                double.parse(((c12 / baseDpt) * 100).toStringAsFixed(1)),
+                double.parse(((c14 / baseDpt) * 100).toStringAsFixed(1)),
+                elRate,
+              ];
+            }
+          }
+
           if (status == 'active' || status == 'live' || status == 'ongoing' || (status.isEmpty && (endDateStr != null && DateTime.tryParse(endDateStr)?.isAfter(DateTime.now()) == true))) {
             activeList.add({
               'id': id,
               'title': title,
               'status': 'active',
               'ends_in': _formatEndsInHelper(endDateStr),
-              'percentage': computedRate,
+              'percentage': elRate,
+              'estimated_voters': estimatedVoters,
+              'hourly_rates': elHourly,
             });
           } else if (status == 'scheduled' || status == 'upcoming' || status == 'draft' || status == 'pending') {
             upcomingList.add({
@@ -203,7 +269,9 @@ class AdminDashboardController extends StateNotifier<AdminDashboardStats> {
                 'title': title,
                 'status': 'active',
                 'ends_in': _formatEndsInHelper(endDateStr),
-                'percentage': computedRate,
+                'percentage': elRate,
+                'estimated_voters': estimatedVoters,
+                'hourly_rates': elHourly,
               });
             }
           }
@@ -219,7 +287,7 @@ class AdminDashboardController extends StateNotifier<AdminDashboardStats> {
           final id = p['id']?.toString() ?? '1';
           final status = p['status']?.toString().toLowerCase() ?? '';
           final title = p['title']?.toString() ?? 'Usulan Pemilihan';
-          if (status == 'approved' || status == 'active' || status == 'live') {
+          if (status == 'active' || status == 'live') {
             if (!activeList.any((x) => x['title'] == title)) {
               activeList.add({
                 'id': id,
@@ -229,39 +297,20 @@ class AdminDashboardController extends StateNotifier<AdminDashboardStats> {
                 'percentage': computedRate,
               });
             }
-          } else if (status == 'pending' || status == 'submitted' || status == 'scheduled') {
+          } else if (status == 'approved' || status == 'pending' || status == 'submitted' || status == 'scheduled') {
             if (!upcomingList.any((x) => x['title'] == title)) {
               upcomingList.add({
                 'id': id,
                 'title': title,
                 'status': status,
-                'scheduled': 'Menunggu Verifikasi & Jadwal',
+                'scheduled': status == 'approved' ? 'Usulan Disetujui' : 'Menunggu Verifikasi & Jadwal',
               });
             }
           }
         }
       } catch (_) {}
 
-      if (activeList.isEmpty) {
-        activeList = [
-          {
-            'id': 'bem-fst-2026',
-            'title': 'Ketua BEM FST 2026',
-            'status': 'active',
-            'ends_in': 'Ends in 4h 20m',
-            'percentage': computedRate,
-          }
-        ];
-      }
-      if (upcomingList.isEmpty) {
-        upcomingList = [
-          {
-            'id': 'himti-2026',
-            'title': 'Pemilihan Ketua Himpunan Teknik Informatika',
-            'scheduled': 'Terjadwal: Besok, 08:00',
-          }
-        ];
-      }
+      // Do not add dummy data so the UI accurately reflects an empty state
 
       state = AdminDashboardStats(
         totalVotes: computedVotes,
@@ -269,7 +318,7 @@ class AdminDashboardController extends StateNotifier<AdminDashboardStats> {
         activeDelegates: computedDelegates,
         totalDpt: computedDpt,
         pendingCandidateCount: pendingCandidates,
-        activeElections: activeList,
+        activeElections: activeList.take(5).toList(),
         upcomingElections: upcomingList,
         hourlyRates: computedHourly,
         isLoading: false,

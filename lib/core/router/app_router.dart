@@ -22,6 +22,8 @@ import '../../features/user/election/presentation/screens/vote_confirmation_scre
 import '../../features/user/election/presentation/screens/vote_processing_screen.dart';
 import '../../features/user/election/presentation/screens/vote_receipt_screen.dart';
 import '../../features/user/delegation/presentation/screens/delegation_screen.dart';
+import '../../features/user/delegation/presentation/screens/delegate_execution_loading_screen.dart';
+import '../../features/user/delegation/presentation/screens/delegate_execution_success_screen.dart';
 import '../../features/delegates/delegation/presentation/screens/delegate_terms_screen.dart';
 import '../../features/delegates/delegation/presentation/screens/delegate_registration_form_screen.dart';
 import '../../features/delegates/delegation/presentation/screens/delegate_portal_login_screen.dart';
@@ -36,10 +38,12 @@ import '../../features/delegates/delegation/presentation/screens/delegate_execut
 import '../../features/delegates/delegation/presentation/screens/delegate_detail_screen.dart';
 import '../../features/delegates/delegation/presentation/screens/mandator_profile_screen.dart';
 import '../../features/user/profile/presentation/screens/profile_screen.dart';
+import '../../features/user/delegation/presentation/screens/user_delegate_detail_screen.dart';
 import '../../features/user/election/presentation/screens/election_detail_screen.dart';
 import '../../features/user/election/presentation/screens/election_info_screen.dart';
 import '../../features/user/election/presentation/screens/election_list_screen.dart';
 import '../../features/user/election/presentation/screens/proposal_create_screen.dart';
+import 'package:voteryxapp/features/user/election_proposal/presentation/screens/candidate_document_form_screen.dart';
 import '../../features/user/election_proposal/presentation/screens/my_election_proposals_screen.dart';
 import '../../features/user/election_proposal/presentation/screens/proposal_candidate_list_screen.dart';
 import '../../features/user/election_proposal/presentation/screens/proposal_manage_schedule_screen.dart';
@@ -58,7 +62,6 @@ import '../../features/admin/election_management/presentation/screens/admin_revi
 import '../../features/admin/candidate_management/presentation/screens/admin_candidate_management_screen.dart';
 import '../../features/admin/candidate_verification/presentation/screens/admin_candidate_verification_screen.dart';
 import '../../features/admin/candidate_verification/presentation/screens/admin_candidate_documents_screen.dart';
-import '../../features/admin/candidate_verification/presentation/screens/admin_candidate_review_screen.dart';
 import '../../features/admin/voter_management/presentation/screens/admin_voter_management_screen.dart';
 import '../../features/admin/settings/presentation/screens/admin_settings_screen.dart';
 import '../../features/admin/election_detail/presentation/screens/admin_election_live_detail_screen.dart';
@@ -93,6 +96,7 @@ abstract final class AppRoutes {
   static const proposalStatus = '/proposal-status';
   static const proposalCreate = '/proposal-create';
   static const proposalCandidates = '/election-proposal/:id/candidates';
+  static const candidateDocumentForm = '/candidate-document-form/:proposalId';
   static const proposalSchedule = '/election-proposal/:id/schedule';
   static const proposalTrack = '/election-proposal/:id/track';
 
@@ -274,8 +278,8 @@ final GoRouter appRouter = GoRouter(
             GoRoute(
               path: AppRoutes.dashboard,
               name: 'dashboard',
-              pageBuilder: (context, state) => const NoTransitionPage<void>(
-                key: ValueKey('user-dashboard-page'),
+              pageBuilder: (context, state) => NoTransitionPage<void>(
+                key: state.pageKey,
                 child: DashboardScreen(),
               ),
             ),
@@ -287,8 +291,8 @@ final GoRouter appRouter = GoRouter(
             GoRoute(
               path: AppRoutes.delegation,
               name: 'delegation',
-              pageBuilder: (context, state) => const NoTransitionPage<void>(
-                key: ValueKey('user-delegation-page'),
+              pageBuilder: (context, state) => NoTransitionPage<void>(
+                key: state.pageKey,
                 child: DelegationScreen(),
               ),
             ),
@@ -300,8 +304,8 @@ final GoRouter appRouter = GoRouter(
             GoRoute(
               path: AppRoutes.proposalStatus,
               name: 'proposal-status',
-              pageBuilder: (context, state) => const NoTransitionPage<void>(
-                key: ValueKey('user-proposal-page'),
+              pageBuilder: (context, state) => NoTransitionPage<void>(
+                key: state.pageKey,
                 child: MyElectionProposalsScreen(),
               ),
             ),
@@ -313,8 +317,8 @@ final GoRouter appRouter = GoRouter(
             GoRoute(
               path: AppRoutes.profile,
               name: 'profile',
-              pageBuilder: (context, state) => const NoTransitionPage<void>(
-                key: ValueKey('user-profile-page'),
+              pageBuilder: (context, state) => NoTransitionPage<void>(
+                key: state.pageKey,
                 child: ProfileScreen(),
               ),
             ),
@@ -337,8 +341,8 @@ final GoRouter appRouter = GoRouter(
             GoRoute(
               path: AppRoutes.adminDashboard,
               name: 'admin-dashboard',
-              pageBuilder: (context, state) => const NoTransitionPage<void>(
-                key: ValueKey('admin-dashboard-page'),
+              pageBuilder: (context, state) => NoTransitionPage<void>(
+                key: state.pageKey,
                 child: AdminDashboardScreen(),
               ),
             ),
@@ -350,8 +354,8 @@ final GoRouter appRouter = GoRouter(
             GoRoute(
               path: AppRoutes.adminProposals,
               name: 'admin-proposals',
-              pageBuilder: (context, state) => const NoTransitionPage<void>(
-                key: ValueKey('admin-proposals-page'),
+              pageBuilder: (context, state) => NoTransitionPage<void>(
+                key: state.pageKey,
                 child: AdminProposalMonitorScreen(),
               ),
             ),
@@ -363,8 +367,8 @@ final GoRouter appRouter = GoRouter(
             GoRoute(
               path: AppRoutes.adminDelegateApplications,
               name: 'admin-delegate-applications',
-              pageBuilder: (context, state) => const NoTransitionPage<void>(
-                key: ValueKey('admin-delegate-applications-page'),
+              pageBuilder: (context, state) => NoTransitionPage<void>(
+                key: state.pageKey,
                 child: AdminDelegateApplicationsScreen(),
               ),
             ),
@@ -376,8 +380,8 @@ final GoRouter appRouter = GoRouter(
             GoRoute(
               path: AppRoutes.adminSettings,
               name: 'admin-settings',
-              pageBuilder: (context, state) => const NoTransitionPage<void>(
-                key: ValueKey('admin-settings-page'),
+              pageBuilder: (context, state) => NoTransitionPage<void>(
+                key: state.pageKey,
                 child: AdminSettingsScreen(),
               ),
             ),
@@ -400,8 +404,8 @@ final GoRouter appRouter = GoRouter(
             GoRoute(
               path: '/delegation/home',
               name: 'delegate-home',
-              pageBuilder: (context, state) => const NoTransitionPage<void>(
-                key: ValueKey('delegate-home-page'),
+              pageBuilder: (context, state) => NoTransitionPage<void>(
+                key: state.pageKey,
                 child: DelegateHomeScreen(),
               ),
             ),
@@ -413,8 +417,8 @@ final GoRouter appRouter = GoRouter(
             GoRoute(
               path: '/delegation/history',
               name: 'delegate-history',
-              pageBuilder: (context, state) => const NoTransitionPage<void>(
-                key: ValueKey('delegate-history-page'),
+              pageBuilder: (context, state) => NoTransitionPage<void>(
+                key: state.pageKey,
                 child: DelegateExecutionHistoryScreen(),
               ),
             ),
@@ -426,8 +430,8 @@ final GoRouter appRouter = GoRouter(
             GoRoute(
               path: '/delegation/profile/me',
               name: 'delegate-profile',
-              pageBuilder: (context, state) => const NoTransitionPage<void>(
-                key: ValueKey('delegate-profile-page'),
+              pageBuilder: (context, state) => NoTransitionPage<void>(
+                key: state.pageKey,
                 child: DelegateProfileScreen(),
               ),
             ),
@@ -471,6 +475,15 @@ final GoRouter appRouter = GoRouter(
       ),
     ),
     GoRoute(
+      path: '/user-delegate-detail/:delegateId',
+      name: 'user-delegate-detail',
+      parentNavigatorKey: _rootNavigatorKey,
+      builder: (context, state) {
+        final delegateId = state.pathParameters['delegateId'] ?? '';
+        return UserDelegateDetailScreen(delegateId: delegateId);
+      },
+    ),
+    GoRoute(
       path: AppRoutes.electionVote,
       name: 'election-vote',
       parentNavigatorKey: _rootNavigatorKey,
@@ -481,6 +494,22 @@ final GoRouter appRouter = GoRouter(
       name: 'election-processing',
       parentNavigatorKey: _rootNavigatorKey,
       builder: (context, state) => const VoteProcessingScreen(),
+    ),
+    GoRoute(
+      path: '/delegate-execution-loading/:id',
+      name: 'delegate-execution-loading',
+      parentNavigatorKey: _rootNavigatorKey,
+      builder: (context, state) => DelegateExecutionLoadingScreen(
+        electionId: state.pathParameters['id'] ?? '',
+      ),
+    ),
+    GoRoute(
+      path: '/delegate-execution-success/:id',
+      name: 'delegate-execution-success',
+      parentNavigatorKey: _rootNavigatorKey,
+      builder: (context, state) => DelegateExecutionSuccessScreen(
+        electionId: state.pathParameters['id'] ?? '',
+      ),
     ),
     GoRoute(
       path: AppRoutes.electionReceipt,
@@ -502,6 +531,14 @@ final GoRouter appRouter = GoRouter(
       builder: (ctx, state) => const ProposalCandidateListScreen(),
     ),
     GoRoute(
+      path: AppRoutes.candidateDocumentForm,
+      name: 'candidate-document-form',
+      parentNavigatorKey: _rootNavigatorKey,
+      builder: (ctx, state) => CandidateDocumentFormScreen(
+        proposalId: state.pathParameters['proposalId'] ?? '',
+      ),
+    ),
+    GoRoute(
       path: AppRoutes.proposalSchedule,
       name: 'proposal-schedule',
       parentNavigatorKey: _rootNavigatorKey,
@@ -517,7 +554,11 @@ final GoRouter appRouter = GoRouter(
       path: AppRoutes.adminProposalTrack,
       name: 'admin-proposal-track',
       parentNavigatorKey: _rootNavigatorKey,
-      builder: (ctx, state) => const AdminProposalTrackDetailScreen(),
+      builder: (ctx, state) {
+        final extra = state.extra as Map<String, dynamic>?;
+        final id = state.pathParameters['id'] ?? extra?['id']?.toString() ?? '';
+        return AdminProposalTrackDetailScreen(proposalId: id);
+      },
     ),
     GoRoute(
       path: AppRoutes.adminProposalCandidates,
@@ -606,6 +647,8 @@ final GoRouter appRouter = GoRouter(
       parentNavigatorKey: _rootNavigatorKey,
       builder: (_, __) => const DelegateVoteSuccessScreen(),
     ),
+
+    // Wildcard delegation route — harus di akhir agar tidak menimpa route spesifik
     GoRoute(
       path: '/delegation/:delegatorId',
       name: 'delegation-detail',
@@ -656,7 +699,10 @@ final GoRouter appRouter = GoRouter(
       parentNavigatorKey: _rootNavigatorKey,
       builder: (_, state) {
         final id = state.pathParameters['id'] ?? '';
-        return AdminCandidateReviewScreen(candidateId: id);
+        final extra = state.extra as Map<String, dynamic>?;
+        final electionId = extra?['electionId']?.toString() ?? '';
+        final isProposal = extra?['isProposal'] == true;
+        return CandidateDetailScreen(electionId: electionId, candidateId: id, isAdmin: true, isProposal: isProposal);
       },
     ),
     GoRoute(
@@ -762,8 +808,7 @@ class _GoRouterRefreshStream extends ChangeNotifier {
     _subscription = stream.asBroadcastStream().listen((AuthState authState) {
       final event = authState.event;
       if (event == AuthChangeEvent.signedIn ||
-          event == AuthChangeEvent.signedOut ||
-          event == AuthChangeEvent.userDeleted) {
+          event == AuthChangeEvent.signedOut) {
         notifyListeners();
       }
     });

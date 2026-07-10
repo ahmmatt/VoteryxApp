@@ -89,7 +89,29 @@ class _AdminElectionLiveDetailScreenState
       displayEndsIn = match['ends_in']?.toString() ?? 'Ends in 4h 20m';
     }
 
-    final double pctVal = (stats.participationRate / 100.0).clamp(0.0, 1.0);
+    int localVotes = 0;
+    for (var cand in _candidates) {
+      localVotes += (cand['vote_count'] as num?)?.toInt() ?? 0;
+    }
+    
+    double localPctVal = 0.0;
+    List<double> localHourlyRates = [0.0, 0.0, 0.0, 0.0, 0.0];
+    int currentEstimatedVoters = 100;
+
+    if (stats.activeElections.isNotEmpty) {
+      final match = stats.activeElections.firstWhere(
+        (x) => x['id']?.toString() == widget.electionId || x['title']?.toString() == displayTitle,
+        orElse: () => stats.activeElections.first,
+      );
+      localPctVal = (match['percentage'] as num?)?.toDouble() ?? 0.0;
+      localPctVal = localPctVal / 100.0; // Convert to 0.0 - 1.0 range for UI
+      if (match.containsKey('hourly_rates')) {
+        localHourlyRates = List<double>.from(match['hourly_rates']);
+      }
+      currentEstimatedVoters = (match['estimated_voters'] as num?)?.toInt() ?? 100;
+    }
+
+    if (currentEstimatedVoters <= 0) currentEstimatedVoters = 100;
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -120,9 +142,9 @@ class _AdminElectionLiveDetailScreenState
             padding: const EdgeInsets.symmetric(horizontal: AppSpacing.pagePad),
             child: ElectionSummaryWhiteCard(
               title: displayTitle,
-              participationPercentage: pctVal,
+              participationPercentage: localPctVal,
               votersCountText:
-                  '${numberFormat.format(stats.totalVotes)} dari ${numberFormat.format(stats.totalDpt > 0 ? stats.totalDpt : 100)}\npemilih terdaftar',
+                  '${numberFormat.format(localVotes)} dari ${numberFormat.format(currentEstimatedVoters)}\npemilih terdaftar',
               countdownText: displayEndsIn,
             ),
           ),
@@ -152,8 +174,8 @@ class _AdminElectionLiveDetailScreenState
             child: TabBarView(
               controller: _tabController,
               children: [
-                _buildCandidatesTab(context, stats, numberFormat),
-                _buildRealCountMonitorTab(context, stats, numberFormat, displayTitle),
+                _buildCandidatesTab(context, stats, numberFormat, localVotes),
+                _buildRealCountMonitorTab(context, stats, numberFormat, displayTitle, localVotes, localPctVal, currentEstimatedVoters, localHourlyRates),
               ],
             ),
           ),
@@ -167,6 +189,7 @@ class _AdminElectionLiveDetailScreenState
     BuildContext context,
     AdminDashboardStats stats,
     NumberFormat numberFormat,
+    int localVotes,
   ) {
     if (_isLoadingCandidates) {
       return const Center(child: CircularProgressIndicator(color: AppColors.primary800));
@@ -244,8 +267,8 @@ class _AdminElectionLiveDetailScreenState
               final votesText = '${numberFormat.format(votesNum)} Suara';
               
               double progress = 0.0;
-              if (stats.totalVotes > 0 && votesNum > 0) {
-                progress = (votesNum / stats.totalVotes).toDouble().clamp(0.0, 1.0);
+              if (localVotes > 0 && votesNum > 0) {
+                progress = (votesNum / localVotes).toDouble().clamp(0.0, 1.0);
               } else if (cand['percentage'] != null) {
                 final pctStr = cand['percentage'].toString().replaceAll('%', '');
                 progress = (double.tryParse(pctStr) ?? 0.0) / 100.0;
@@ -281,6 +304,10 @@ class _AdminElectionLiveDetailScreenState
     AdminDashboardStats stats,
     NumberFormat numberFormat,
     String displayTitle,
+    int localVotes,
+    double localPctVal,
+    int currentEstimatedVoters,
+    List<double> localHourlyRates,
   ) {
     return SingleChildScrollView(
       padding: const EdgeInsets.all(AppSpacing.lg),
@@ -290,18 +317,16 @@ class _AdminElectionLiveDetailScreenState
           // Stats Grid
           _buildStatCard(
             title: 'TOTAL SUARA MASUK',
-            value: numberFormat.format(stats.totalVotes),
+            value: numberFormat.format(localVotes),
             badge: 'LIVE',
             hasProgressBar: true,
-            progressValue: stats.totalDpt > 0
-                ? (stats.totalVotes / stats.totalDpt).clamp(0.0, 1.0)
-                : 0.0,
+            progressValue: localPctVal,
           ),
           const SizedBox(height: 12),
           _buildStatCard(
             title: 'PARTISIPASI',
-            value: '${stats.participationRate}%',
-            subtitle: 'Dari Total User: ${numberFormat.format(stats.totalDpt)}',
+            value: '${(localPctVal * 100).toStringAsFixed(1)}%',
+            subtitle: 'Dari Total Pemilih: ${numberFormat.format(currentEstimatedVoters)}',
           ),
           const SizedBox(height: 12),
           _buildStatCard(
@@ -392,8 +417,8 @@ class _AdminElectionLiveDetailScreenState
                       CustomPaint(
                         size: const Size(double.infinity, 150),
                         painter: _LiveChartPainter(
-                          hourlyRates: stats.hourlyRates,
-                          currentRate: stats.participationRate,
+                          hourlyRates: localHourlyRates,
+                          currentRate: (localPctVal * 100),
                         ),
                       ),
                       Positioned(

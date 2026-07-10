@@ -4,6 +4,8 @@
 -- ====================================================================
 
 -- Drop tabel lama jika ada agar sinkronisasi bersih (untuk dev/reset)
+DROP TABLE IF EXISTS public.user_notifications CASCADE;
+DROP TABLE IF EXISTS public.proposal_candidates CASCADE;
 DROP TABLE IF EXISTS public.delegates CASCADE;
 DROP TABLE IF EXISTS public.delegations CASCADE;
 DROP TABLE IF EXISTS public.votes CASCADE;
@@ -33,6 +35,8 @@ CREATE TABLE IF NOT EXISTS public.users (
     is_delegate_profile_public BOOLEAN DEFAULT false,
     delegate_bio TEXT,
     delegate_vision TEXT,
+    delegate_skills JSONB DEFAULT '[]'::jsonb,
+    delegate_track_records JSONB DEFAULT '[]'::jsonb,
     trust_score DOUBLE PRECISION DEFAULT 0.0,
     delegated_to UUID REFERENCES public.users(id) ON DELETE SET NULL,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
@@ -46,6 +50,8 @@ ALTER TABLE public.users ADD COLUMN IF NOT EXISTS major TEXT;
 ALTER TABLE public.users ADD COLUMN IF NOT EXISTS is_delegate_profile_public BOOLEAN DEFAULT false;
 ALTER TABLE public.users ADD COLUMN IF NOT EXISTS delegate_bio TEXT;
 ALTER TABLE public.users ADD COLUMN IF NOT EXISTS delegate_vision TEXT;
+ALTER TABLE public.users ADD COLUMN IF NOT EXISTS delegate_skills JSONB DEFAULT '[]'::jsonb;
+ALTER TABLE public.users ADD COLUMN IF NOT EXISTS delegate_track_records JSONB DEFAULT '[]'::jsonb;
 ALTER TABLE public.users ADD COLUMN IF NOT EXISTS birth_place TEXT;
 ALTER TABLE public.users ADD COLUMN IF NOT EXISTS birth_date TEXT;
 ALTER TABLE public.users ADD COLUMN IF NOT EXISTS gender TEXT;
@@ -64,6 +70,7 @@ CREATE TABLE IF NOT EXISTS public.elections (
     banner_url TEXT,
     estimated_voters INTEGER DEFAULT 0,
     public_key TEXT,
+    dpt_config JSONB DEFAULT '{"faculty": "all", "major": "all", "specific_users": []}'::jsonb,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
@@ -148,6 +155,57 @@ CREATE TABLE IF NOT EXISTS public.election_proposals (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
+-- 6. Tabel Pengajuan Delegasi (Delegate Applications)
+CREATE TABLE IF NOT EXISTS public.delegate_applications (
+    id TEXT PRIMARY KEY,
+    user_id UUID REFERENCES public.users(id) ON DELETE CASCADE,
+    name TEXT NOT NULL,
+    expertise TEXT NOT NULL,
+    bio TEXT NOT NULL,
+    track_record TEXT NOT NULL,
+    portfolio_url TEXT,
+    is_student BOOLEAN DEFAULT false,
+    nim TEXT,
+    status TEXT DEFAULT 'pending',
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+-- 8. Tabel Kandidat per Proposal (Proposal Candidates)
+CREATE TABLE IF NOT EXISTS public.proposal_candidates (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    proposal_id UUID REFERENCES public.election_proposals(id) ON DELETE CASCADE NOT NULL,
+    user_id UUID REFERENCES public.users(id) ON DELETE SET NULL,
+    full_name TEXT NOT NULL,
+    nik_or_nim TEXT,              -- NIK atau NIM yang dicari saat pengajuan
+    docs_completed BOOLEAN DEFAULT false,  -- true setelah kandidat lengkapi berkas
+    notification_sent BOOLEAN DEFAULT false,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+-- 9. Tabel Notifikasi Persisten per User
+CREATE TABLE IF NOT EXISTS public.user_notifications (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID REFERENCES public.users(id) ON DELETE CASCADE NOT NULL,
+    title TEXT NOT NULL,
+    message TEXT NOT NULL,
+    type TEXT NOT NULL,           -- 'candidate_nominated', 'proposal_approved', 'proposal_rejected', 'proposal_pending'
+    is_read BOOLEAN DEFAULT false,
+    is_dismissed BOOLEAN DEFAULT false,  -- notif kandidat hanya bisa dismiss setelah docs_completed=true
+    reference_id TEXT,            -- proposal_id atau election_id terkait
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+-- Tambahkan kolom baru yang mungkin belum ada di Supabase yang sudah running
+ALTER TABLE public.election_proposals ADD COLUMN IF NOT EXISTS admin_note TEXT;
+ALTER TABLE public.proposal_candidates ADD COLUMN IF NOT EXISTS docs_completed BOOLEAN DEFAULT false;
+ALTER TABLE public.proposal_candidates ADD COLUMN IF NOT EXISTS notification_sent BOOLEAN DEFAULT false;
+ALTER TABLE public.proposal_candidates ADD COLUMN IF NOT EXISTS is_verified BOOLEAN DEFAULT false;
+ALTER TABLE public.proposal_candidates ADD COLUMN IF NOT EXISTS visi TEXT;
+ALTER TABLE public.proposal_candidates ADD COLUMN IF NOT EXISTS misi TEXT;
+ALTER TABLE public.proposal_candidates ADD COLUMN IF NOT EXISTS track_records JSONB DEFAULT '[]'::jsonb;
+ALTER TABLE public.proposal_candidates ADD COLUMN IF NOT EXISTS programs JSONB DEFAULT '[]'::jsonb;
+ALTER TABLE public.proposal_candidates ADD COLUMN IF NOT EXISTS photo_url TEXT;
+
 -- ====================================================================
 -- ROW LEVEL SECURITY (RLS) POLICIES
 -- ====================================================================
@@ -181,6 +239,17 @@ CREATE POLICY "Allow auth insert votes" ON public.votes FOR INSERT WITH CHECK (t
 
 CREATE POLICY "Allow public read proposals" ON public.election_proposals FOR SELECT USING (true);
 CREATE POLICY "Allow auth insert proposals" ON public.election_proposals FOR INSERT WITH CHECK (true);
+CREATE POLICY "Allow auth update proposals" ON public.election_proposals FOR UPDATE USING (true);
+
+ALTER TABLE public.proposal_candidates ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Allow public read proposal_candidates" ON public.proposal_candidates FOR SELECT USING (true);
+CREATE POLICY "Allow auth insert proposal_candidates" ON public.proposal_candidates FOR INSERT WITH CHECK (true);
+CREATE POLICY "Allow auth update proposal_candidates" ON public.proposal_candidates FOR UPDATE USING (true);
+
+ALTER TABLE public.user_notifications ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Allow user read own notifications" ON public.user_notifications FOR SELECT USING (true);
+CREATE POLICY "Allow auth insert notifications" ON public.user_notifications FOR INSERT WITH CHECK (true);
+CREATE POLICY "Allow auth update notifications" ON public.user_notifications FOR UPDATE USING (true);
 
 -- ====================================================================
 -- DUMMY SEED DATA (AGAR APLIKASI LANGSUNG HIDUP DAN MENARIK)

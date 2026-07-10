@@ -1,4 +1,5 @@
 // lib/features/delegates/profile/presentation/screens/delegate_profile_screen.dart
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -10,7 +11,6 @@ import 'package:voteryxapp/core/router/app_router.dart';
 import 'delegate_edit_bio_screen.dart';
 import 'delegate_update_skills_screen.dart';
 import 'delegate_track_record_screen.dart';
-import 'delegate_security_screen.dart';
 import 'package:voteryxapp/features/auth/presentation/providers/auth_provider.dart';
 import 'package:voteryxapp/features/delegates/delegation/application/delegate_dashboard_provider.dart';
 
@@ -244,23 +244,39 @@ class _DelegateProfileHeader extends ConsumerWidget {
                 clipBehavior: Clip.none,
                 alignment: Alignment.bottomRight,
                 children: [
-                  Container(
+                   Container(
                     width: 70,
                     height: 70,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
                       border: Border.all(color: AppColors.goldMid, width: 2),
                       color: AppColors.primary900,
-                      image: avatarUrl != null && avatarUrl.isNotEmpty && avatarUrl.startsWith('http')
-                          ? DecorationImage(
-                              image: NetworkImage(avatarUrl),
-                              fit: BoxFit.cover,
-                            )
-                          : null,
                     ),
-                    child: avatarUrl == null || !avatarUrl.startsWith('http')
-                        ? const Icon(Icons.person, color: AppColors.goldMid, size: 36)
-                        : null,
+                    child: ClipOval(
+                      child: Builder(builder: (_) {
+                        final clean = avatarUrl?.trim() ?? '';
+                        if (clean.startsWith('data:image')) {
+                          try {
+                            final b64 = clean.split(',').last;
+                            return Image(
+                              image: MemoryImage(base64Decode(b64)),
+                              width: 70, height: 70, fit: BoxFit.cover,
+                              errorBuilder: (_, __, ___) => const Icon(
+                                Icons.person, color: AppColors.goldMid, size: 36),
+                            );
+                          } catch (_) {}
+                        } else if (clean.startsWith('http')) {
+                          return Image.network(
+                            clean,
+                            width: 70, height: 70, fit: BoxFit.cover,
+                            errorBuilder: (_, __, ___) => const Icon(
+                              Icons.person, color: AppColors.goldMid, size: 36),
+                          );
+                        }
+                        return const Icon(
+                          Icons.person, color: AppColors.goldMid, size: 36);
+                      }),
+                    ),
                   ),
                   // Badge edit kecil tetap ada untuk tap ke edit bio
                   GestureDetector(

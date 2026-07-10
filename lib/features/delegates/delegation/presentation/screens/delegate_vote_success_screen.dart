@@ -1,5 +1,10 @@
 // lib/features/delegation/presentation/screens/delegate_vote_success_screen.dart
+import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:voteryxapp/features/delegates/delegation/application/delegate_dashboard_provider.dart';
+import 'package:voteryxapp/features/delegates/delegation/application/delegate_vote_execution_provider.dart';
+import 'package:voteryxapp/features/user/profile/presentation/providers/profile_provider.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../../core/constants/app_colors.dart';
@@ -17,19 +22,22 @@ class _MandatorItem {
 
 /// Layar Delegate Portal — menampilkan bukti eksekusi suara yang
 /// berhasil dikunci beserta detail receipt dan QR code validasi.
-class DelegateVoteSuccessScreen extends StatelessWidget {
+class DelegateVoteSuccessScreen extends ConsumerWidget {
   const DelegateVoteSuccessScreen({super.key});
 
-  static const _batchId = '#VOTE-DELEG-9921-X';
-
-  static const List<_MandatorItem> _mandators = [
-    _MandatorItem(name: 'Siti Rahmawati', imageUrl: 'https://i.pravatar.cc/150?img=5'),
-    _MandatorItem(name: 'Budi Santoso', imageUrl: 'https://i.pravatar.cc/150?img=11'),
-    _MandatorItem(name: 'Rizal Pratama', imageUrl: 'https://i.pravatar.cc/150?img=12'),
-  ];
-
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final state = ref.watch(delegateVoteExecutionProvider);
+    final dashboardData = ref.watch(delegateDashboardProvider).valueOrNull;
+    final profile = ref.watch(userProfileProvider).valueOrNull;
+    
+    final int weight = state.totalWeight > 0 ? state.totalWeight : 0;
+    final String batchId = state.transactionHash ?? '#VOTE-DELEG-9921-X';
+    final String electionTitle = dashboardData?.urgentElectionTitle ?? 'Pemilihan Aktif';
+    final String executorName = profile?.fullName ?? 'Delegate';
+    
+    final activeMandates = dashboardData?.mandates.where((m) => m.status == 'active').toList() ?? [];
+    final totalMandators = activeMandates.length;
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: _buildAppBar(context),
@@ -50,7 +58,7 @@ class DelegateVoteSuccessScreen extends StatelessWidget {
 
               // ── Headline ───────────────────────────────────────
               Text(
-                '47 Suara Berhasil Dikunci!',
+                '$weight Suara Berhasil Dikunci!',
                 style: AppTypography.displayHeading.copyWith(
                   fontSize: 24,
                   color: AppColors.primary900,
@@ -69,7 +77,7 @@ class DelegateVoteSuccessScreen extends StatelessWidget {
               const SizedBox(height: 28),
 
               // ── Receipt card ───────────────────────────────────
-              _buildReceiptCard(context),
+              _buildReceiptCard(context, batchId, electionTitle, executorName, weight, totalMandators, activeMandates),
               const SizedBox(height: 20),
 
               // ── Info banner ────────────────────────────────────
@@ -86,6 +94,36 @@ class DelegateVoteSuccessScreen extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  Widget _buildAvatar(String? avatarUrl) {
+    if (avatarUrl == null || avatarUrl.isEmpty) {
+      return Container(
+        color: AppColors.outlineVariant,
+        child: const Icon(Icons.person, color: AppColors.textSecondary, size: 20),
+      );
+    }
+    
+    try {
+      if (avatarUrl.startsWith('data:image')) {
+        final base64Str = avatarUrl.split(',').last;
+        final normalized = base64.normalize(base64Str.replaceAll(RegExp(r'\s+'), ''));
+        return Image.memory(
+          base64Decode(normalized),
+          fit: BoxFit.cover,
+        );
+      } else {
+        return Image.network(
+          avatarUrl,
+          fit: BoxFit.cover,
+        );
+      }
+    } catch (_) {
+      return Container(
+        color: AppColors.outlineVariant,
+        child: const Icon(Icons.person, color: AppColors.textSecondary, size: 20),
+      );
+    }
   }
 
   // ─────────────────────────── AppBar ────────────────────────────
@@ -138,7 +176,7 @@ class DelegateVoteSuccessScreen extends StatelessWidget {
               border: Border.all(color: Colors.white, width: 2),
             ),
             child: Text(
-              '×47',
+              '×$weight',
               style: AppTypography.captionBold.copyWith(
                 color: Colors.white,
                 fontSize: 11,
@@ -151,7 +189,7 @@ class DelegateVoteSuccessScreen extends StatelessWidget {
   }
 
   // ─────────────────────── Receipt Card ──────────────────────────
-  Widget _buildReceiptCard(BuildContext context) {
+  Widget _buildReceiptCard(BuildContext context, String batchId, String electionTitle, String executorName, int weight, int totalMandators, List<DelegateMandateItem> mandates) {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(AppSpacing.xl),
@@ -181,27 +219,27 @@ class DelegateVoteSuccessScreen extends StatelessWidget {
           const SizedBox(height: 14),
 
           // Batch ID chip
-          _buildBatchIdChip(context),
+          _buildBatchIdChip(context, batchId),
           const SizedBox(height: 20),
 
           const Divider(color: AppColors.outlineVariant, height: 1),
           const SizedBox(height: 20),
 
           // Receipt rows
-          _buildReceiptRow('Waktu', '14 Okt 2023, 14:22 WIB'),
+          _buildReceiptRow('Waktu', _formatCurrentTime()),
           const SizedBox(height: 14),
-          _buildReceiptRow('Pemilihan', 'Ketua BEM UI 2024'),
+          _buildReceiptRow('Pemilihan', electionTitle),
           const SizedBox(height: 14),
-          _buildReceiptRowWithBadge('Dieksekusi sebagai', 'Ahmad Rizki', 'DELEGATE'),
+          _buildReceiptRowWithBadge('Dieksekusi sebagai', executorName, 'DELEGATE'),
           const SizedBox(height: 14),
-          _buildReceiptRow('Bobot Dieksekusi', '47 Suara',
+          _buildReceiptRow('Bobot Dieksekusi', '$weight Suara',
               valueColor: AppColors.goldDark),
           const SizedBox(height: 14),
-          _buildReceiptRow('Mandator', '12 Orang'),
+          _buildReceiptRow('Mandator', '$totalMandators Orang'),
           const SizedBox(height: 20),
 
           // Mandator detail box
-          _buildMandatorDetail(),
+          if (mandates.isNotEmpty) _buildMandatorDetail(mandates),
           const SizedBox(height: 20),
 
           // QR Code
@@ -220,10 +258,10 @@ class DelegateVoteSuccessScreen extends StatelessWidget {
   }
 
   // ─────────────────── Batch ID Chip ─────────────────────────────
-  Widget _buildBatchIdChip(BuildContext context) {
+  Widget _buildBatchIdChip(BuildContext context, String batchId) {
     return GestureDetector(
       onTap: () {
-        Clipboard.setData(const ClipboardData(text: _batchId));
+        Clipboard.setData(ClipboardData(text: batchId));
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Batch ID disalin')),
         );
@@ -239,7 +277,7 @@ class DelegateVoteSuccessScreen extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             Text(
-              'BATCH ID: $_batchId',
+              'BATCH ID: $batchId',
               style: AppTypography.captionBold.copyWith(
                 color: AppColors.primary900,
                 fontSize: 11,
@@ -347,7 +385,10 @@ class DelegateVoteSuccessScreen extends StatelessWidget {
   }
 
   // ─────────────────── Mandator Detail Box ───────────────────────
-  Widget _buildMandatorDetail() {
+  Widget _buildMandatorDetail(List<DelegateMandateItem> mandates) {
+    final displayMandates = mandates.take(3).toList();
+    final remaining = mandates.length - displayMandates.length;
+    
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(AppSpacing.md),
@@ -367,27 +408,29 @@ class DelegateVoteSuccessScreen extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 14),
-          ..._mandators.map((m) => Padding(
+          ...displayMandates.map((m) => Padding(
                 padding: const EdgeInsets.only(bottom: 12),
                 child: _buildMandatorItem(m),
               )),
-          const Divider(color: AppColors.outlineVariant, height: 1),
-          const SizedBox(height: 12),
-          Center(
-            child: Text(
-              '+9 mandator lainnya',
-              style: AppTypography.captionBold.copyWith(
-                color: AppColors.primary900,
-                fontSize: 12,
+          if (remaining > 0) ...[
+            const Divider(color: AppColors.outlineVariant, height: 1),
+            const SizedBox(height: 12),
+            Center(
+              child: Text(
+                '+$remaining mandator lainnya',
+                style: AppTypography.captionBold.copyWith(
+                  color: AppColors.primary900,
+                  fontSize: 12,
+                ),
               ),
             ),
-          ),
+          ],
         ],
       ),
     );
   }
 
-  Widget _buildMandatorItem(_MandatorItem item) {
+  Widget _buildMandatorItem(DelegateMandateItem item) {
     return Row(
       children: [
         Container(
@@ -396,16 +439,13 @@ class DelegateVoteSuccessScreen extends StatelessWidget {
           decoration: BoxDecoration(
             shape: BoxShape.circle,
             border: Border.all(color: AppColors.outlineVariant, width: 1),
-            image: DecorationImage(
-              image: NetworkImage(item.imageUrl),
-              fit: BoxFit.cover,
-            ),
           ),
+          child: ClipOval(child: _buildAvatar(item.delegatorAvatarUrl)),
         ),
-        const SizedBox(width: 10),
+        const SizedBox(width: 12),
         Expanded(
           child: Text(
-            item.name,
+            item.delegatorName,
             style: AppTypography.bodyMedium.copyWith(
               color: AppColors.primary900,
               fontWeight: FontWeight.w600,
@@ -527,5 +567,11 @@ class DelegateVoteSuccessScreen extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  String _formatCurrentTime() {
+    final now = DateTime.now();
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agt', 'Sep', 'Okt', 'Nov', 'Des'];
+    return '${now.day} ${months[now.month - 1]} ${now.year}, ${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')} WIB';
   }
 }

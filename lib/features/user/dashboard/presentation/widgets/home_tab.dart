@@ -11,6 +11,7 @@ import 'package:voteryxapp/core/widgets/status_badge.dart';
 import 'package:voteryxapp/features/auth/presentation/providers/auth_provider.dart';
 import 'package:voteryxapp/features/user/election/domain/entities/election.dart';
 import 'package:voteryxapp/features/user/election/presentation/providers/election_provider.dart';
+import 'package:voteryxapp/features/user/notifications/presentation/providers/user_notifications_provider.dart';
 import 'package:voteryxapp/features/user/notifications/presentation/widgets/notifications_modal.dart';
 
 /// Tab Home untuk Dashboard User — terhubung ke Supabase via Riverpod.
@@ -44,21 +45,29 @@ class HomeTab extends ConsumerWidget {
           children: [
             // ── Header Section ──
             userProfileAsync.when(
-              data: (profile) => _HeaderSection(
-                greeting: _getGreeting(),
-                userName: profile?.fullName ?? 'Pengguna Voteryx',
-                isDelegate: dashboardAsync.maybeWhen(
-                  data: (d) => d.hasActiveMandate,
-                  orElse: () => false,
-                ),
-                mandateCount: 0, // TODO: ambil dari delegations
-              ),
+              data: (profile) {
+                final dData = dashboardAsync.valueOrNull;
+                final activeRights = dData != null 
+                    ? dData.activeElections.length - dData.votedElectionIds.length - dData.delegatedElectionIds.length
+                    : 0;
+
+                return _HeaderSection(
+                  greeting: _getGreeting(),
+                  userName: profile?.fullName ?? 'Pengguna Voteryx',
+                  isDelegate: dData?.hasActiveMandate ?? false,
+                  mandateCount: 0, // TODO: ambil dari delegations
+                  bobotSuara: activeRights < 0 ? 0 : activeRights,
+                  mandateElectionIds: dData?.mandateElectionIds ?? [],
+                );
+              },
               loading: () => _HeaderSkeleton(),
               error: (_, __) => _HeaderSection(
                 greeting: _getGreeting(),
                 userName: 'Pengguna Voteryx',
                 isDelegate: false,
                 mandateCount: 0,
+                bobotSuara: 0,
+                mandateElectionIds: const [],
               ),
             ),
 
@@ -101,11 +110,12 @@ class HomeTab extends ConsumerWidget {
                 }
                 return Column(
                   children: data.activeElections.map((election) {
-                    final hasVoted =
-                        data.votedElectionIds.contains(election.id);
+                    final hasVoted = data.votedElectionIds.contains(election.id);
+                    final hasDelegated = data.delegatedElectionIds.contains(election.id);
                     return _ActiveElectionCard(
                       election: election,
                       hasVoted: hasVoted,
+                      hasDelegated: hasDelegated,
                     );
                   }).toList(),
                 );
@@ -131,12 +141,16 @@ class _HeaderSection extends ConsumerWidget {
     required this.userName,
     required this.isDelegate,
     required this.mandateCount,
+    required this.bobotSuara,
+    required this.mandateElectionIds,
   });
 
   final String greeting;
   final String userName;
   final bool isDelegate;
   final int mandateCount;
+  final int bobotSuara;
+  final List<String> mandateElectionIds;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -184,12 +198,54 @@ class _HeaderSection extends ConsumerWidget {
                   ],
                 ),
               ),
-              IconButton(
-                icon: const Icon(Icons.notifications_none_rounded, color: Colors.white, size: 24),
-                tooltip: 'Notifikasi',
-                onPressed: () {
-                  showNotificationsModal(context, ref);
-                },
+              Stack(
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.notifications_none_rounded, color: Colors.white, size: 24),
+                    tooltip: 'Notifikasi',
+                    onPressed: () {
+                      showNotificationsModal(context, ref);
+                    },
+                  ),
+                  Consumer(
+                    builder: (context, ref, child) {
+                      final notifsAsync = ref.watch(userNotificationsProvider);
+                      return notifsAsync.maybeWhen(
+                        data: (notifs) {
+                          final unreadCount = notifs.where((n) => !n.isRead).length;
+                          if (unreadCount == 0) return const SizedBox.shrink();
+                          return Positioned(
+                            right: 8,
+                            top: 8,
+                            child: Container(
+                              padding: const EdgeInsets.all(4),
+                              decoration: const BoxDecoration(
+                                color: AppColors.errorRed,
+                                shape: BoxShape.circle,
+                              ),
+                              constraints: const BoxConstraints(
+                                minWidth: 16,
+                                minHeight: 16,
+                              ),
+                              child: Center(
+                                child: Text(
+                                  unreadCount > 99 ? '99+' : unreadCount.toString(),
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 9,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                  textAlign: TextAlign.center,
+                                ),
+                              ),
+                            ),
+                          );
+                        },
+                        orElse: () => const SizedBox.shrink(),
+                      );
+                    },
+                  ),
+                ],
               ),
             ],
           ),
@@ -227,7 +283,7 @@ class _HeaderSection extends ConsumerWidget {
                       ),
                     ),
                     Text(
-                      '1',
+                      bobotSuara.toString(),
                       style: AppTypography.displayHeading.copyWith(
                         color: Colors.white,
                         fontSize: 28,
@@ -263,64 +319,75 @@ class _HeaderSection extends ConsumerWidget {
           // Delegate card (hanya jika ada mandat)
           if (isDelegate) ...[
             const SizedBox(height: AppSpacing.sm),
-            Container(
-              padding: const EdgeInsets.symmetric(
-                horizontal: AppSpacing.md,
-                vertical: AppSpacing.mdSm,
-              ),
-              decoration: BoxDecoration(
-                gradient: AppColors.delegateGradient,
-                borderRadius: BorderRadius.circular(14),
-                boxShadow: [
-                  BoxShadow(
-                    color: AppColors.delegateTealMid.withValues(alpha: 0.3),
-                    blurRadius: 12,
-                    offset: const Offset(0, 4),
-                  ),
-                ],
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'MANDAT DITERIMA',
-                        style: AppTypography.captionBold.copyWith(
-                          color: Colors.white70,
-                          letterSpacing: 0.7,
-                        ),
-                      ),
-                      Text(
-                        '$mandateCount Suara',
-                        style: AppTypography.displayHeading.copyWith(
-                          color: Colors.white,
-                          fontSize: 19,
-                        ),
-                      ),
-                      Text(
-                        'Siap dieksekusi',
-                        style: AppTypography.bodySmall.copyWith(
-                          color: Colors.white70,
-                        ),
-                      ),
-                    ],
-                  ),
-                  Container(
-                    width: 38,
-                    height: 38,
-                    decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.2),
-                      shape: BoxShape.circle,
+            InkWell(
+              onTap: mandateElectionIds.isNotEmpty
+                  ? () {
+                      context.pushNamed(
+                        'election',
+                        pathParameters: {'id': mandateElectionIds.first},
+                      );
+                    }
+                  : null,
+              borderRadius: BorderRadius.circular(14),
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: AppSpacing.md,
+                  vertical: AppSpacing.mdSm,
+                ),
+                decoration: BoxDecoration(
+                  gradient: AppColors.delegateGradient,
+                  borderRadius: BorderRadius.circular(14),
+                  boxShadow: [
+                    BoxShadow(
+                      color: AppColors.delegateTealMid.withValues(alpha: 0.3),
+                      blurRadius: 12,
+                      offset: const Offset(0, 4),
                     ),
-                    child: const Icon(
-                      Icons.groups_outlined,
-                      color: Colors.white,
-                      size: 22,
+                  ],
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'MANDAT DITERIMA',
+                          style: AppTypography.captionBold.copyWith(
+                            color: Colors.white70,
+                            letterSpacing: 0.7,
+                          ),
+                        ),
+                        Text(
+                          '$mandateCount Suara',
+                          style: AppTypography.displayHeading.copyWith(
+                            color: Colors.white,
+                            fontSize: 19,
+                          ),
+                        ),
+                        Text(
+                          'Siap dieksekusi',
+                          style: AppTypography.bodySmall.copyWith(
+                            color: Colors.white70,
+                          ),
+                        ),
+                      ],
                     ),
-                  ),
-                ],
+                    Container(
+                      width: 38,
+                      height: 38,
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.2),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(
+                        Icons.groups_outlined,
+                        color: Colors.white,
+                        size: 22,
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
           ],
@@ -336,10 +403,12 @@ class _ActiveElectionCard extends StatelessWidget {
   const _ActiveElectionCard({
     required this.election,
     required this.hasVoted,
+    this.hasDelegated = false,
   });
 
   final Election election;
   final bool hasVoted;
+  final bool hasDelegated;
 
   @override
   Widget build(BuildContext context) {
@@ -376,26 +445,26 @@ class _ActiveElectionCard extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               StatusBadge(status: statusBadgeStatus),
-              if (hasVoted)
+              if (hasVoted || hasDelegated)
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                   decoration: BoxDecoration(
-                    color: AppColors.successBg,
+                    color: hasDelegated ? const Color(0xFFFFF7E6) : AppColors.successBg,
                     borderRadius: BorderRadius.circular(20),
                   ),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      const Icon(
-                        Icons.check_circle_outline,
-                        color: AppColors.successTeal,
+                      Icon(
+                        hasDelegated ? Icons.groups : Icons.check_circle_outline,
+                        color: hasDelegated ? AppColors.goldDark : AppColors.successTeal,
                         size: 13,
                       ),
                       const SizedBox(width: 4),
                       Text(
-                        'Sudah Memilih',
+                        hasDelegated ? 'Suara Didelegasikan' : 'Sudah Memilih',
                         style: AppTypography.captionBold.copyWith(
-                          color: AppColors.successTeal,
+                          color: hasDelegated ? AppColors.goldDark : AppColors.successTeal,
                           fontSize: 10,
                         ),
                       ),
@@ -530,8 +599,12 @@ class _ActiveElectionCard extends StatelessWidget {
               Expanded(
                 flex: 3,
                 child: GoldButton(
-                  label: hasVoted ? 'Sudah Memilih' : 'Pilih Sekarang',
-                  icon: hasVoted ? Icons.check : Icons.arrow_forward,
+                  label: hasVoted 
+                      ? 'Sudah Memilih' 
+                      : hasDelegated 
+                          ? 'Suara Didelegasikan' 
+                          : 'Pilih Sekarang',
+                  icon: hasVoted || hasDelegated ? Icons.check : Icons.arrow_forward,
                   height: 42,
                   onPressed: hasVoted
                       ? null

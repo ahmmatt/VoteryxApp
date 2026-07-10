@@ -1,4 +1,5 @@
 // lib/features/user/profile/presentation/screens/profile_settings_screen.dart
+import 'dart:convert';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -303,7 +304,19 @@ class _ProfileSettingsScreenState extends ConsumerState<ProfileSettingsScreen> {
   }
 
   Widget _buildAvatarSection(String name, String? avatarUrl) {
-    final hasPhoto = avatarUrl != null && avatarUrl.trim().isNotEmpty;
+    final clean = avatarUrl?.trim() ?? '';
+    // Tentukan ImageProvider
+    ImageProvider? existingImageProvider;
+    if (_pickedAvatarBytes != null) {
+      existingImageProvider = MemoryImage(_pickedAvatarBytes!);
+    } else if (clean.startsWith('data:image')) {
+      try {
+        final base64Str = clean.split(',').last;
+        existingImageProvider = MemoryImage(base64Decode(base64Str));
+      } catch (_) {}
+    } else if (clean.startsWith('http')) {
+      existingImageProvider = NetworkImage(clean);
+    }
 
     return Column(
       children: [
@@ -327,32 +340,23 @@ class _ProfileSettingsScreenState extends ConsumerState<ProfileSettingsScreen> {
                   ],
                 ),
                 alignment: Alignment.center,
-                child: _pickedAvatarBytes != null
+                child: existingImageProvider != null
                     ? ClipOval(
-                        child: Image.memory(
-                          _pickedAvatarBytes!,
+                        child: Image(
+                          image: existingImageProvider,
                           width: 100,
                           height: 100,
                           fit: BoxFit.cover,
-                        ),
-                      )
-                    : (hasPhoto
-                        ? ClipOval(
-                            child: Image.network(
-                              avatarUrl,
-                              width: 100,
-                              height: 100,
-                              fit: BoxFit.cover,
-                              errorBuilder: (_, __, ___) => Text(
-                                name.isNotEmpty ? name[0].toUpperCase() : 'U',
-                                style: AppTypography.displayHeading.copyWith(color: Colors.white, fontSize: 40),
-                              ),
-                            ),
-                          )
-                        : Text(
+                          errorBuilder: (_, __, ___) => Text(
                             name.isNotEmpty ? name[0].toUpperCase() : 'U',
                             style: AppTypography.displayHeading.copyWith(color: Colors.white, fontSize: 40),
-                          )),
+                          ),
+                        ),
+                      )
+                    : Text(
+                        name.isNotEmpty ? name[0].toUpperCase() : 'U',
+                        style: AppTypography.displayHeading.copyWith(color: Colors.white, fontSize: 40),
+                      ),
               ),
               Container(
                 decoration: BoxDecoration(

@@ -125,39 +125,6 @@ class DelegateApplicationController extends StateNotifier<List<DelegateApplicati
         } catch (_) {}
       }
 
-      // Ambil juga pengguna di tabel users yang sudah mendaftar delegasi atau memiliki delegate_bio
-      try {
-        final usersResp = await SupabaseConfig.client
-            .from('users')
-            .select('*')
-            .or('role.eq.delegate,delegate_bio.neq.null,is_delegate_profile_public.eq.true');
-
-        final userList = (usersResp as List).map((u) {
-          final nimVal = u['nim']?.toString() ?? '';
-          final idVal = 'DEL-USER-${u['id']?.toString().substring(0, 8) ?? nimVal}';
-          final nameVal = u['full_name']?.toString() ?? 'Delegator Voteryx';
-          return DelegateApplication(
-            id: idVal,
-            name: nameVal,
-            expertise: u['delegate_vision']?.toString() ?? u['major']?.toString() ?? 'Umum',
-            bio: u['delegate_bio']?.toString() ?? 'Delegator terdaftar.',
-            trackRecord: 'Terverifikasi via akun pengguna Voteryx.',
-            portfolioUrl: '-',
-            isStudent: nimVal.isNotEmpty,
-            nim: nimVal,
-            status: u['role'] == 'delegate'
-                ? DelegateApplicationStatus.approved
-                : DelegateApplicationStatus.pending,
-          );
-        }).toList();
-
-        // Gabungkan list tanpa duplikasi NIM / ID
-        for (final uApp in userList) {
-          if (!dbList.any((d) => (d.nim.isNotEmpty && d.nim == uApp.nim) || d.name == uApp.name)) {
-            dbList.add(uApp);
-          }
-        }
-      } catch (_) {}
 
       if (dbList.isNotEmpty) {
         state = dbList;

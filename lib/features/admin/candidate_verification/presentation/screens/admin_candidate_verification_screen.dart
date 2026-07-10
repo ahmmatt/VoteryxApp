@@ -75,19 +75,24 @@ class AdminCandidateVerificationScreen extends ConsumerWidget {
               separatorBuilder: (_, __) => const SizedBox(height: AppSpacing.lg),
               itemBuilder: (context, index) {
                 final c = candidates[index];
-                final name = c['full_name']?.toString() ?? 'Kandidat #${index + 1}';
-                final faculty = c['faculty']?.toString() ?? c['major']?.toString() ?? 'Fakultas Sains & Teknologi';
-                final candNo = c['candidate_number']?.toString() ?? '${index + 1}';
-                final nim = c['nim']?.toString() ?? (c['candidate_number'] != null ? '210600$candNo • No. Urut $candNo' : 'No. Urut $candNo');
+                final name = c['full_name']?.toString() ?? 'Nama tidak diketahui';
+                final faculty = c['faculty']?.toString() ?? c['major']?.toString() ?? '-';
+                final candNo = c['candidate_number']?.toString() ?? '-';
+                final nimVal = c['nim']?.toString() ?? '-';
+                final nim = '$nimVal • No. Urut $candNo';
                 final imageUrl = getCandidateAvatarUrl(c);
                 final isVerified = c['is_verified'] == true;
                 final electionTitle = (c['elections'] is Map) ? (c['elections']['title']?.toString() ?? 'Pemilihan Umum') : 'Pemilihan Umum';
                 final candidateId = c['id']?.toString() ?? '';
+                final electionId = c['election_id']?.toString() ?? '';
+                final isProposal = c['is_proposal'] == true;
 
                 return _buildCandidateCard(
                   context: context,
                   ref: ref,
                   candidateId: candidateId,
+                  electionId: electionId,
+                  isProposal: isProposal,
                   name: name,
                   faculty: faculty,
                   nim: nim,
@@ -108,6 +113,8 @@ class AdminCandidateVerificationScreen extends ConsumerWidget {
     required BuildContext context,
     required WidgetRef ref,
     required String candidateId,
+    required String electionId,
+    required bool isProposal,
     required String name,
     required String faculty,
     required String nim,
@@ -244,8 +251,12 @@ class AdminCandidateVerificationScreen extends ConsumerWidget {
                           child: OutlinedButton(
                             onPressed: () {
                               context.pushNamed(
-                                'admin-candidate-documents',
+                                'admin-candidate-review',
                                 pathParameters: {'id': candidateId},
+                                extra: {
+                                  'electionId': electionId,
+                                  'isProposal': isProposal,
+                                },
                               );
                             },
                             style: OutlinedButton.styleFrom(
@@ -268,7 +279,7 @@ class AdminCandidateVerificationScreen extends ConsumerWidget {
                                   onPressed: () async {
                                     final success = await ref
                                         .read(adminCandidateVerificationProvider.notifier)
-                                        .updateVerificationStatus(candidateId, true);
+                                        .updateVerificationStatus(candidateId, true, isProposal: isProposal);
                                     if (context.mounted && success) {
                                       ScaffoldMessenger.of(context).showSnackBar(
                                         SnackBar(
@@ -295,18 +306,18 @@ class AdminCandidateVerificationScreen extends ConsumerWidget {
                                   onPressed: () async {
                                     final success = await ref
                                         .read(adminCandidateVerificationProvider.notifier)
-                                        .updateVerificationStatus(candidateId, false);
+                                        .updateVerificationStatus(candidateId, false, isProposal: isProposal);
                                     if (context.mounted && success) {
                                       ScaffoldMessenger.of(context).showSnackBar(
                                         SnackBar(
                                           content: Text('⚠️ Verifikasi $name dibatalkan.'),
-                                          backgroundColor: Colors.orange,
+                                          backgroundColor: AppColors.errorRed,
                                         ),
                                       );
                                     }
                                   },
                                   style: ElevatedButton.styleFrom(
-                                    backgroundColor: Colors.orange.shade700,
+                                    backgroundColor: AppColors.errorRed,
                                     elevation: 0,
                                     shape: RoundedRectangleBorder(
                                         borderRadius: BorderRadius.circular(8)),
@@ -325,6 +336,10 @@ class AdminCandidateVerificationScreen extends ConsumerWidget {
                             context.pushNamed(
                               'admin-candidate-review',
                               pathParameters: {'id': candidateId},
+                              extra: {
+                                'electionId': electionId,
+                                'isProposal': isProposal,
+                              },
                             );
                           },
                           tooltip: 'Tinjau Detail',

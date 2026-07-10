@@ -1,4 +1,5 @@
 // lib/features/user/profile/presentation/screens/profile_screen.dart
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -82,15 +83,44 @@ class ProfileScreen extends ConsumerWidget {
     );
   }
 
+  Widget _buildAvatarFallback(String name) {
+    return Container(
+      width: 100,
+      height: 100,
+      color: AppColors.primary800,
+      child: Center(
+        child: Text(
+          name.trim().isNotEmpty ? name.trim()[0].toUpperCase() : '?',
+          style: AppTypography.displayHeading.copyWith(
+            color: Colors.white,
+            fontSize: 36,
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildProfileHeader({
     required String name,
     required String faculty,
     required String kycStatus,
     String? avatarUrl,
   }) {
-    final effectiveUrl = (avatarUrl != null && avatarUrl.trim().isNotEmpty)
-        ? avatarUrl
-        : 'https://ui-avatars.com/api/?name=${Uri.encodeComponent(name)}&background=0F1F3D&color=fff&size=200';
+    // Tentukan ImageProvider berdasarkan tipe URL: Base64 data URI, network URL, atau fallback inisial
+    final cleanUrl = (avatarUrl != null && avatarUrl.trim().isNotEmpty) ? avatarUrl.trim() : null;
+    ImageProvider? imageProvider;
+    if (cleanUrl != null) {
+      if (cleanUrl.startsWith('data:image')) {
+        try {
+          final base64Str = cleanUrl.split(',').last;
+          imageProvider = MemoryImage(base64Decode(base64Str));
+        } catch (_) {
+          imageProvider = null;
+        }
+      } else if (cleanUrl.startsWith('http')) {
+        imageProvider = NetworkImage(cleanUrl);
+      }
+    }
 
     return Container(
       width: double.infinity,
@@ -120,26 +150,15 @@ class ProfileScreen extends ConsumerWidget {
                   ],
                 ),
                 child: ClipOval(
-                  child: Image.network(
-                    effectiveUrl,
-                    width: 100,
-                    height: 100,
-                    fit: BoxFit.cover,
-                    errorBuilder: (context, error, stackTrace) => Container(
-                      width: 100,
-                      height: 100,
-                      color: AppColors.primary800,
-                      child: Center(
-                        child: Text(
-                          name.isNotEmpty ? name[0].toUpperCase() : '?',
-                          style: AppTypography.displayHeading.copyWith(
-                            color: Colors.white,
-                            fontSize: 36,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
+                  child: imageProvider != null
+                      ? Image(
+                          image: imageProvider,
+                          width: 100,
+                          height: 100,
+                          fit: BoxFit.cover,
+                          errorBuilder: (context, error, stackTrace) => _buildAvatarFallback(name),
+                        )
+                      : _buildAvatarFallback(name),
                 ),
               ),
               Container(

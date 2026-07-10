@@ -43,6 +43,34 @@ final myProposalsProvider = FutureProvider.autoDispose<List<ElectionProposal>>((
   }).toList();
 });
 
+// ─── Candidate Search Provider ────────────────────────────────────────────────
+/// Mencari user berdasarkan nama atau NIK dari tabel public.users.
+final candidateSearchQueryProvider = StateProvider<String>((ref) => '');
+
+final candidateSearchResultsProvider = FutureProvider.autoDispose<List<ProposalCandidate>>((ref) async {
+  final query = ref.watch(candidateSearchQueryProvider).trim();
+  if (query.length < 2) return [];
+
+  final client = SupabaseConfig.client;
+
+  // Cari berdasarkan nama lengkap atau NIK hash (partial match nama, exact NIK)
+  final List results = await client
+      .from('users')
+      .select('id, full_name, faculty, avatar_url, nik_hash, nim')
+      .or('full_name.ilike.%$query%,nim.ilike.%$query%')
+      .limit(10);
+
+  return results.map<ProposalCandidate>((row) {
+    return ProposalCandidate(
+      userId: row['id'] as String,
+      fullName: row['full_name'] as String? ?? 'Tidak Dikenal',
+      nikOrNim: row['nim'] as String?,
+      avatarUrl: row['avatar_url'] as String?,
+      faculty: row['faculty'] as String?,
+    );
+  }).toList();
+});
+
 // ─── Proposal Draft Provider ──────────────────────────────────────────────────
 
 final proposalDraftProvider =
@@ -60,6 +88,19 @@ class ProposalDraftNotifier extends StateNotifier<ElectionProposalDraft> {
   void setStartDate(DateTime d) => state = state.copyWith(proposedStartDate: d);
   void setEndDate(DateTime d) => state = state.copyWith(proposedEndDate: d);
   void setEstimatedVoters(int v) => state = state.copyWith(estimatedVoters: v);
+
+  void addCandidate(ProposalCandidate c) {
+    // Hindari duplikat
+    if (state.selectedCandidates.any((e) => e.userId == c.userId)) return;
+    state = state.copyWith(selectedCandidates: [...state.selectedCandidates, c]);
+  }
+
+  void removeCandidate(String userId) {
+    state = state.copyWith(
+      selectedCandidates: state.selectedCandidates.where((e) => e.userId != userId).toList(),
+    );
+  }
+
   void reset() => state = const ElectionProposalDraft();
 }
 
@@ -115,7 +156,10 @@ class ProposalSubmitNotifier extends StateNotifier<ProposalSubmitState> {
     state = state.copyWith(isLoading: true, error: null);
 
     try {
-      await SupabaseConfig.client.from('election_proposals').insert({
+      final client = SupabaseConfig.client;
+
+      // 1. Insert proposal ke tabel election_proposals
+      final inserted = await client.from('election_proposals').insert({
         'proposer_id': userId,
         'title': draft.title.trim(),
         'election_type': draft.electionType,
@@ -125,11 +169,39 @@ class ProposalSubmitNotifier extends StateNotifier<ProposalSubmitState> {
         'proposed_end_date': draft.proposedEndDate?.toIso8601String(),
         'estimated_voters': draft.estimatedVoters,
         'status': 'pending',
-      });
+      }).select().single();
 
-      // Reset draft
+      final proposalId = inserted['id'] as String;
+
+      // 2. Insert kandidat-kandidat terpilih ke tabel proposal_candidates
+      //    dan kirim notifikasi persisten ke masing-masing kandidat
+      for (final candidate in draft.selectedCandidates) {
+        // Insert ke proposal_candidates
+        await client.from('proposal_candidates').insert({
+          'proposal_id': proposalId,
+          'user_id': candidate.userId,
+          'full_name': candidate.fullName,
+          'nik_or_nim': candidate.nikOrNim,
+          'docs_completed': false,
+          'notification_sent': true,
+        });
+
+        // Kirim notifikasi persisten ke kandidat
+        await client.from('user_notifications').insert({
+          'user_id': candidate.userId,
+          'title': 'Anda Diajukan Sebagai Kandidat',
+          'message': 'Anda telah diusulkan sebagai kandidat dalam pemilihan "${draft.title.trim()}". '
+              'Segera lengkapi data dan berkas Anda agar dapat dilanjutkan ke tahap verifikasi. '
+              'Notifikasi ini akan tetap aktif sampai semua berkas Anda lengkap.',
+          'type': 'candidate_nominated',
+          'is_read': false,
+          'is_dismissed': false,
+          'reference_id': proposalId,
+        });
+      }
+
+      // 3. Reset draft & invalidate providers
       _ref.read(proposalDraftProvider.notifier).reset();
-      // Invalidate list
       _ref.invalidate(myProposalsProvider);
 
       state = state.copyWith(isLoading: false, isSuccess: true);

@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:voteryxapp/core/constants/app_colors.dart';
 import 'package:voteryxapp/core/constants/app_radius.dart';
 import 'package:voteryxapp/core/constants/app_typography.dart';
+import 'package:go_router/go_router.dart';
 import '../providers/user_notifications_provider.dart';
 
 void showNotificationsModal(BuildContext context, WidgetRef ref) {
@@ -50,26 +51,34 @@ class NotificationsBottomSheet extends ConsumerWidget {
                     color: AppColors.primary800.withValues(alpha: 0.1),
                     shape: BoxShape.circle,
                   ),
-                  child: const Icon(Icons.notifications_active_outlined, color: AppColors.primary800, size: 22),
+                  child: const Icon(Icons.notifications_active_outlined,
+                      color: AppColors.primary800, size: 22),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('Pusat Notifikasi', style: AppTypography.headerTitle.copyWith(fontSize: 18)),
-                      Text('Info terbaru mengenai pemilihan dan aktivitasmu', style: AppTypography.caption.copyWith(color: AppColors.textSecondary)),
+                      Text('Pusat Notifikasi',
+                          style:
+                              AppTypography.headerTitle.copyWith(fontSize: 18, color: AppColors.primary800)),
+                      Text(
+                          'Info terbaru mengenai pemilihan dan aktivitasmu',
+                          style: AppTypography.caption
+                              .copyWith(color: AppColors.textSecondary)),
                     ],
                   ),
                 ),
                 IconButton(
                   onPressed: () => ref.invalidate(userNotificationsProvider),
-                  icon: const Icon(Icons.refresh, color: AppColors.textSecondary, size: 20),
+                  icon: const Icon(Icons.refresh,
+                      color: AppColors.textSecondary, size: 20),
                   tooltip: 'Segarkan Notifikasi',
                 ),
                 IconButton(
                   onPressed: () => Navigator.of(context).pop(),
-                  icon: const Icon(Icons.close, color: AppColors.textSecondary),
+                  icon:
+                      const Icon(Icons.close, color: AppColors.textSecondary),
                 ),
               ],
             ),
@@ -88,7 +97,7 @@ class NotificationsBottomSheet extends ConsumerWidget {
                   separatorBuilder: (_, __) => const SizedBox(height: 12),
                   itemBuilder: (context, index) {
                     final item = items[index];
-                    return _buildNotificationCard(item);
+                    return _buildNotificationCard(context, item, ref);
                   },
                 );
               },
@@ -101,14 +110,19 @@ class NotificationsBottomSheet extends ConsumerWidget {
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      const Icon(Icons.error_outline, size: 48, color: AppColors.errorRed),
+                      const Icon(Icons.error_outline,
+                          size: 48, color: AppColors.errorRed),
                       const SizedBox(height: 12),
-                      Text('Gagal Memuat Notifikasi', style: AppTypography.cardTitle),
+                      Text('Gagal Memuat Notifikasi',
+                          style: AppTypography.cardTitle),
                       const SizedBox(height: 8),
                       ElevatedButton(
-                        onPressed: () => ref.invalidate(userNotificationsProvider),
-                        style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary800),
-                        child: const Text('Coba Lagi', style: TextStyle(color: Colors.white)),
+                        onPressed: () =>
+                            ref.invalidate(userNotificationsProvider),
+                        style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColors.primary800),
+                        child: const Text('Coba Lagi',
+                            style: TextStyle(color: Colors.white)),
                       ),
                     ],
                   ),
@@ -134,14 +148,17 @@ class NotificationsBottomSheet extends ConsumerWidget {
                 color: AppColors.primary800.withValues(alpha: 0.06),
                 shape: BoxShape.circle,
               ),
-              child: const Icon(Icons.notifications_off_outlined, size: 56, color: AppColors.outline),
+              child: const Icon(Icons.notifications_off_outlined,
+                  size: 56, color: AppColors.outline),
             ),
             const SizedBox(height: 20),
-            Text('Belum Ada Notifikasi', style: AppTypography.cardTitle.copyWith(fontSize: 18)),
+            Text('Belum Ada Notifikasi',
+                style: AppTypography.cardTitle.copyWith(fontSize: 18)),
             const SizedBox(height: 8),
             Text(
               'Saat ini belum ada aktivitas pemilihan, delegasi suara, atau status usulan baru pada akun Anda.',
-              style: AppTypography.bodyMedium.copyWith(color: AppColors.textSecondary),
+              style: AppTypography.bodyMedium
+                  .copyWith(color: AppColors.textSecondary),
               textAlign: TextAlign.center,
             ),
           ],
@@ -150,9 +167,10 @@ class NotificationsBottomSheet extends ConsumerWidget {
     );
   }
 
-  Widget _buildNotificationCard(AppNotificationItem item) {
+  Widget _buildNotificationCard(BuildContext context, AppNotificationItem item, WidgetRef ref) {
     Color badgeColor;
     IconData icon;
+    final bool isUrgent = item.type == 'candidate_nominated';
 
     switch (item.type) {
       case 'election':
@@ -175,6 +193,10 @@ class NotificationsBottomSheet extends ConsumerWidget {
         badgeColor = AppColors.errorRed;
         icon = Icons.cancel_outlined;
         break;
+      case 'candidate_nominated':
+        badgeColor = AppColors.errorRed;
+        icon = Icons.assignment_ind_outlined;
+        break;
       case 'proposal_pending':
       default:
         badgeColor = AppColors.warningAmber;
@@ -182,60 +204,155 @@ class NotificationsBottomSheet extends ConsumerWidget {
         break;
     }
 
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(AppRadius.card),
-        border: Border.all(color: AppColors.outlineVariant.withValues(alpha: 0.6)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.02),
-            blurRadius: 8,
-            offset: const Offset(0, 3),
+    return InkWell(
+      onTap: () {
+        if (isUrgent && !item.isDismissible && item.referenceId != null) {
+          Navigator.of(context).pop(); // Close modal
+          context.pushNamed('candidate-document-form', pathParameters: {'proposalId': item.referenceId!});
+        }
+      },
+      borderRadius: BorderRadius.circular(AppRadius.card),
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: isUrgent
+              ? const Color(0xFFFFF5F5)
+              : Colors.white,
+          borderRadius: BorderRadius.circular(AppRadius.card),
+          border: Border.all(
+            color: isUrgent
+                ? AppColors.errorRed.withValues(alpha: 0.3)
+                : AppColors.outlineVariant.withValues(alpha: 0.6),
+            width: isUrgent ? 1.5 : 1,
           ),
-        ],
-      ),
-      child: Row(
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.02),
+              blurRadius: 8,
+              offset: const Offset(0, 3),
+            ),
+          ],
+        ),
+        child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              color: badgeColor.withValues(alpha: 0.12),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Icon(icon, color: badgeColor, size: 24),
-          ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: badgeColor.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(icon, color: badgeColor, size: 24),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Expanded(
-                      child: Text(
-                        item.title,
-                        style: AppTypography.cardTitle.copyWith(fontSize: 15),
-                      ),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            item.title,
+                            style:
+                                AppTypography.cardTitle.copyWith(fontSize: 15),
+                          ),
+                        ),
+                        Text(
+                          _formatTimestamp(item.timestamp),
+                          style: AppTypography.caption.copyWith(
+                              color: AppColors.textSecondary, fontSize: 11),
+                        ),
+                      ],
                     ),
+                    const SizedBox(height: 6),
                     Text(
-                      _formatTimestamp(item.timestamp),
-                      style: AppTypography.caption.copyWith(color: AppColors.textSecondary, fontSize: 11),
+                      item.message,
+                      style: AppTypography.bodyMedium.copyWith(
+                          color: AppColors.textSecondary,
+                          height: 1.4,
+                          fontSize: 13),
                     ),
                   ],
                 ),
-                const SizedBox(height: 6),
-                Text(
-                  item.message,
-                  style: AppTypography.bodyMedium.copyWith(color: AppColors.textSecondary, height: 1.4, fontSize: 13),
-                ),
-              ],
-            ),
+              ),
+            ],
           ),
+
+          // Pesan wajib untuk notif kandidat yang belum dismiss
+          if (isUrgent) ...[
+            const SizedBox(height: 12),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                color: AppColors.errorRed.withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(
+                    color: AppColors.errorRed.withValues(alpha: 0.2)),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    item.isDismissible
+                        ? Icons.check_circle
+                        : Icons.lock_clock,
+                    size: 14,
+                    color: item.isDismissible
+                        ? AppColors.successTeal
+                        : AppColors.errorRed,
+                  ),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      item.isDismissible
+                          ? 'Berkas Anda sudah lengkap. Notifikasi ini dapat ditutup.'
+                          : 'Notifikasi ini tidak dapat ditutup sampai Anda melengkapi semua berkas kandidat.',
+                      style: AppTypography.caption.copyWith(
+                        color: item.isDismissible
+                            ? AppColors.successTeal
+                            : AppColors.errorRed,
+                        fontSize: 11,
+                        height: 1.3,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            if (item.isDismissible)
+              Padding(
+                padding: const EdgeInsets.only(top: 8),
+                child: Align(
+                  alignment: Alignment.centerRight,
+                  child: TextButton(
+                    onPressed: () {
+                      // Extract DB id dari prefix 'notif_'
+                      final dbId = item.id.replaceFirst('notif_', '');
+                      ref.read(dismissNotificationProvider(dbId));
+                      ref.invalidate(userNotificationsProvider);
+                    },
+                    style: TextButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 6),
+                      backgroundColor:
+                          AppColors.successTeal.withValues(alpha: 0.1),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8)),
+                    ),
+                    child: Text('Tutup Notifikasi',
+                        style: AppTypography.captionBold
+                            .copyWith(color: AppColors.successTeal)),
+                  ),
+                ),
+              ),
+          ],
         ],
       ),
+    ),
     );
   }
 
@@ -244,9 +361,9 @@ class NotificationsBottomSheet extends ConsumerWidget {
     final diff = now.difference(time);
 
     if (diff.inMinutes < 1) return 'Baru saja';
-    if (diff.inMinutes < 60) return '${diff.inMinutes}m lalu';
-    if (diff.inHours < 24) return '${diff.inHours}j lalu';
-    if (diff.inDays < 7) return '${diff.inDays}h lalu';
+    if (diff.inMinutes < 60) return '${diff.inMinutes} menit lalu';
+    if (diff.inHours < 24) return '${diff.inHours} jam lalu';
+    if (diff.inDays < 7) return '${diff.inDays} hari lalu';
     return '${time.day}/${time.month}/${time.year}';
   }
 }

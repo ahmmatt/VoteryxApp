@@ -1,56 +1,162 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:intl/intl.dart';
+
 import '../../../../../core/constants/app_colors.dart';
 import '../../../../../core/constants/app_spacing.dart';
 import '../../../../../core/constants/app_typography.dart';
 import '../../../../../core/constants/app_radius.dart';
-import '../../../../../features/user/election_proposal/presentation/screens/my_election_proposals_screen.dart';
+import '../../../../user/election_proposal/domain/entities/election_proposal.dart';
+import '../../../../user/election_proposal/presentation/providers/election_proposal_provider.dart';
 
-class ProposalCreateScreen extends StatefulWidget {
+class ProposalCreateScreen extends ConsumerStatefulWidget {
   const ProposalCreateScreen({super.key});
 
   @override
-  State<ProposalCreateScreen> createState() => _ProposalCreateScreenState();
+  ConsumerState<ProposalCreateScreen> createState() =>
+      _ProposalCreateScreenState();
 }
 
-class _ProposalCreateScreenState extends State<ProposalCreateScreen> {
+class _ProposalCreateScreenState extends ConsumerState<ProposalCreateScreen> {
   final PageController _pageController = PageController();
   int _currentStep = 0;
 
-  void _nextStep() {
-    if (_currentStep < 2) {
-      setState(() {
-        _currentStep++;
-      });
-      _pageController.animateToPage(
-        _currentStep,
-        duration: const Duration(milliseconds: 300),
-        curve: Curves.easeInOut,
-      );
-    }
-  }
+  // ── Step 1 Controllers ─────────────────────────────────────────────────────
+  final _titleCtrl = TextEditingController();
+  final _orgCtrl = TextEditingController();
+  final _purposeCtrl = TextEditingController();
+  final _votersCtrl = TextEditingController();
+  final _typeCtrl = TextEditingController();
+  DateTime? _startDate;
+  DateTime? _endDate;
+  bool _agreeCheck = false;
 
-  void _prevStep() {
-    if (_currentStep > 0) {
-      setState(() {
-        _currentStep--;
-      });
-      _pageController.animateToPage(
-        _currentStep,
-        duration: const Duration(milliseconds: 300),
-        curve: Curves.easeInOut,
-      );
-    }
-  }
+  // ── Step 1 form key ────────────────────────────────────────────────────────
+  final _step1FormKey = GlobalKey<FormState>();
+
+  // ── Step 2 Search ──────────────────────────────────────────────────────────
+  final _searchCtrl = TextEditingController();
+  bool _showSearchResults = false;
 
   @override
   void dispose() {
     _pageController.dispose();
+    _titleCtrl.dispose();
+    _orgCtrl.dispose();
+    _purposeCtrl.dispose();
+    _votersCtrl.dispose();
+    _typeCtrl.dispose();
+    _searchCtrl.dispose();
     super.dispose();
   }
 
+  // ─────────────────────────────────────────────────────────────────────────
+  // Navigation
+  // ─────────────────────────────────────────────────────────────────────────
+
+  bool _validateStep1() {
+    if (_titleCtrl.text.trim().isEmpty) {
+      _showError('Nama Pemilihan wajib diisi.');
+      return false;
+    }
+    if (_typeCtrl.text.trim().isEmpty) {
+      _showError('Jenis Pemilihan wajib diisi.');
+      return false;
+    }
+    if (_orgCtrl.text.trim().isEmpty) {
+      _showError('Lembaga / Organisasi wajib diisi.');
+      return false;
+    }
+    if (_purposeCtrl.text.trim().isEmpty) {
+      _showError('Tujuan Pengajuan wajib diisi.');
+      return false;
+    }
+    if (_startDate == null || _endDate == null) {
+      _showError('Periode usulan (Mulai & Selesai) wajib diisi.');
+      return false;
+    }
+    if (_endDate!.isBefore(_startDate!)) {
+      _showError('Tanggal Selesai harus setelah tanggal Mulai.');
+      return false;
+    }
+    return true;
+  }
+
+  void _showError(String msg) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(msg),
+        backgroundColor: AppColors.errorRed,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+      ),
+    );
+  }
+
+  void _goNext() {
+    if (_currentStep == 0) {
+      if (!_validateStep1()) return;
+      // Sync ke provider draft
+      ref.read(proposalDraftProvider.notifier)
+        ..setTitle(_titleCtrl.text.trim())
+        ..setElectionType(_typeCtrl.text.trim())
+        ..setOrganization(_orgCtrl.text.trim())
+        ..setPurpose(_purposeCtrl.text.trim())
+        ..setStartDate(_startDate!)
+        ..setEndDate(_endDate!);
+      if (_votersCtrl.text.trim().isNotEmpty) {
+        ref.read(proposalDraftProvider.notifier)
+            .setEstimatedVoters(int.tryParse(_votersCtrl.text.trim()) ?? 0);
+      }
+    } else if (_currentStep == 1) {
+      final candidates = ref.read(proposalDraftProvider).selectedCandidates;
+      if (candidates.length < 2) {
+        _showError('Minimal 2 kandidat harus ditambahkan.');
+        return;
+      }
+    }
+
+    if (_currentStep < 2) {
+      setState(() => _currentStep++);
+      _pageController.animateToPage(
+        _currentStep,
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeInOut,
+      );
+    }
+  }
+
+  void _goPrev() {
+    if (_currentStep > 0) {
+      setState(() => _currentStep--);
+      _pageController.animateToPage(
+        _currentStep,
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeInOut,
+      );
+    }
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Build
+  // ─────────────────────────────────────────────────────────────────────────
+
   @override
   Widget build(BuildContext context) {
+    // Listen submit state
+    ref.listen(proposalSubmitProvider, (prev, next) {
+      if (next.isSuccess) {
+        ref.read(proposalSubmitProvider.notifier).reset();
+        context.goNamed('proposal-status');
+      }
+      if (next.error != null) {
+        _showError(next.error!);
+        ref.read(proposalSubmitProvider.notifier).clearError();
+      }
+    });
+
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
@@ -59,9 +165,10 @@ class _ProposalCreateScreenState extends State<ProposalCreateScreen> {
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Colors.white),
-          onPressed: () => Navigator.of(context).pop(),
+          onPressed: () => context.pop(),
         ),
-        title: Text('Ajukan Pemilihan Baru', style: AppTypography.headerTitle.copyWith(color: Colors.white)),
+        title: Text('Ajukan Pemilihan Baru',
+            style: AppTypography.headerTitle.copyWith(color: Colors.white)),
       ),
       body: Column(
         children: [
@@ -69,7 +176,7 @@ class _ProposalCreateScreenState extends State<ProposalCreateScreen> {
           Expanded(
             child: PageView(
               controller: _pageController,
-              physics: const NeverScrollableScrollPhysics(), // Disable swipe
+              physics: const NeverScrollableScrollPhysics(),
               children: [
                 _buildStep1(),
                 _buildStep2(),
@@ -82,6 +189,10 @@ class _ProposalCreateScreenState extends State<ProposalCreateScreen> {
     );
   }
 
+  // ─────────────────────────────────────────────────────────────────────────
+  // Step Indicator
+  // ─────────────────────────────────────────────────────────────────────────
+
   Widget _buildStepIndicator() {
     return Container(
       color: Colors.transparent,
@@ -89,20 +200,19 @@ class _ProposalCreateScreenState extends State<ProposalCreateScreen> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          _buildStepCircle(0, isCompleted: _currentStep > 0),
+          _buildStepCircle(0),
           _buildStepLine(isActive: _currentStep >= 1),
-          _buildStepCircle(1, isCompleted: _currentStep > 1),
+          _buildStepCircle(1),
           _buildStepLine(isActive: _currentStep >= 2),
-          _buildStepCircle(2, isCompleted: false),
+          _buildStepCircle(2),
         ],
       ),
     );
   }
 
-  Widget _buildStepCircle(int stepIndex, {bool isCompleted = false}) {
-    final isActive = _currentStep == stepIndex;
-    final isPast = _currentStep > stepIndex;
-    
+  Widget _buildStepCircle(int index) {
+    final isActive = _currentStep == index;
+    final isPast = _currentStep > index;
     return Container(
       width: 32,
       height: 32,
@@ -115,12 +225,12 @@ class _ProposalCreateScreenState extends State<ProposalCreateScreen> {
         ),
       ),
       alignment: Alignment.center,
-      child: isCompleted
-          ? const Icon(Icons.check, color: Colors.white, size: 18)
+      child: isPast
+          ? const Icon(Icons.check, color: Colors.white, size: 16)
           : Text(
-              '${stepIndex + 1}',
+              '${index + 1}',
               style: AppTypography.captionBold.copyWith(
-                color: (isActive || isPast) ? Colors.white : AppColors.textSecondary,
+                color: isActive ? Colors.white : AppColors.textSecondary,
               ),
             ),
     );
@@ -128,242 +238,516 @@ class _ProposalCreateScreenState extends State<ProposalCreateScreen> {
 
   Widget _buildStepLine({required bool isActive}) {
     return Container(
-      width: 40,
-      height: 1.5,
+      width: 40, height: 1.5,
       margin: const EdgeInsets.symmetric(horizontal: 8),
       color: isActive ? AppColors.goldDark : AppColors.outlineVariant,
     );
   }
 
-  // ── Step 1: Info Dasar ──────────────────────────────────────────────────────
+  // ─────────────────────────────────────────────────────────────────────────
+  // STEP 1: Info Dasar
+  // ─────────────────────────────────────────────────────────────────────────
+
   Widget _buildStep1() {
     return SingleChildScrollView(
       padding: const EdgeInsets.symmetric(horizontal: AppSpacing.pagePad),
       physics: const ClampingScrollPhysics(),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
-          Text('P1 — Info Dasar', style: AppTypography.displayHeading.copyWith(fontSize: 24)),
-          const SizedBox(height: 8),
-          Text(
-            'Ajukan pemilihan untuk organisasi atau jabatan kamu. Admin akan melakukan review sebelum pemilihan dijalankan.',
-            textAlign: TextAlign.center,
-            style: AppTypography.bodyText.copyWith(color: AppColors.textSecondary),
-          ),
-          const SizedBox(height: AppSpacing.xxl),
-          
-          // Form Container
-          Container(
-            padding: const EdgeInsets.all(AppSpacing.lg),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(16),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.02),
-                  blurRadius: 10,
-                  offset: const Offset(0, 4),
-                ),
-              ],
+      child: Form(
+        key: _step1FormKey,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            Text('P1 — Info Dasar',
+                style: AppTypography.displayHeading.copyWith(fontSize: 24)),
+            const SizedBox(height: 8),
+            Text(
+              'Lengkapi semua kolom di bawah ini. Semua kolom wajib diisi sebelum lanjut ke tahap berikutnya.',
+              textAlign: TextAlign.center,
+              style: AppTypography.bodyText.copyWith(color: AppColors.textSecondary),
             ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _buildInputField(
-                  label: 'Nama Pemilihan',
-                  hint: 'Contoh: Pemilihan Ketua HIMA TI 2026',
-                  suffixIcon: Icons.edit_outlined,
-                ),
-                const SizedBox(height: AppSpacing.lg),
-                _buildInputField(
-                  label: 'Jenis Pemilihan',
-                  hint: 'Ketua Organisasi Mahasiswa',
-                  suffixIcon: Icons.keyboard_arrow_down,
-                ),
-                const SizedBox(height: AppSpacing.lg),
-                _buildInputField(
-                  label: 'LEMBAGA / ORGANISASI PENGUSUL',
-                  hint: 'HIMA Teknik Informatika',
-                  suffixIcon: Icons.edit_outlined,
-                  helperText: 'Berdasarkan jabatan kamu sebagai Ketua HIMA',
-                ),
-                const SizedBox(height: AppSpacing.lg),
-                _buildTextAreaField(
-                  label: 'Tujuan Pengajuan',
-                  hint: 'Jelaskan tujuan pemilihan ini...',
-                  counterText: '0/300',
-                ),
-                const SizedBox(height: AppSpacing.lg),
-                Text('Periode Diusulkan', style: AppTypography.captionBold),
-                const SizedBox(height: AppSpacing.xs),
-                _buildDateField(hint: 'mm/dd/yyyy', suffixText: 'MULAI'),
-                const SizedBox(height: AppSpacing.sm),
-                _buildDateField(hint: 'mm/dd/yyyy', suffixText: 'SELESAI'),
-                const SizedBox(height: AppSpacing.lg),
-                Text('Estimasi Jumlah Pemilih', style: AppTypography.captionBold),
-                const SizedBox(height: AppSpacing.xs),
-                Container(
-                  decoration: BoxDecoration(
-                    border: Border.all(color: AppColors.outlineVariant),
-                    borderRadius: BorderRadius.circular(AppRadius.input),
+            const SizedBox(height: AppSpacing.xxl),
+
+            // Form Container
+            Container(
+              padding: const EdgeInsets.all(AppSpacing.lg),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(16),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.03),
+                    blurRadius: 10,
+                    offset: const Offset(0, 4),
                   ),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: TextFormField(
-                          decoration: InputDecoration(
-                            hintText: 'Contoh: 1200',
-                            hintStyle: AppTypography.bodyText.copyWith(color: AppColors.outline),
-                            border: InputBorder.none,
-                            enabledBorder: InputBorder.none,
-                            focusedBorder: InputBorder.none,
-                            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                ],
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Nama Pemilihan
+                  _label('Nama Pemilihan *'),
+                  const SizedBox(height: 6),
+                  _textField(
+                    controller: _titleCtrl,
+                    hint: 'Contoh: Pemilihan Ketua HIMA TI 2026',
+                    suffixIcon: Icons.edit_outlined,
+                  ),
+                  const SizedBox(height: AppSpacing.lg),
+
+                  // Jenis Pemilihan
+                  _label('Jenis Pemilihan *'),
+                  const SizedBox(height: 6),
+                  _textField(
+                    controller: _typeCtrl,
+                    hint: 'Contoh: Pemilihan Umum, BEM, RT/RW, dll',
+                  ),
+                  const SizedBox(height: AppSpacing.lg),
+
+                  // Organisasi
+                  _label('Lembaga / Organisasi Pengusul *'),
+                  const SizedBox(height: 6),
+                  _textField(
+                    controller: _orgCtrl,
+                    hint: 'Contoh: KPU, HIMA, Kelurahan, dll',
+                  ),
+                  const SizedBox(height: AppSpacing.lg),
+
+                  // Tujuan
+                  _label('Tujuan Pengajuan *'),
+                  const SizedBox(height: 6),
+                  _textAreaField(
+                    controller: _purposeCtrl,
+                    hint: 'Jelaskan tujuan pemilihan ini secara singkat...',
+                    maxLength: 300,
+                  ),
+                  const SizedBox(height: AppSpacing.lg),
+
+                  // Periode
+                  _label('Periode Diusulkan *'),
+                  const SizedBox(height: 6),
+                  _datePicker(
+                    label: 'MULAI',
+                    value: _startDate,
+                    onPick: (d) => setState(() => _startDate = d),
+                  ),
+                  const SizedBox(height: AppSpacing.sm),
+                  _datePicker(
+                    label: 'SELESAI',
+                    value: _endDate,
+                    onPick: (d) => setState(() => _endDate = d),
+                  ),
+                  const SizedBox(height: AppSpacing.lg),
+
+                  // Estimasi Pemilih (Opsional)
+                  _label('Estimasi Jumlah Pemilih (Opsional)'),
+                  const SizedBox(height: 6),
+                  Container(
+                    decoration: BoxDecoration(
+                      border: Border.all(color: AppColors.outlineVariant),
+                      borderRadius: BorderRadius.circular(AppRadius.input),
+                    ),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        Expanded(
+                          child: TextField(
+                            controller: _votersCtrl,
+                            keyboardType: TextInputType.number,
+                            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                            decoration: InputDecoration(
+                              hintText: 'Contoh: 1200',
+                              hintStyle: AppTypography.bodyText.copyWith(color: AppColors.outline),
+                              border: InputBorder.none,
+                              enabledBorder: InputBorder.none,
+                              focusedBorder: InputBorder.none,
+                              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                            ),
                           ),
                         ),
-                      ),
-                      Padding(
-                        padding: const EdgeInsets.only(right: 16),
-                        child: Text('orang', style: AppTypography.bodyMedium.copyWith(fontWeight: FontWeight.w600)),
-                      ),
-                    ],
+                        Padding(
+                          padding: const EdgeInsets.only(right: 16),
+                          child: Text('orang',
+                              style: AppTypography.bodyMedium.copyWith(fontWeight: FontWeight.w600)),
+                        ),
+                      ],
+                    ),
                   ),
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  'Estimasi ini membantu server mengalokasikan beban pemilihan.',
-                  style: AppTypography.caption.copyWith(color: AppColors.textSecondary, fontSize: 10),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
-          
-          const SizedBox(height: AppSpacing.xxl),
-          _buildPrimaryButton(
-            text: 'Lanjut: Tambah Kandidat',
-            icon: Icons.arrow_forward,
-            onTap: _nextStep,
-          ),
-          const SizedBox(height: AppSpacing.xxl),
-        ],
+
+            const SizedBox(height: AppSpacing.xxl),
+            _primaryButton(label: 'Lanjut: Tambah Kandidat', onTap: _goNext),
+            const SizedBox(height: AppSpacing.xxl),
+          ],
+        ),
       ),
     );
   }
 
-  // ── Step 2: Daftar Kandidat ──────────────────────────────────────────────────
+  Widget _label(String text) => Text(text, style: AppTypography.captionBold);
+
+  Widget _textField({
+    required TextEditingController controller,
+    required String hint,
+    IconData? suffixIcon,
+  }) {
+    return Container(
+      decoration: BoxDecoration(
+        border: Border.all(color: AppColors.outlineVariant),
+        borderRadius: BorderRadius.circular(AppRadius.input),
+      ),
+      child: TextField(
+        controller: controller,
+        decoration: InputDecoration(
+          hintText: hint,
+          hintStyle: AppTypography.bodyText.copyWith(color: AppColors.outline),
+          border: InputBorder.none,
+          enabledBorder: InputBorder.none,
+          focusedBorder: InputBorder.none,
+          contentPadding:
+              const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          suffixIcon: suffixIcon != null
+              ? Icon(suffixIcon, color: AppColors.outline, size: 18)
+              : null,
+        ),
+      ),
+    );
+  }
+
+  Widget _textAreaField({
+    required TextEditingController controller,
+    required String hint,
+    int maxLength = 300,
+  }) {
+    return Container(
+      decoration: BoxDecoration(
+        border: Border.all(color: AppColors.outlineVariant),
+        borderRadius: BorderRadius.circular(AppRadius.input),
+      ),
+      child: TextField(
+        controller: controller,
+        maxLines: 4,
+        maxLength: maxLength,
+        decoration: InputDecoration(
+          hintText: hint,
+          hintStyle: AppTypography.bodyText.copyWith(color: AppColors.outline),
+          border: InputBorder.none,
+          enabledBorder: InputBorder.none,
+          focusedBorder: InputBorder.none,
+          contentPadding: const EdgeInsets.all(16),
+        ),
+      ),
+    );
+  }
+
+  Widget _datePicker({
+    required String label,
+    required DateTime? value,
+    required ValueChanged<DateTime> onPick,
+  }) {
+    final fmt = DateFormat('dd MMM yyyy');
+    return GestureDetector(
+      onTap: () async {
+        final picked = await showDatePicker(
+          context: context,
+          initialDate: value ?? DateTime.now(),
+          firstDate: DateTime.now(),
+          lastDate: DateTime.now().add(const Duration(days: 365 * 5)),
+        );
+        if (picked != null) onPick(picked);
+      },
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        decoration: BoxDecoration(
+          border: Border.all(
+            color: value != null ? AppColors.primary800 : AppColors.outlineVariant,
+          ),
+          borderRadius: BorderRadius.circular(AppRadius.input),
+        ),
+        child: Row(
+          children: [
+            Icon(Icons.calendar_today_outlined,
+                size: 16,
+                color: value != null ? AppColors.primary800 : AppColors.outline),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                value != null ? fmt.format(value) : 'Pilih tanggal...',
+                style: AppTypography.bodyText.copyWith(
+                  color: value != null ? AppColors.textPrimary : AppColors.outline,
+                ),
+              ),
+            ),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+              decoration: BoxDecoration(
+                color: AppColors.primary800.withOpacity(0.08),
+                borderRadius: BorderRadius.circular(4),
+              ),
+              child: Text(label,
+                  style: AppTypography.captionBold
+                      .copyWith(color: AppColors.primary800, fontSize: 9)),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // STEP 2: Kandidat — Search from Database
+  // ─────────────────────────────────────────────────────────────────────────
+
   Widget _buildStep2() {
+    final draft = ref.watch(proposalDraftProvider);
+    final selectedCandidates = draft.selectedCandidates;
+    final searchResults = ref.watch(candidateSearchResultsProvider);
+
     return SingleChildScrollView(
       padding: const EdgeInsets.symmetric(horizontal: AppSpacing.pagePad),
       physics: const ClampingScrollPhysics(),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Daftar Kandidat', style: AppTypography.displayHeading.copyWith(fontSize: 24)),
+          Text('Daftar Kandidat',
+              style: AppTypography.displayHeading.copyWith(fontSize: 24)),
           const SizedBox(height: 8),
           Text(
-            'Masukkan nama dan NIM calon kandidat. Mereka akan menerima notifikasi untuk melengkapi profil setelah usulan disetujui.',
-            style: AppTypography.bodyText.copyWith(color: AppColors.textSecondary),
+            'Cari dan tambahkan kandidat berdasarkan nama atau NIM. Kandidat yang diajukan akan menerima notifikasi wajib melengkapi berkas.',
+            style: AppTypography.bodyText.copyWith(color: AppColors.textSecondary, height: 1.4),
           ),
           const SizedBox(height: AppSpacing.lg),
-          
+
           // Info Box
           Container(
             padding: const EdgeInsets.all(AppSpacing.md),
             decoration: BoxDecoration(
-              color: const Color(0xFFE2E6F0),
+              color: AppColors.navy600.withOpacity(0.08),
               borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: AppColors.navy600.withOpacity(0.2)),
             ),
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Icon(Icons.info, color: AppColors.primary800, size: 20),
-                const SizedBox(width: AppSpacing.sm),
+                const Icon(Icons.info_outline, color: AppColors.primary800, size: 20),
+                const SizedBox(width: 10),
                 Expanded(
                   child: Text(
-                    'Sistem pemilihan memerlukan minimal 2 kandidat terverifikasi untuk melanjutkan ke tahap peninjauan.',
-                    style: AppTypography.bodyMedium.copyWith(fontWeight: FontWeight.w500, color: AppColors.primary800),
+                    'Minimal 2 kandidat wajib ditambahkan. Notifikasi akan dikirim kepada setiap kandidat untuk melengkapi berkas mereka.',
+                    style: AppTypography.bodyMedium.copyWith(
+                        color: AppColors.primary800, fontWeight: FontWeight.w600),
                   ),
                 ),
               ],
             ),
           ),
           const SizedBox(height: AppSpacing.xl),
-          
-          // Candidate Cards
-          _buildCandidateFormCard(
-            title: 'KANDIDAT 1',
-            nameVal: 'Arjuna Pratama',
-            nimVal: '2021001234',
-            status: 'NIM terverifikasi',
-            isVerified: true,
-            isError: false,
-          ),
-          const SizedBox(height: AppSpacing.md),
-          _buildCandidateFormCard(
-            title: 'KANDIDAT 2',
-            nameVal: 'Joko Susilo',
-            nimVal: '2019998877',
-            status: 'NIM tidak ditemukan',
-            isVerified: false,
-            isError: true,
-          ),
-          const SizedBox(height: AppSpacing.md),
-          _buildCandidateFormCard(
-            title: 'KANDIDAT 3',
-            nameVal: '',
-            nimVal: '',
-            isDashed: true,
-          ),
-          const SizedBox(height: AppSpacing.md),
-          
-          // Tambah Kandidat Lain Button
+
+          // ── Search Bar ────────────────────────────────────────────────
           Container(
-            width: double.infinity,
-            padding: const EdgeInsets.symmetric(vertical: 16),
             decoration: BoxDecoration(
-              color: const Color(0xFFE6EFFF),
-              borderRadius: BorderRadius.circular(8),
-              // We should use dashed border, but using a solid border for simplicity
-              border: Border.all(color: const Color(0xFFB5C9F0)), 
-            ),
-            alignment: Alignment.center,
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const Icon(Icons.add_circle_outline, color: AppColors.primary800, size: 20),
-                const SizedBox(width: 8),
-                Text('Tambah Kandidat Lain', style: AppTypography.bodyMedium.copyWith(fontWeight: FontWeight.w700, color: AppColors.primary800)),
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: AppColors.outlineVariant),
+              boxShadow: [
+                BoxShadow(
+                    color: Colors.black.withOpacity(0.04),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2))
               ],
             ),
+            child: TextField(
+              controller: _searchCtrl,
+              onChanged: (v) {
+                ref.read(candidateSearchQueryProvider.notifier).state = v;
+                setState(() => _showSearchResults = v.trim().length >= 2);
+              },
+              style: AppTypography.bodyText.copyWith(color: AppColors.textPrimary),
+              decoration: InputDecoration(
+                hintText: 'Cari berdasarkan nama atau NIM...',
+                hintStyle: AppTypography.bodyText.copyWith(color: AppColors.textSecondary),
+                prefixIcon: const Icon(Icons.search, color: AppColors.primary800, size: 22),
+                suffixIcon: _searchCtrl.text.isNotEmpty
+                    ? IconButton(
+                        icon: const Icon(Icons.clear, size: 18, color: AppColors.textSecondary),
+                        onPressed: () {
+                          _searchCtrl.clear();
+                          ref.read(candidateSearchQueryProvider.notifier).state = '';
+                          setState(() => _showSearchResults = false);
+                        },
+                      )
+                    : null,
+                border: InputBorder.none,
+                contentPadding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              ),
+            ),
           ),
+          const SizedBox(height: AppSpacing.sm),
+
+          // ── Search Results ────────────────────────────────────────────
+          if (_showSearchResults)
+            Container(
+              constraints: const BoxConstraints(maxHeight: 250),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: AppColors.outlineVariant),
+                boxShadow: [
+                  BoxShadow(
+                      color: Colors.black.withOpacity(0.08),
+                      blurRadius: 12,
+                      offset: const Offset(0, 4))
+                ],
+              ),
+              child: searchResults.when(
+                data: (results) {
+                  if (results.isEmpty) {
+                    return Padding(
+                      padding: const EdgeInsets.all(AppSpacing.lg),
+                      child: Row(
+                        children: [
+                          Icon(Icons.person_search,
+                              color: AppColors.textSecondary.withOpacity(0.5), size: 20),
+                          const SizedBox(width: 12),
+                          Text('User tidak ditemukan.',
+                              style: AppTypography.bodyText
+                                  .copyWith(color: AppColors.textSecondary)),
+                        ],
+                      ),
+                    );
+                  }
+                  return ListView.separated(
+                    shrinkWrap: true,
+                    padding: const EdgeInsets.symmetric(vertical: 4),
+                    itemCount: results.length,
+                    separatorBuilder: (_, __) =>
+                        const Divider(height: 1, color: AppColors.outlineVariant),
+                    itemBuilder: (context, i) {
+                      final c = results[i];
+                      final isAdded = selectedCandidates.any((s) => s.userId == c.userId);
+                      return ListTile(
+                        leading: CircleAvatar(
+                          radius: 18,
+                          backgroundColor: AppColors.primary800.withOpacity(0.1),
+                          child: Text(
+                            c.fullName.isNotEmpty ? c.fullName[0].toUpperCase() : '?',
+                            style: AppTypography.captionBold
+                                .copyWith(color: AppColors.primary800),
+                          ),
+                        ),
+                        title: Text(c.fullName,
+                            style: AppTypography.itemTitle.copyWith(fontSize: 14)),
+                        subtitle: Text(
+                          [
+                            if (c.nikOrNim != null) 'NIM: ${c.nikOrNim}',
+                            if (c.faculty != null) c.faculty!,
+                          ].join(' • '),
+                          style: AppTypography.caption
+                              .copyWith(color: AppColors.textSecondary),
+                        ),
+                        trailing: isAdded
+                            ? const Icon(Icons.check_circle,
+                                color: AppColors.successTeal, size: 22)
+                            : IconButton(
+                                icon: const Icon(Icons.add_circle_outline,
+                                    color: AppColors.primary800, size: 24),
+                                onPressed: () {
+                                  ref
+                                      .read(proposalDraftProvider.notifier)
+                                      .addCandidate(c);
+                                  _searchCtrl.clear();
+                                  ref.read(candidateSearchQueryProvider.notifier).state = '';
+                                  setState(() => _showSearchResults = false);
+                                },
+                              ),
+                        onTap: isAdded
+                            ? null
+                            : () {
+                                ref.read(proposalDraftProvider.notifier).addCandidate(c);
+                                _searchCtrl.clear();
+                                ref.read(candidateSearchQueryProvider.notifier).state = '';
+                                setState(() => _showSearchResults = false);
+                              },
+                      );
+                    },
+                  );
+                },
+                loading: () => const Padding(
+                  padding: EdgeInsets.all(AppSpacing.lg),
+                  child: Center(
+                      child: CircularProgressIndicator(
+                          color: AppColors.goldMid, strokeWidth: 2)),
+                ),
+                error: (e, _) => Padding(
+                  padding: const EdgeInsets.all(AppSpacing.lg),
+                  child: Text('Gagal mencari: $e',
+                      style: AppTypography.caption
+                          .copyWith(color: AppColors.errorRed)),
+                ),
+              ),
+            ),
+
+          const SizedBox(height: AppSpacing.xl),
+
+          // ── Kandidat Terpilih ─────────────────────────────────────────
+          if (selectedCandidates.isNotEmpty) ...[
+            Row(
+              children: [
+                Text('Kandidat Dipilih',
+                    style: AppTypography.captionBold
+                        .copyWith(color: AppColors.textSecondary)),
+                const SizedBox(width: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: AppColors.primary800,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text('${selectedCandidates.length}',
+                      style: AppTypography.captionBold
+                          .copyWith(color: Colors.white, fontSize: 11)),
+                ),
+              ],
+            ),
+            const SizedBox(height: AppSpacing.md),
+            ...selectedCandidates.asMap().entries.map((e) => Padding(
+                  padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+                  child: _selectedCandidateCard(e.value, e.key + 1),
+                )),
+          ] else
+            _emptyState(),
+
           const SizedBox(height: AppSpacing.xxl),
-          
-          // Bottom Actions
+
+          // ── Nav Buttons ───────────────────────────────────────────────
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               TextButton.icon(
-                onPressed: _prevStep,
+                onPressed: _goPrev,
                 icon: const Icon(Icons.arrow_back, color: AppColors.primary800, size: 18),
-                label: Text('Kembali', style: AppTypography.bodyMedium.copyWith(fontWeight: FontWeight.w700, color: AppColors.primary800)),
+                label: Text('Kembali',
+                    style: AppTypography.bodyMedium
+                        .copyWith(fontWeight: FontWeight.w700, color: AppColors.primary800)),
               ),
-              InkWell(
-                onTap: _nextStep,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
-                  decoration: BoxDecoration(
-                    color: AppColors.goldDark,
-                    borderRadius: BorderRadius.circular(8),
-                    gradient: const LinearGradient(
-                      colors: [Color(0xFFD4A030), Color(0xFFB38622)],
-                    ),
-                  ),
-                  child: Row(
-                    children: [
-                      Text('Lanjut: Review', style: AppTypography.bodyMedium.copyWith(color: Colors.white, fontWeight: FontWeight.w600)),
-                      const SizedBox(width: 8),
-                      const Icon(Icons.arrow_forward, color: Colors.white, size: 18),
-                    ],
-                  ),
+              ElevatedButton.icon(
+                onPressed: _goNext,
+                icon: const Icon(Icons.arrow_forward, size: 18),
+                label: Text(
+                  'Lanjut: Review${selectedCandidates.length >= 2 ? " (${selectedCandidates.length})" : ""}',
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: selectedCandidates.length >= 2
+                      ? AppColors.goldDark
+                      : AppColors.outlineVariant,
+                  foregroundColor: selectedCandidates.length >= 2
+                      ? Colors.white
+                      : AppColors.textSecondary,
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(AppRadius.button)),
                 ),
               ),
             ],
@@ -374,184 +758,290 @@ class _ProposalCreateScreenState extends State<ProposalCreateScreen> {
     );
   }
 
-  // ── Step 3: Review ──────────────────────────────────────────────────────────
+  Widget _selectedCandidateCard(ProposalCandidate c, int index) {
+    return Container(
+      padding: const EdgeInsets.all(AppSpacing.md),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(AppRadius.card),
+        border: Border.all(color: AppColors.outlineVariant),
+        boxShadow: [
+          BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 6, offset: const Offset(0, 2))
+        ],
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 36, height: 36,
+            decoration: const BoxDecoration(color: AppColors.primary800, shape: BoxShape.circle),
+            child: Center(
+              child: Text('$index',
+                  style: AppTypography.captionBold.copyWith(color: Colors.white, fontSize: 13)),
+            ),
+          ),
+          const SizedBox(width: AppSpacing.md),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(c.fullName, style: AppTypography.itemTitle),
+                if (c.nikOrNim != null || c.faculty != null)
+                  Text(
+                    [
+                      if (c.nikOrNim != null) 'NIM: ${c.nikOrNim}',
+                      if (c.faculty != null) c.faculty!,
+                    ].join(' • '),
+                    style: AppTypography.caption.copyWith(color: AppColors.textSecondary),
+                  ),
+              ],
+            ),
+          ),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+            decoration: BoxDecoration(
+              color: const Color(0xFFFFF3CD),
+              borderRadius: BorderRadius.circular(6),
+            ),
+            child: Row(mainAxisSize: MainAxisSize.min, children: [
+              const Icon(Icons.notifications_active_outlined, size: 10, color: Color(0xFF856404)),
+              const SizedBox(width: 3),
+              Text('Dinotif', style: AppTypography.captionBold.copyWith(fontSize: 9, color: const Color(0xFF856404))),
+            ]),
+          ),
+          const SizedBox(width: 6),
+          IconButton(
+            icon: const Icon(Icons.delete_outline, color: AppColors.errorRed, size: 20),
+            onPressed: () => ref.read(proposalDraftProvider.notifier).removeCandidate(c.userId),
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _emptyState() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(AppSpacing.xxl),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(AppRadius.card),
+        border: Border.all(color: AppColors.outlineVariant),
+      ),
+      child: Column(
+        children: [
+          Icon(Icons.person_search, size: 48, color: AppColors.textSecondary.withOpacity(0.4)),
+          const SizedBox(height: 12),
+          Text('Belum ada kandidat',
+              style: AppTypography.captionBold.copyWith(color: AppColors.textSecondary)),
+          const SizedBox(height: 4),
+          Text(
+            'Ketikkan nama atau NIM di kolom pencarian untuk menemukan dan menambahkan kandidat.',
+            textAlign: TextAlign.center,
+            style: AppTypography.caption.copyWith(color: AppColors.textSecondary, height: 1.4),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // STEP 3: Review & Submit
+  // ─────────────────────────────────────────────────────────────────────────
+
   Widget _buildStep3() {
+    final draft = ref.watch(proposalDraftProvider);
+    final submitState = ref.watch(proposalSubmitProvider);
+    final fmt = DateFormat('d MMM yyyy');
+
     return SingleChildScrollView(
       padding: const EdgeInsets.symmetric(horizontal: AppSpacing.pagePad),
       physics: const ClampingScrollPhysics(),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Ringkasan Proposal Card
+          Text('Review & Kirim',
+              style: AppTypography.displayHeading.copyWith(fontSize: 24)),
+          const SizedBox(height: 8),
+          Text('Periksa kembali data usulan pemilihan sebelum dikirimkan ke admin.',
+              style: AppTypography.bodyText.copyWith(color: AppColors.textSecondary)),
+          const SizedBox(height: AppSpacing.xl),
+
+          // Ringkasan Proposal
           Container(
             padding: const EdgeInsets.all(AppSpacing.lg),
             decoration: BoxDecoration(
-              color: const Color(0xFFF0EFEA), // Light beige
+              color: const Color(0xFFF8F6F0),
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: AppColors.outlineVariant.withOpacity(0.5)),
+              border: Border.all(color: AppColors.outlineVariant),
             ),
-            child: Stack(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Positioned(
-                  right: 0,
-                  top: 0,
-                  child: Icon(Icons.verified_user_outlined, size: 60, color: AppColors.goldMid.withOpacity(0.1)),
-                ),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('Ringkasan Proposal', style: AppTypography.screenTitle.copyWith(fontSize: 18)),
-                    const SizedBox(height: AppSpacing.lg),
-                    _buildSummaryItem('Nama Pemilihan', 'Pemilihan Ketua Dewan Perwakilan Rakyat 2024'),
-                    const SizedBox(height: AppSpacing.sm),
-                    _buildSummaryItem('Jenis', 'Pemilihan Umum Tertutup'),
-                    const SizedBox(height: AppSpacing.sm),
-                    _buildSummaryItemWithBadge('Pengusul', 'Sekretariat Negara', 'VERIFIED'),
-                    const SizedBox(height: AppSpacing.sm),
-                    _buildSummaryItem('Periode', '12 Okt - 15 Okt 2024'),
-                    const SizedBox(height: AppSpacing.sm),
-                    _buildSummaryItem('Estimasi Pemilih', '2,450 Anggota Terdaftar'),
-                    const SizedBox(height: AppSpacing.sm),
-                    _buildSummaryItem('Tujuan', 'Rotasi Kepemimpinan Legislatif'),
-                  ],
-                ),
+                Row(children: [
+                  const Icon(Icons.description_outlined, color: AppColors.primary800, size: 18),
+                  const SizedBox(width: 8),
+                  Text('Ringkasan Proposal', style: AppTypography.cardTitle),
+                ]),
+                const Divider(height: 20),
+                _summaryRow('Nama Pemilihan', draft.title),
+                _summaryRow('Jenis', draft.electionType),
+                _summaryRow('Organisasi', draft.organization),
+                _summaryRow('Tujuan', draft.purpose, maxLines: 3),
+                if (draft.proposedStartDate != null && draft.proposedEndDate != null)
+                  _summaryRow('Periode',
+                      '${fmt.format(draft.proposedStartDate!)} — ${fmt.format(draft.proposedEndDate!)}'),
+                if (draft.estimatedVoters != null && draft.estimatedVoters! > 0)
+                  _summaryRow('Est. Pemilih', '${draft.estimatedVoters} orang'),
               ],
             ),
           ),
           const SizedBox(height: AppSpacing.md),
-          
-          // Daftar Kandidat Card
+
+          // Daftar Kandidat
           Container(
             padding: const EdgeInsets.all(AppSpacing.lg),
             decoration: BoxDecoration(
               color: Colors.white,
               borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: AppColors.outlineVariant),
             ),
             child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text('Daftar\nKandidat', style: AppTypography.screenTitle.copyWith(fontSize: 18)),
+                    Row(children: [
+                      const Icon(Icons.people_outline, color: AppColors.primary800, size: 18),
+                      const SizedBox(width: 8),
+                      Text('Kandidat', style: AppTypography.cardTitle),
+                    ]),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                       decoration: BoxDecoration(
-                        color: const Color(0xFFE5E7EB),
-                        borderRadius: BorderRadius.circular(16),
+                        color: AppColors.primary800,
+                        borderRadius: BorderRadius.circular(12),
                       ),
-                      child: Text('3 Kandidat\nTerdaftar', textAlign: TextAlign.right, style: AppTypography.caption.copyWith(fontSize: 10, color: AppColors.textSecondary)),
+                      child: Text('${draft.selectedCandidates.length} orang',
+                          style: AppTypography.captionBold.copyWith(color: Colors.white, fontSize: 11)),
                     ),
                   ],
                 ),
-                const SizedBox(height: AppSpacing.lg),
-                _buildCandidateSummaryItem('AP', 'Arjuna Pratama', 'NIP: 198804012012011002 • Fraksi G-A'),
-                const SizedBox(height: AppSpacing.md),
-                _buildCandidateSummaryItem('SB', 'Siti Bahari', 'NIP: 199102142015032001 • Fraksi G-B'),
-                const SizedBox(height: AppSpacing.md),
-                _buildCandidateSummaryItem('DR', 'Dodi Rustandi', 'NIP: 198505222010011005 • Fraksi G-C'),
+                const Divider(height: 20),
+                ...draft.selectedCandidates.asMap().entries.map((e) => Padding(
+                      padding: const EdgeInsets.only(bottom: 10),
+                      child: Row(
+                        children: [
+                          CircleAvatar(
+                            radius: 14,
+                            backgroundColor: AppColors.primary800.withOpacity(0.1),
+                            child: Text(
+                              '${e.key + 1}',
+                              style: AppTypography.captionBold
+                                  .copyWith(color: AppColors.primary800, fontSize: 11),
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(e.value.fullName, style: AppTypography.itemTitle),
+                                if (e.value.nikOrNim != null)
+                                  Text('NIM: ${e.value.nikOrNim}',
+                                      style: AppTypography.caption
+                                          .copyWith(color: AppColors.textSecondary)),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    )),
               ],
             ),
           ),
           const SizedBox(height: AppSpacing.md),
-          
-          // Informasi Proses Box
+
+          // Info Box
           Container(
             padding: const EdgeInsets.all(AppSpacing.md),
             decoration: BoxDecoration(
-              color: const Color(0xFFFFE0B2), // Light orange
+              color: const Color(0xFFFFE0B2),
               borderRadius: BorderRadius.circular(8),
             ),
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const Icon(Icons.access_time_filled, color: Color(0xFF8D6E63), size: 20),
-                const SizedBox(width: AppSpacing.sm),
+                const SizedBox(width: 10),
                 Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text('Informasi Proses', style: AppTypography.captionBold.copyWith(color: const Color(0xFF4E342E))),
-                      const SizedBox(height: 2),
-                      Text(
-                        'Proposal Anda akan melalui tahap verifikasi teknis oleh tim pusat dalam waktu estimasi 1-2 hari kerja.',
-                        style: AppTypography.caption.copyWith(color: const Color(0xFF4E342E)),
-                      ),
-                    ],
+                  child: Text(
+                    'Proposal Anda akan melalui tahap verifikasi teknis oleh tim admin dalam waktu 1-2 hari kerja. Kandidat juga akan segera mendapatkan notifikasi.',
+                    style: AppTypography.caption.copyWith(color: const Color(0xFF4E342E), height: 1.4),
                   ),
                 ),
               ],
             ),
           ),
-          const SizedBox(height: AppSpacing.md),
-          
-          // Bottom Container
-          Container(
-            padding: const EdgeInsets.all(AppSpacing.lg),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Column(
-              children: [
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    SizedBox(
-                      width: 24,
-                      height: 24,
-                      child: Checkbox(
-                        value: false,
-                        onChanged: (val) {},
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        'Saya menyatakan bahwa data yang diberikan benar dan telah disetujui oleh pimpinan lembaga berwenang sesuai regulasi yang berlaku.',
-                        style: AppTypography.caption.copyWith(color: AppColors.textSecondary),
-                      ),
-                    ),
-                  ],
+          const SizedBox(height: AppSpacing.lg),
+
+          // Persetujuan
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Checkbox(
+                value: _agreeCheck,
+                onChanged: (v) => setState(() => _agreeCheck = v ?? false),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+                activeColor: AppColors.primary800,
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: GestureDetector(
+                  onTap: () => setState(() => _agreeCheck = !_agreeCheck),
+                  child: Text(
+                    'Saya menyatakan bahwa data yang diberikan adalah benar dan telah disetujui oleh pimpinan lembaga yang berwenang.',
+                    style: AppTypography.caption.copyWith(color: AppColors.textSecondary, height: 1.4),
+                  ),
                 ),
-                const SizedBox(height: AppSpacing.lg),
-                _buildPrimaryButton(
-                  text: 'Kirim Usulan',
-                  icon: Icons.send,
-                  onTap: () {
-                    context.goNamed('proposal-status');
-                  },
-                ),
-                const SizedBox(height: AppSpacing.md),
-                TextButton.icon(
-                  onPressed: _prevStep,
-                  icon: const Icon(Icons.arrow_back, color: AppColors.primary800, size: 14),
-                  label: Text('Edit', style: AppTypography.bodyMedium.copyWith(fontWeight: FontWeight.w600, color: AppColors.primary800)),
-                ),
-                const Divider(height: 32),
-                Row(
-                  children: [
-                    Container(width: 6, height: 6, decoration: const BoxDecoration(color: Color(0xFF34C759), shape: BoxShape.circle)),
-                    const SizedBox(width: 6),
-                    Text('Sistem Siap Mengirim', style: AppTypography.captionBold.copyWith(fontSize: 10, color: AppColors.textSecondary)),
-                  ],
-                ),
-              ],
+              ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.xl),
+
+          // Submit Button
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              onPressed: (_agreeCheck && !submitState.isLoading)
+                  ? () => ref.read(proposalSubmitProvider.notifier).submitProposal()
+                  : null,
+              icon: submitState.isLoading
+                  ? const SizedBox(
+                      width: 16, height: 16,
+                      child: CircularProgressIndicator(
+                          color: Colors.white, strokeWidth: 2))
+                  : const Icon(Icons.send, size: 18),
+              label: Text(submitState.isLoading ? 'Mengirim...' : 'Kirim Usulan',
+                  style: AppTypography.bodyMedium.copyWith(color: Colors.white)),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: _agreeCheck ? AppColors.primary800 : AppColors.outlineVariant,
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(AppRadius.button)),
+              ),
             ),
           ),
-          
           const SizedBox(height: AppSpacing.md),
           Center(
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              decoration: BoxDecoration(
-                color: const Color(0xFFE6EFFF),
-                borderRadius: BorderRadius.circular(4),
-              ),
-              child: Text(
-                'ID Proposal Sementara: #PR-2024-0012',
-                style: AppTypography.caption.copyWith(fontSize: 10, color: AppColors.primary800),
-              ),
+            child: TextButton.icon(
+              onPressed: _goPrev,
+              icon: const Icon(Icons.arrow_back, color: AppColors.primary800, size: 14),
+              label: Text('Edit Kandidat',
+                  style: AppTypography.bodyMedium
+                      .copyWith(color: AppColors.primary800, fontWeight: FontWeight.w600)),
             ),
           ),
           const SizedBox(height: AppSpacing.xxl),
@@ -560,292 +1050,41 @@ class _ProposalCreateScreenState extends State<ProposalCreateScreen> {
     );
   }
 
-  // ── Helpers ─────────────────────────────────────────────────────────────────
-  
-  Widget _buildInputField({required String label, required String hint, IconData? suffixIcon, String? helperText}) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(label, style: AppTypography.captionBold),
-        const SizedBox(height: AppSpacing.xs),
-        Container(
-          decoration: BoxDecoration(
-            border: Border.all(color: AppColors.outlineVariant),
-            borderRadius: BorderRadius.circular(AppRadius.input),
-          ),
-          child: TextFormField(
-            decoration: InputDecoration(
-              hintText: hint,
-              hintStyle: AppTypography.bodyText.copyWith(color: AppColors.outline),
-              suffixIcon: suffixIcon != null ? Icon(suffixIcon, color: AppColors.outline) : null,
-              border: InputBorder.none,
-              enabledBorder: InputBorder.none,
-              focusedBorder: InputBorder.none,
-              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-            ),
-          ),
-        ),
-        if (helperText != null) ...[
-          const SizedBox(height: 6),
-          Text(helperText, style: AppTypography.caption.copyWith(color: AppColors.textSecondary, fontStyle: FontStyle.italic)),
-        ],
-      ],
-    );
-  }
-
-  Widget _buildTextAreaField({required String label, required String hint, required String counterText}) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text(label, style: AppTypography.captionBold),
-            Text(counterText, style: AppTypography.caption.copyWith(color: AppColors.outline)),
-          ],
-        ),
-        const SizedBox(height: AppSpacing.xs),
-        Container(
-          decoration: BoxDecoration(
-            border: Border.all(color: AppColors.outlineVariant),
-            borderRadius: BorderRadius.circular(AppRadius.input),
-          ),
-          child: TextFormField(
-            maxLines: 4,
-            decoration: InputDecoration(
-              hintText: hint,
-              hintStyle: AppTypography.bodyText.copyWith(color: AppColors.outline),
-              border: InputBorder.none,
-              enabledBorder: InputBorder.none,
-              focusedBorder: InputBorder.none,
-              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildDateField({required String hint, required String suffixText}) {
-    return Container(
-      decoration: BoxDecoration(
-        border: Border.all(color: AppColors.outlineVariant),
-        borderRadius: BorderRadius.circular(AppRadius.input),
-      ),
+  Widget _summaryRow(String label, String value, {int maxLines = 2}) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
       child: Row(
-        children: [
-          const Padding(
-            padding: EdgeInsets.only(left: 16.0),
-            child: Icon(Icons.calendar_today_outlined, size: 18, color: AppColors.outline),
-          ),
-          Expanded(
-            child: TextFormField(
-              decoration: InputDecoration(
-                hintText: hint,
-                hintStyle: AppTypography.bodyText.copyWith(color: AppColors.outline),
-                border: InputBorder.none,
-                enabledBorder: InputBorder.none,
-                focusedBorder: InputBorder.none,
-                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
-              ),
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.only(right: 16.0),
-            child: Text(suffixText, style: AppTypography.captionBold.copyWith(color: AppColors.outline)),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildCandidateFormCard({
-    required String title,
-    required String nameVal,
-    required String nimVal,
-    String? status,
-    bool isVerified = false,
-    bool isError = false,
-    bool isDashed = false,
-  }) {
-    Color borderColor = Colors.transparent;
-    if (isError) borderColor = const Color(0xFFE53935);
-    if (isDashed) borderColor = AppColors.outlineVariant;
-
-    return Container(
-      padding: const EdgeInsets.all(AppSpacing.lg),
-      decoration: BoxDecoration(
-        color: isDashed ? Colors.transparent : Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: borderColor.withOpacity(isDashed ? 1 : 0.3)),
-      ),
-      child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(title, style: AppTypography.captionBold.copyWith(color: AppColors.outline)),
-              Icon(isDashed ? Icons.delete_outline : Icons.delete, color: isDashed ? AppColors.outline : const Color(0xFFE53935), size: 18),
-            ],
+          SizedBox(
+            width: 110,
+            child: Text(label,
+                style: AppTypography.caption.copyWith(color: AppColors.textSecondary)),
           ),
-          const SizedBox(height: AppSpacing.sm),
-          Text('NAMA LENGKAP', style: AppTypography.captionBold.copyWith(fontSize: 10, color: AppColors.outline)),
-          const SizedBox(height: 4),
-          Container(
-            decoration: BoxDecoration(
-              color: isDashed ? const Color(0xFFF9FAFB) : Colors.transparent,
-              border: Border.all(color: AppColors.outlineVariant),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: TextFormField(
-              initialValue: nameVal,
-              enabled: !isDashed,
-              decoration: const InputDecoration(
-                border: InputBorder.none,
-                enabledBorder: InputBorder.none,
-                focusedBorder: InputBorder.none,
-                contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-              ),
-            ),
+          Expanded(
+            child: Text(value,
+                style: AppTypography.captionBold,
+                maxLines: maxLines,
+                overflow: TextOverflow.ellipsis),
           ),
-          const SizedBox(height: AppSpacing.md),
-          Text('NOMOR INDUK MAHASISWA (NIM)', style: AppTypography.captionBold.copyWith(fontSize: 10, color: AppColors.outline)),
-          const SizedBox(height: 4),
-          Container(
-            decoration: BoxDecoration(
-              color: isDashed ? const Color(0xFFF9FAFB) : Colors.transparent,
-              border: Border.all(color: isError ? const Color(0xFFE53935) : AppColors.outlineVariant),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: TextFormField(
-              initialValue: nimVal,
-              enabled: !isDashed,
-              decoration: const InputDecoration(
-                border: InputBorder.none,
-                enabledBorder: InputBorder.none,
-                focusedBorder: InputBorder.none,
-                contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-              ),
-            ),
-          ),
-          if (status != null) ...[
-            const SizedBox(height: 8),
-            Row(
-              children: [
-                Icon(
-                  isVerified ? Icons.check_circle : Icons.error,
-                  color: isVerified ? const Color(0xFF009688) : const Color(0xFFE53935),
-                  size: 14,
-                ),
-                const SizedBox(width: 4),
-                Text(
-                  status,
-                  style: AppTypography.captionBold.copyWith(
-                    fontSize: 10,
-                    color: isVerified ? const Color(0xFF009688) : const Color(0xFFE53935),
-                  ),
-                ),
-              ],
-            ),
-          ],
         ],
       ),
     );
   }
 
-  Widget _buildSummaryItem(String label, String value) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(label, style: AppTypography.caption.copyWith(fontSize: 9, color: AppColors.textSecondary)),
-        const SizedBox(height: 2),
-        Text(value, style: AppTypography.bodyMedium.copyWith(fontWeight: FontWeight.w600, fontSize: 13, color: AppColors.primary800)),
-      ],
-    );
-  }
-
-  Widget _buildSummaryItemWithBadge(String label, String value, String badgeText) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(label, style: AppTypography.caption.copyWith(fontSize: 9, color: AppColors.textSecondary)),
-        const SizedBox(height: 2),
-        Row(
-          children: [
-            Text(value, style: AppTypography.bodyMedium.copyWith(fontWeight: FontWeight.w600, fontSize: 13, color: AppColors.primary800)),
-            const SizedBox(width: 8),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-              decoration: BoxDecoration(
-                color: AppColors.primary800,
-                borderRadius: BorderRadius.circular(4),
-              ),
-              child: Text(badgeText, style: AppTypography.captionBold.copyWith(fontSize: 8, color: Colors.white)),
-            ),
-          ],
+  Widget _primaryButton({required String label, required VoidCallback onTap}) {
+    return SizedBox(
+      width: double.infinity,
+      child: ElevatedButton(
+        onPressed: onTap,
+        style: ElevatedButton.styleFrom(
+          backgroundColor: AppColors.primary800,
+          padding: const EdgeInsets.symmetric(vertical: 14),
+          shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(AppRadius.button)),
         ),
-      ],
-    );
-  }
-
-  Widget _buildCandidateSummaryItem(String init, String name, String detail) {
-    return Row(
-      children: [
-        Container(
-          width: 36,
-          height: 36,
-          decoration: const BoxDecoration(
-            color: AppColors.primary800,
-            shape: BoxShape.circle,
-          ),
-          alignment: Alignment.center,
-          child: Text(init, style: AppTypography.captionBold.copyWith(color: Colors.white)),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(name, style: AppTypography.bodyMedium.copyWith(fontWeight: FontWeight.w700, color: AppColors.primary800)),
-              Text(detail, style: AppTypography.caption.copyWith(fontSize: 10, color: AppColors.textSecondary)),
-            ],
-          ),
-        ),
-        const Icon(Icons.info_outline, color: AppColors.outline, size: 20),
-      ],
-    );
-  }
-
-  Widget _buildPrimaryButton({required String text, required IconData icon, required VoidCallback onTap}) {
-    return InkWell(
-      onTap: onTap,
-      child: Container(
-        width: double.infinity,
-        padding: const EdgeInsets.symmetric(vertical: 16),
-        decoration: BoxDecoration(
-          color: AppColors.goldDark,
-          borderRadius: BorderRadius.circular(24),
-          gradient: const LinearGradient(
-            colors: [Color(0xFFD4A030), Color(0xFFB38622)],
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: AppColors.goldMid.withOpacity(0.3),
-              blurRadius: 8,
-              offset: const Offset(0, 4),
-            ),
-          ],
-        ),
-        alignment: Alignment.center,
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Text(text, style: AppTypography.bodyMedium.copyWith(color: Colors.white, fontWeight: FontWeight.w700)),
-            const SizedBox(width: 8),
-            Icon(icon, color: Colors.white, size: 18),
-          ],
-        ),
+        child: Text(label,
+            style: AppTypography.bodyMedium.copyWith(color: Colors.white)),
       ),
     );
   }

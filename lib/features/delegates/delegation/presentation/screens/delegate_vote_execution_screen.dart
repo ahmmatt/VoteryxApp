@@ -1,5 +1,7 @@
 // lib/features/delegates/delegation/presentation/screens/delegate_vote_execution_screen.dart
+import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:voteryxapp/features/delegates/delegation/application/delegate_vote_execution_provider.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../../core/constants/app_colors.dart';
@@ -111,7 +113,10 @@ class _DelegateVoteExecutionScreenState
                         child: _buildCandidateCard(
                           candidate: entry.value,
                           isSelected: entry.key == _selectedIndex,
-                          onTap: () => setState(() => _selectedIndex = entry.key),
+                          onTap: () {
+                            setState(() => _selectedIndex = entry.key);
+                            ref.read(delegateVoteExecutionProvider.notifier).selectCandidate(entry.value.id, entry.value.name);
+                          },
                         ),
                       );
                     }),
@@ -119,7 +124,7 @@ class _DelegateVoteExecutionScreenState
 
                     // 4. Konfirmasi + swipe
                     if (_selectedIndex >= 0 && _selectedIndex < candidates.length)
-                      _buildConfirmationSection(candidates[_selectedIndex], totalWeight)
+                      _buildConfirmationSection(candidates[_selectedIndex], totalWeight, data.urgentElectionId ?? '')
                     else
                       Center(
                         child: Padding(
@@ -387,21 +392,10 @@ class _DelegateVoteExecutionScreenState
                   width: 2,
                 ),
                 color: AppColors.outlineVariant.withValues(alpha: 0.3),
-                image: photoUrl != null && photoUrl.startsWith('http')
-                    ? DecorationImage(image: NetworkImage(photoUrl), fit: BoxFit.cover)
-                    : null,
               ),
-              child: photoUrl == null || !photoUrl.startsWith('http')
-                  ? Center(
-                      child: Text(
-                        '${candidate.candidateNumber}',
-                        style: AppTypography.bodyMedium.copyWith(
-                          color: AppColors.primary900,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    )
-                  : null,
+              child: ClipOval(
+                child: _buildCandidateAvatar(candidate.photoUrl, candidate.candidateNumber.toString(), isSelected),
+              ),
             ),
             const SizedBox(width: 14),
             // Name + vision
@@ -455,8 +449,48 @@ class _DelegateVoteExecutionScreenState
     );
   }
 
+  Widget _buildCandidateAvatar(String? avatarUrl, String fallbackNumber, bool isSelected) {
+    if (avatarUrl == null || avatarUrl.isEmpty) {
+      return Center(
+        child: Text(
+          fallbackNumber,
+          style: AppTypography.bodyMedium.copyWith(
+            color: AppColors.primary900,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+      );
+    }
+    
+    try {
+      if (avatarUrl.startsWith('data:image')) {
+        final base64Str = avatarUrl.split(',').last;
+        final normalized = base64.normalize(base64Str.replaceAll(RegExp(r'\s+'), ''));
+        return Image.memory(
+          base64Decode(normalized),
+          fit: BoxFit.cover,
+        );
+      } else {
+        return Image.network(
+          avatarUrl,
+          fit: BoxFit.cover,
+        );
+      }
+    } catch (_) {
+      return Center(
+        child: Text(
+          fallbackNumber,
+          style: AppTypography.bodyMedium.copyWith(
+            color: AppColors.primary900,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+      );
+    }
+  }
+
   // ─────────────────── Confirmation + Swipe ───────────────────────
-  Widget _buildConfirmationSection(DelegateCandidateItem selected, int totalWeight) {
+  Widget _buildConfirmationSection(DelegateCandidateItem selected, int totalWeight, String electionId) {
     return Column(
       children: [
         Text(
@@ -529,12 +563,12 @@ class _DelegateVoteExecutionScreenState
         ),
         const SizedBox(height: 24),
         // Swipe to lock
-        _buildSwipeButton(totalWeight),
+        _buildSwipeButton(totalWeight, electionId),
       ],
     );
   }
 
-  Widget _buildSwipeButton(int totalWeight) {
+  Widget _buildSwipeButton(int totalWeight, String electionId) {
     const double height = 64.0;
     const double thumbSize = 56.0;
 
@@ -574,9 +608,14 @@ class _DelegateVoteExecutionScreenState
                       _sliderProgress = ((_sliderProgress * maxDrag + details.delta.dx) / maxDrag).clamp(0.0, 1.0);
                     });
                   },
-                  onHorizontalDragEnd: (_) {
+                  onHorizontalDragEnd: (_) async {
                     if (_sliderProgress > 0.75) {
+                      final notifier = ref.read(delegateVoteExecutionProvider.notifier);
+                      notifier.setTotalWeight(totalWeight);
+                      
                       context.pushNamed('delegate-vote-processing');
+                      
+                      await notifier.executeDelegateVote(electionId: electionId);
                     } else {
                       setState(() => _sliderProgress = 0.0);
                     }

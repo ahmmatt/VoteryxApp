@@ -13,6 +13,14 @@ class Delegate {
     this.delegationCount = 0,
     this.photoUrl,
     this.specialization,
+    this.trackRecords = const [],
+    this.skills = const [],
+    // Kolom dari tabel delegate_applications
+    this.expertise,
+    this.bio,
+    this.trackRecord,
+    this.portfolioUrl,
+    this.nim,
   });
 
   final String id;
@@ -24,6 +32,28 @@ class Delegate {
   final int delegationCount;
   final String? photoUrl;
   final String? specialization;
+
+  /// Track record delegator: [{year, title, description}] dari kolom JSONB
+  final List<Map<String, dynamic>> trackRecords;
+
+  /// Keahlian delegator dari kolom array
+  final List<String> skills;
+
+  // ── Kolom dari tabel delegate_applications ─────────────────────
+  /// Bidang keahlian delegator (teks), mis. "Akademik & Kurikulum"
+  final String? expertise;
+
+  /// Bio delegator (teks singkat)
+  final String? bio;
+
+  /// Riwayat / track record delegator (teks panjang)
+  final String? trackRecord;
+
+  /// URL portfolio delegator
+  final String? portfolioUrl;
+
+  /// NIM delegator (jika mahasiswa)
+  final String? nim;
 
   /// Inisial untuk avatar fallback.
   String get initials {

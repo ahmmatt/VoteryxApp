@@ -15,7 +15,7 @@ class ElectionRepository {
     final response = await _client
         .from('elections')
         .select('*, candidates(count), votes(count)')
-        .filter('status', 'in', '("live","scheduled")')
+        .inFilter('status', ['live', 'scheduled'])
         .order('start_date', ascending: true);
 
     return (response as List)
@@ -45,27 +45,67 @@ class ElectionRepository {
         .eq('id', electionId)
         .single();
 
-    // Ambil kandidat election
-    final candidatesData = await _client
-        .from('candidates')
-        .select('*')
-        .eq('election_id', electionId)
-        .order('candidate_number', ascending: true);
+    // Coba join dengan users untuk mendapatkan avatar_url sebagai fallback
+    List<dynamic> candidatesData;
+    try {
+      candidatesData = await _client
+          .from('candidates')
+          .select('*, users(avatar_url)')
+          .eq('election_id', electionId)
+          .order('candidate_number', ascending: true);
+    } catch (_) {
+      candidatesData = await _client
+          .from('candidates')
+          .select('*')
+          .eq('election_id', electionId)
+          .order('candidate_number', ascending: true);
+    }
 
     // Ambil vote count
-    final voteCount = await _client
+    int voteCount = await _client
         .from('votes')
         .count(CountOption.exact)
         .eq('election_id', electionId);
 
+    int candVoteSum = 0;
+    // Untuk setiap kandidat yang tidak punya photo_url, coba ambil avatar dari users
+    final resolvedCandidates = <Map<String, dynamic>>[];
+    for (final c in candidatesData as List) {
+      final cMap = Map<String, dynamic>.from(c as Map);
+      candVoteSum += (cMap['vote_count'] as num?)?.toInt() ?? 0;
+
+      final hasPhoto = (cMap['photo_url'] as String?)?.isNotEmpty ?? false;
+      final hasAvatarFromJoin = (cMap['users'] as Map<String, dynamic>?)?['avatar_url'] != null;
+      if (!hasPhoto && !hasAvatarFromJoin) {
+        final userId = cMap['user_id'] as String?;
+        if (userId != null) {
+          try {
+            final userRow = await _client
+                .from('users')
+                .select('avatar_url')
+                .eq('id', userId)
+                .maybeSingle();
+            if (userRow != null && userRow['avatar_url'] != null) {
+              cMap['users'] = {'avatar_url': userRow['avatar_url']};
+            }
+          } catch (_) {}
+        }
+      }
+      resolvedCandidates.add(cMap);
+    }
+
+    if (candVoteSum > voteCount) {
+      voteCount = candVoteSum;
+    }
+
     final election = ElectionModel.fromJson({
       ...electionData,
-      'candidates': candidatesData,
+      'candidates': resolvedCandidates,
       'votes': {'count': voteCount},
     });
 
-    final candidates = (candidatesData as List)
-        .map((c) => CandidateModel.fromJson(c as Map<String, dynamic>))
+    final candidates = resolvedCandidates
+        .map((c) => CandidateModel.fromJson(c))
         .toList();
 
     return {'election': election, 'candidates': candidates};
@@ -73,16 +113,46 @@ class ElectionRepository {
 
   // ─── Candidates ───────────────────────────────────────────────────────────
 
-  /// Ambil detail satu kandidat.
+  /// Ambil detail satu kandidat (dengan fallback foto dari users).
   Future<Candidate?> getCandidateDetail(String candidateId) async {
-    final response = await _client
-        .from('candidates')
-        .select('*')
-        .eq('id', candidateId)
-        .maybeSingle();
+    Map<String, dynamic>? response;
+    try {
+      response = await _client
+          .from('candidates')
+          .select('*, users(avatar_url)')
+          .eq('id', candidateId)
+          .maybeSingle();
+    } catch (_) {
+      response = await _client
+          .from('candidates')
+          .select('*')
+          .eq('id', candidateId)
+          .maybeSingle();
+    }
 
     if (response == null) return null;
-    return CandidateModel.fromJson(response);
+
+    // Jika photo_url kosong dan ada user_id, coba ambil avatar_url dari users
+    final hasPhoto = (response['photo_url'] as String?)?.isNotEmpty ?? false;
+    final hasAvatarFromJoin = (response['users'] as Map<String, dynamic>?)?['avatar_url'] != null;
+    if (!hasPhoto && !hasAvatarFromJoin) {
+      final userId = response['user_id'] as String?;
+      if (userId != null) {
+        try {
+          final userRow = await _client
+              .from('users')
+              .select('avatar_url')
+              .eq('id', userId)
+              .maybeSingle();
+          if (userRow != null && userRow['avatar_url'] != null) {
+            response = Map<String, dynamic>.from(response!)
+              ..['users'] = {'avatar_url': userRow['avatar_url']};
+          }
+        } catch (_) {}
+      }
+    }
+
+    return CandidateModel.fromJson(response!);
   }
 
   // ─── User Participation Status ────────────────────────────────────────────
@@ -93,6 +163,19 @@ class ElectionRepository {
         .from('votes')
         .select('election_id')
         .eq('voter_id', userId);
+
+    return (response as List)
+        .map((e) => e['election_id'] as String)
+        .toSet();
+  }
+
+  /// Ambil semua election_id yang sudah didelegasikan user.
+  Future<Set<String>> getUserDelegatedElectionIds(String userId) async {
+    final response = await _client
+        .from('delegations')
+        .select('election_id')
+        .eq('delegator_id', userId)
+        .eq('status', 'active');
 
     return (response as List)
         .map((e) => e['election_id'] as String)
@@ -150,5 +233,40 @@ class ElectionRepository {
         .eq('status', 'active')
         .limit(1);
     return (response as List).isNotEmpty;
+  }
+
+  /// Ambil daftar election_id di mana user memiliki mandat sebagai delegate.
+  Future<List<String>> getMandateElectionIds(String userId) async {
+    final response = await _client
+        .from('delegations')
+        .select('election_id')
+        .eq('delegate_id', userId)
+        .eq('status', 'active');
+    
+    return (response as List)
+        .map((e) => e['election_id'] as String)
+        .toSet()
+        .toList();
+  }
+
+  /// Ambil riwayat/info delegasi user pada pemilihan tertentu.
+  Future<Map<String, dynamic>?> getDelegationInfo(String electionId, String userId) async {
+    final response = await _client
+        .from('delegations')
+        .select('id, delegate_id, users!delegations_delegate_id_fkey(full_name, avatar_url)')
+        .eq('election_id', electionId)
+        .eq('delegator_id', userId)
+        .eq('status', 'active')
+        .maybeSingle();
+
+    if (response == null) return null;
+    
+    final delegateUser = response['users'] as Map<String, dynamic>?;
+    return {
+      'delegation_id': response['id'],
+      'delegate_id': response['delegate_id'],
+      'delegate_name': delegateUser?['full_name'] ?? 'Unknown Delegate',
+      'delegate_photo_url': delegateUser?['avatar_url'] ?? delegateUser?['photo_url'],
+    };
   }
 }

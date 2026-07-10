@@ -1,7 +1,9 @@
-// lib/features/delegation/presentation/screens/delegate_vote_processing_screen.dart
+// lib/features/delegates/delegation/presentation/screens/delegate_vote_processing_screen.dart
 import 'dart:math';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:voteryxapp/features/delegates/delegation/application/delegate_vote_execution_provider.dart';
 import '../../../../../core/constants/app_colors.dart';
 import '../../../../../core/constants/app_spacing.dart';
 import '../../../../../core/constants/app_typography.dart';
@@ -10,16 +12,16 @@ import '../../../../../core/constants/app_radius.dart';
 /// Layar animasi pemrosesan / enkripsi suara.
 /// Menampilkan hash latar, progress step, dan badge batch ID.
 /// Otomatis navigate ke halaman sukses setelah 3 detik.
-class DelegateVoteProcessingScreen extends StatefulWidget {
+class DelegateVoteProcessingScreen extends ConsumerStatefulWidget {
   const DelegateVoteProcessingScreen({super.key});
 
   @override
-  State<DelegateVoteProcessingScreen> createState() =>
+  ConsumerState<DelegateVoteProcessingScreen> createState() =>
       _DelegateVoteProcessingScreenState();
 }
 
 class _DelegateVoteProcessingScreenState
-    extends State<DelegateVoteProcessingScreen>
+    extends ConsumerState<DelegateVoteProcessingScreen>
     with TickerProviderStateMixin {
   late final AnimationController _rotateController;
   late final AnimationController _progressController;
@@ -55,6 +57,9 @@ class _DelegateVoteProcessingScreenState
 
   @override
   Widget build(BuildContext context) {
+    final state = ref.watch(delegateVoteExecutionProvider);
+    final int weight = state.totalWeight > 0 ? state.totalWeight : 47; // fallback
+    
     return Scaffold(
       backgroundColor: AppColors.background,
       body: Stack(
@@ -72,7 +77,7 @@ class _DelegateVoteProcessingScreenState
                 children: [
                   const SizedBox(height: 24),
                   // Animated lock icon
-                  _buildAnimatedLock(),
+                  _buildAnimatedLock(weight),
                   const SizedBox(height: 40),
                   // Title
                   Text(
@@ -94,10 +99,10 @@ class _DelegateVoteProcessingScreenState
                   ),
                   const SizedBox(height: 40),
                   // Progress steps card
-                  _buildProgressCard(),
+                  _buildProgressCard(weight),
                   const Spacer(),
                   // Batch hash footer
-                  _buildBatchHashFooter(),
+                  _buildBatchHashFooter(weight),
                   const SizedBox(height: 16),
                 ],
               ),
@@ -146,7 +151,7 @@ class _DelegateVoteProcessingScreenState
   }
 
   // ─────────────────── Animated Lock Icon ────────────────────────
-  Widget _buildAnimatedLock() {
+  Widget _buildAnimatedLock(int weight) {
     return SizedBox(
       width: 200,
       height: 200,
@@ -215,7 +220,7 @@ class _DelegateVoteProcessingScreenState
                     border: Border.all(color: Colors.white, width: 2),
                   ),
                   child: Text(
-                    '×47',
+                    '×$weight',
                     style: AppTypography.captionBold.copyWith(
                       color: AppColors.primary900,
                       fontSize: 10,
@@ -231,7 +236,7 @@ class _DelegateVoteProcessingScreenState
   }
 
   // ─────────────────── Progress Steps Card ───────────────────────
-  Widget _buildProgressCard() {
+  Widget _buildProgressCard(int weight) {
     return Container(
       padding: const EdgeInsets.all(AppSpacing.xl),
       decoration: BoxDecoration(
@@ -252,7 +257,7 @@ class _DelegateVoteProcessingScreenState
             icon: Icons.check_circle_outline_rounded,
             iconColor: const Color(0xFF10B981),
             iconBg: const Color(0xFFD1FAE5),
-            title: 'Menganonimkan 47 identitas...',
+            title: 'Menganonimkan $weight identitas...',
             subtitle: 'Berhasil',
             subtitleColor: const Color(0xFF10B981),
             isDone: true,
@@ -261,7 +266,7 @@ class _DelegateVoteProcessingScreenState
           const Divider(height: 1, color: AppColors.outlineVariant),
           const SizedBox(height: 20),
           // Step 2 — in progress
-          _buildProgressStep(),
+          _buildProgressStep(weight),
           const SizedBox(height: 20),
           const Divider(height: 1, color: AppColors.outlineVariant),
           const SizedBox(height: 20),
@@ -326,7 +331,7 @@ class _DelegateVoteProcessingScreenState
     );
   }
 
-  Widget _buildProgressStep() {
+  Widget _buildProgressStep(int weight) {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -348,7 +353,7 @@ class _DelegateVoteProcessingScreenState
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'Mengenkripsi 47 suara...',
+                'Mengenkripsi $weight suara...',
                 style: AppTypography.bodyMedium.copyWith(
                   color: AppColors.primary900,
                   fontWeight: FontWeight.w700,
@@ -378,7 +383,7 @@ class _DelegateVoteProcessingScreenState
   }
 
   // ─────────────────── Batch Hash Footer ─────────────────────────
-  Widget _buildBatchHashFooter() {
+  Widget _buildBatchHashFooter(int weight) {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
@@ -399,7 +404,7 @@ class _DelegateVoteProcessingScreenState
           ),
           const SizedBox(height: 4),
           Text(
-            'BATCH-e3b0c482...×47',
+            'BATCH-e3b0c482...×$weight',
             style: AppTypography.captionBold.copyWith(
               color: AppColors.goldDark,
               fontSize: 12,
