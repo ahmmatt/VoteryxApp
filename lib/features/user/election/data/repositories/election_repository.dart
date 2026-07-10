@@ -61,17 +61,37 @@ class ElectionRepository {
           .order('candidate_number', ascending: true);
     }
 
-    // Ambil vote count
-    int voteCount = await _client
-        .from('votes')
-        .count(CountOption.exact)
-        .eq('election_id', electionId);
+    // Ambil data suara real dari tabel votes
+    int totalRealVotes = 0;
+    Map<String, int> candVotes = {};
+    try {
+      final votesResp = await _client
+          .from('votes')
+          .select('candidate_id, encrypted_choice, vote_weight')
+          .eq('election_id', electionId);
+          
+      for (var v in (votesResp as List)) {
+        final weight = (v['vote_weight'] as num?)?.toInt() ?? 1;
+        totalRealVotes += weight;
+        final cId = (v['candidate_id'] ?? v['encrypted_choice'])?.toString() ?? '';
+        if (cId.isNotEmpty) {
+          candVotes[cId] = (candVotes[cId] ?? 0) + weight;
+        }
+      }
+    } catch (_) {}
 
     int candVoteSum = 0;
     // Untuk setiap kandidat yang tidak punya photo_url, coba ambil avatar dari users
     final resolvedCandidates = <Map<String, dynamic>>[];
     for (final c in candidatesData as List) {
       final cMap = Map<String, dynamic>.from(c as Map);
+      
+      // Update vote_count dengan real votes
+      final cId = cMap['id']?.toString() ?? '';
+      final dbCount = (cMap['vote_count'] as num?)?.toInt() ?? 0;
+      final realCount = candVotes[cId] ?? 0;
+      cMap['vote_count'] = realCount > dbCount ? realCount : dbCount;
+      
       candVoteSum += (cMap['vote_count'] as num?)?.toInt() ?? 0;
 
       final hasPhoto = (cMap['photo_url'] as String?)?.isNotEmpty ?? false;
@@ -94,14 +114,23 @@ class ElectionRepository {
       resolvedCandidates.add(cMap);
     }
 
-    if (candVoteSum > voteCount) {
-      voteCount = candVoteSum;
-    }
+    int finalVoteCount = totalRealVotes > candVoteSum ? totalRealVotes : candVoteSum;
+    
+    // Perbarui participation_rate dan pastikan estimated_voters valid berdasarkan jumlah user terdaftar
+    int totalUsers = 0;
+    try {
+      totalUsers = await _client.from('users').count(CountOption.exact);
+    } catch (_) {}
+
+    int estimatedVoters = totalUsers > 0 ? totalUsers : ((electionData['estimated_voters'] as num?)?.toInt() ?? 100);
+    if (estimatedVoters <= 0) estimatedVoters = 100;
+    electionData['estimated_voters'] = estimatedVoters;
+    electionData['participation_rate'] = finalVoteCount / estimatedVoters;
 
     final election = ElectionModel.fromJson({
       ...electionData,
       'candidates': resolvedCandidates,
-      'votes': {'count': voteCount},
+      'votes': {'count': finalVoteCount},
     });
 
     final candidates = resolvedCandidates
@@ -149,6 +178,28 @@ class ElectionRepository {
               ..['users'] = {'avatar_url': userRow['avatar_url']};
           }
         } catch (_) {}
+      }
+    }
+
+    // Ambil data suara real dari tabel votes
+    final electionId = response!['election_id'] as String?;
+    if (electionId != null) {
+      try {
+        final votesResp = await _client
+            .from('votes')
+            .select('candidate_id, encrypted_choice, vote_weight')
+            .eq('election_id', electionId);
+        int realVotes = 0;
+        for (var v in (votesResp as List)) {
+          final cId = (v['candidate_id'] ?? v['encrypted_choice'])?.toString() ?? '';
+          if (cId == candidateId) {
+            realVotes += (v['vote_weight'] as num?)?.toInt() ?? 1;
+          }
+        }
+        final dbVotes = (response!['vote_count'] as num?)?.toInt() ?? 0;
+        response!['vote_count'] = realVotes > dbVotes ? realVotes : dbVotes;
+      } catch (e) {
+        print('Error fetching candidate votes: $e');
       }
     }
 

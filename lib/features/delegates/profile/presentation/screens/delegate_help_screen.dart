@@ -37,10 +37,6 @@ class _DelegateHelpScreenState extends State<DelegateHelpScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Search Bar
-            _buildSearchBar(),
-            const SizedBox(height: AppSpacing.xl),
-
             // Kategori Populer
             Text(
               'Kategori Populer',

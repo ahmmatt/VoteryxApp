@@ -52,6 +52,27 @@ class _AdminElectionLiveDetailScreenState
             .select('*')
             .eq('election_id', widget.electionId!)
             .order('candidate_number', ascending: true);
+            
+        final votesResp = await SupabaseConfig.client
+            .from('votes')
+            .select('candidate_id, encrypted_choice, vote_weight')
+            .eq('election_id', widget.electionId!);
+            
+        Map<String, int> candVotes = {};
+        for (var v in (votesResp as List)) {
+          final cId = (v['candidate_id'] ?? v['encrypted_choice'])?.toString() ?? '';
+          final weight = (v['vote_weight'] as num?)?.toInt() ?? 1;
+          if (cId.isNotEmpty) {
+            candVotes[cId] = (candVotes[cId] ?? 0) + weight;
+          }
+        }
+        
+        for (var i = 0; i < resp.length; i++) {
+          final cId = resp[i]['id']?.toString() ?? '';
+          final dbCount = (resp[i]['vote_count'] as num?)?.toInt() ?? 0;
+          final realCount = candVotes[cId] ?? 0;
+          resp[i]['vote_count'] = realCount > dbCount ? realCount : dbCount;
+        }
       }
       _candidates = List<Map<String, dynamic>>.from(resp);
     } catch (_) {
@@ -103,8 +124,6 @@ class _AdminElectionLiveDetailScreenState
         (x) => x['id']?.toString() == widget.electionId || x['title']?.toString() == displayTitle,
         orElse: () => stats.activeElections.first,
       );
-      localPctVal = (match['percentage'] as num?)?.toDouble() ?? 0.0;
-      localPctVal = localPctVal / 100.0; // Convert to 0.0 - 1.0 range for UI
       if (match.containsKey('hourly_rates')) {
         localHourlyRates = List<double>.from(match['hourly_rates']);
       }
@@ -112,6 +131,14 @@ class _AdminElectionLiveDetailScreenState
     }
 
     if (currentEstimatedVoters <= 0) currentEstimatedVoters = 100;
+    
+    // Hitung ulang partisipasi berdasarkan real votes (localVotes)
+    localPctVal = (localVotes / currentEstimatedVoters).clamp(0.0, 1.0);
+    
+    // Perbarui chart rate terakhir agar sinkron
+    if (localHourlyRates.isNotEmpty) {
+      localHourlyRates[localHourlyRates.length - 1] = localPctVal * 100;
+    }
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -174,7 +201,7 @@ class _AdminElectionLiveDetailScreenState
             child: TabBarView(
               controller: _tabController,
               children: [
-                _buildCandidatesTab(context, stats, numberFormat, localVotes),
+                _buildCandidatesTab(context, stats, numberFormat, localVotes, currentEstimatedVoters),
                 _buildRealCountMonitorTab(context, stats, numberFormat, displayTitle, localVotes, localPctVal, currentEstimatedVoters, localHourlyRates),
               ],
             ),
@@ -190,6 +217,7 @@ class _AdminElectionLiveDetailScreenState
     AdminDashboardStats stats,
     NumberFormat numberFormat,
     int localVotes,
+    int currentEstimatedVoters,
   ) {
     if (_isLoadingCandidates) {
       return const Center(child: CircularProgressIndicator(color: AppColors.primary800));
@@ -267,8 +295,8 @@ class _AdminElectionLiveDetailScreenState
               final votesText = '${numberFormat.format(votesNum)} Suara';
               
               double progress = 0.0;
-              if (localVotes > 0 && votesNum > 0) {
-                progress = (votesNum / localVotes).toDouble().clamp(0.0, 1.0);
+              if (currentEstimatedVoters > 0 && votesNum > 0) {
+                progress = (votesNum / currentEstimatedVoters).toDouble().clamp(0.0, 1.0);
               } else if (cand['percentage'] != null) {
                 final pctStr = cand['percentage'].toString().replaceAll('%', '');
                 progress = (double.tryParse(pctStr) ?? 0.0) / 100.0;

@@ -1,6 +1,7 @@
 // lib/features/admin/dashboard/presentation/providers/admin_dashboard_provider.dart
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:voteryxapp/core/network/supabase_client.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:voteryxapp/features/auth/data/mock/mock_ktp_database.dart';
 import 'package:voteryxapp/features/delegates/delegation/application/delegate_application_provider.dart';
 
@@ -76,8 +77,7 @@ class AdminDashboardController extends StateNotifier<AdminDashboardStats> {
       // 1. Ambil jumlah DPT murni (Total User Terdaftar) dari tabel users di Supabase
       int dbUsersCount = 0;
       try {
-        final usersResp = await SupabaseConfig.client.from('users').select('id');
-        dbUsersCount = (usersResp as List).length;
+        dbUsersCount = await SupabaseConfig.client.from('users').count(CountOption.exact);
       } catch (_) {}
       final int computedDpt = dbUsersCount;
 
@@ -191,8 +191,8 @@ class AdminDashboardController extends StateNotifier<AdminDashboardStats> {
           final endDateStr = e['end_date']?.toString();
           final startDateStr = e['start_date']?.toString();
 
-          // Hitung rate spesifik per pemilihan
-          final estimatedVoters = (e['estimated_voters'] as num?)?.toInt() ?? 0;
+          // Hitung rate spesifik per pemilihan menggunakan total users (computedDpt)
+          final estimatedVoters = computedDpt > 0 ? computedDpt : ((e['estimated_voters'] as num?)?.toInt() ?? 100);
           int electionVotes = votesPerElection[id] ?? 0;
           final candVotes = candidateVotesPerElection[id] ?? 0;
           if (candVotes > electionVotes) {

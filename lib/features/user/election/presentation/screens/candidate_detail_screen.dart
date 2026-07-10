@@ -52,6 +52,9 @@ class _CandidateDetailScreenState extends ConsumerState<CandidateDetailScreen>
         ? ref.watch(proposalCandidateDetailProvider(widget.candidateId))
         : ref.watch(candidateDetailProvider(widget.candidateId));
 
+    final electionAsync = ref.watch(electionDetailProvider(widget.electionId));
+    final electionData = electionAsync.valueOrNull;
+
     return candidateAsync.when(
       loading: () => Scaffold(
         backgroundColor: AppColors.background,
@@ -167,7 +170,7 @@ class _CandidateDetailScreenState extends ConsumerState<CandidateDetailScreen>
                     _buildVisiMisiTab(candidate),
                     _buildTrackRecordTab(candidate),
                     _buildProgramKerjaTab(candidate),
-                    _buildStatistikTab(candidate),
+                    _buildStatistikTab(candidate, electionData?.election),
                   ],
                 ),
               ),
@@ -520,11 +523,19 @@ class _CandidateDetailScreenState extends ConsumerState<CandidateDetailScreen>
     );
   }
 
-  Widget _buildStatistikTab(Candidate candidate) {
+  Widget _buildStatistikTab(Candidate candidate, Election? election) {
     // If it's a proposal, there are no stats yet
     final int dukungan = candidate.voteCount;
-    // For now, if Dukungan is 0, percentage is 0. If we had total voters, we could calculate it properly.
-    final double percentage = dukungan > 0 ? 0.0 : 0.0; 
+    
+    // Hitung Sentimen (dukungan dari total estimasi pemilih)
+    final int estimasiPemilih = election?.estimatedVoters ?? 100;
+    final double percentage = estimasiPemilih > 0 ? (dukungan / estimasiPemilih).clamp(0.0, 1.0) : 0.0;
+    
+    // Hitung Partisipasi (total suara masuk dari estimasi pemilih)
+    final double partisipasi = election?.participationRate ?? 0.0;
+    final String partisipasiText = election != null && election.estimatedVoters > 0
+        ? '${(partisipasi * 100).toStringAsFixed(1)}%'
+        : '-'; 
 
     return ListView(
       padding: const EdgeInsets.fromLTRB(24, 24, 24, 120),
@@ -593,7 +604,7 @@ class _CandidateDetailScreenState extends ConsumerState<CandidateDetailScreen>
                           style: AppTypography.captionBold
                               .copyWith(color: AppColors.textSecondary)),
                       const SizedBox(height: 4),
-                      Text('-', style: AppTypography.screenTitle),
+                      Text(partisipasiText, style: AppTypography.screenTitle),
                     ],
                   ),
                 ],

@@ -26,8 +26,6 @@ class HelpScreen extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _buildSearchBar(),
-            const SizedBox(height: AppSpacing.lg),
             _buildBanner(),
             const SizedBox(height: AppSpacing.xl),
             
